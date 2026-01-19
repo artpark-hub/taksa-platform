@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package organization.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "go-service/api/organization/v1;v1";
+
+// OrganizationService manages organizations and users
+service OrganizationService {
+  // RegisterMasterUser creates a new organization with a master user
+  rpc RegisterMasterUser (RegisterMasterUserRequest) returns (RegisterMasterUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/master_user"
+      body: "*"
+    };
+  }
+  
+  // GetJWTToken exchanges session for JWT token
+  rpc GetJWTToken (GetJWTTokenRequest) returns (GetJWTTokenResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/um/token"
+    };
+  }
+  
+  // CreateSubUser creates a sub-user under the authenticated user's organization
+  rpc CreateSubUser (CreateSubUserRequest) returns (CreateSubUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/user"
+      body: "*"
+    };
+  }
+}
+
+// --- Request/Response Messages ---
+
+message RegisterMasterUserRequest {
+  string email = 1;
+  string password = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string organization_name = 5;
+}
+
+message RegisterMasterUserResponse {
+  OrganizationData data = 1;
+  ResponseMeta meta = 2;
+}
+
+message GetJWTTokenRequest {
+  // Empty - session comes from cookie/header
+}
+
+message GetJWTTokenResponse {
+  TokenData data = 1;
+  ResponseMeta meta = 2;
+}
+
+message CreateSubUserRequest {
+  string email = 1;
+  string password = 2;
+  string first_name = 3;
+  string last_name = 4;
+}
+
+message CreateSubUserResponse {
+  UserData data = 1;
+  ResponseMeta meta = 2;
+}
+
+// Data structures
+message OrganizationData {
+  string identity_id = 1;
+  string organization_id = 2;
+  string status = 3;
+}
+
+message TokenData {
+  string jwt_token = 1;
+  string organization_id = 2;
+  string email = 3;
+  string role = 4;
+}
+
+message UserData {
+  string identity_id = 1;
+  string organization_id = 2;
+}
+
+message ResponseMeta {
+  string request_id = 1;
+  string timestamp = 2;
+}
