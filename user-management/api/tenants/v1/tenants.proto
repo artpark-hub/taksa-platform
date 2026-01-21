@@ -101,6 +101,7 @@ message ListSubUsersRequest {}
 
 message ListSubUsersResponse {
   repeated UserSummary users = 1;
+  //repeated cause we want the same structure to be followed for every sub user in the list. If it was not given as repeated then it would have taken only one users details instead of taking all the sub users details.  
   ResponseMeta meta = 2;
 }
 
@@ -120,6 +121,7 @@ message OrganizationData {
   string identity_id = 1;
   string organization_name = 2;
   string status = 3;
+  //this status field stores the status of the user (a field given by kratos) and the values which they will be storing are active/inactive
 }
 
 message TokenData {
