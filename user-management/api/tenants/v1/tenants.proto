@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package organization.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "user-management/api/tenants/v1;v1";
+
+service OrganizationService {
+  
+  // 1. RegisterMasterUser
+  // Input: Master User Details + Organization Name
+  // Logic: Creates Kratos identity (role="master", traits.org=organization_name)
+  rpc RegisterMasterUser (RegisterMasterUserRequest) returns (RegisterMasterUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/master_user"
+      body: "*"
+    };
+  }
+  
+  // 2. GetJWTToken
+  // Logic: Exchanges Kratos session for Oathkeeper JWT.
+  // Returns: ONLY the JWT token.
+  rpc GetJWTToken (GetJWTTokenRequest) returns (GetJWTTokenResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/um/token"
+    };
+  }
+  
+  // 3. CreateSubUser
+  // Input: User Details (No Org, No Role)
+  // Logic: Backend extracts Org from JWT -> Creates Kratos identity (role="sub", traits.org=extracted_org)
+  rpc CreateSubUser (CreateSubUserRequest) returns (CreateSubUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/user"
+      body: "*"
+    };
+  }
+
+  // 4. ListSubUsers
+  // Input: Empty (uses JWT)
+  // Logic: Backend extracts Org from JWT -> Lists users where traits.org matches and role="sub"
+  rpc ListSubUsers (ListSubUsersRequest) returns (ListSubUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/um/users"
+    };
+  }
+
+  // 5. DeleteSubUser
+  // Input: Identity ID
+  rpc DeleteSubUser (DeleteUserRequest) returns (DeleteUserResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/um/user/{identity_id}"
+    };
+  }
+
+  // 6. DeleteMasterUser
+  // Input: Identity ID
+  rpc DeleteMasterUser (DeleteUserRequest) returns (DeleteUserResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/um/master_user/{identity_id}"
+    };
+  }
+}
+
+// --- Request/Response Messages ---
+
+message RegisterMasterUserRequest {
+  string email = 1;
+  string password = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string organization_name = 5;
+}
+
+message RegisterMasterUserResponse {
+  OrganizationData data = 1;
+  ResponseMeta meta = 2;
+}
+
+message GetJWTTokenRequest {}
+
+message GetJWTTokenResponse {
+  TokenData data = 1;
+  ResponseMeta meta = 2;
+}
+
+message CreateSubUserRequest {
+  string email = 1;
+  string password = 2;
+  string first_name = 3;
+  string last_name = 4;
+}
+
+message CreateSubUserResponse {
+  UserData data = 1;
+  ResponseMeta meta = 2;
+}
+
+message ListSubUsersRequest {}
+
+message ListSubUsersResponse {
+  repeated UserSummary users = 1;
+  ResponseMeta meta = 2;
+}
+
+message DeleteUserRequest {
+  string identity_id = 1;
+}
+
+message DeleteUserResponse {
+  string status = 1;
+  string message = 2;
+  ResponseMeta meta = 3;
+}
+
+// --- Data Structures ---
+
+message OrganizationData {
+  string identity_id = 1;
+  string organization_name = 2;
+  string status = 3;
+}
+
+message TokenData {
+  string jwt_token = 1;
+}
+
+message UserData {
+  string identity_id = 1;
+  string organization_name = 2;
+}
+
+message UserSummary {
+  string identity_id = 1;
+  string email = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string organization_name = 5;
+}
+
+message ResponseMeta {
+  string timestamp = 1;
+}
