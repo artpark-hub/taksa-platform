@@ -21,7 +21,7 @@ service OrganizationService {
   // 2. GetJWTToken
   // Logic: Exchanges Kratos session for Oathkeeper JWT.
   // Returns: ONLY the JWT token.
-  rpc GetJWTToken (GetJWTTokenRequest) returns (GetJWTTokenResponse) {
+  rpc GetJWTToken (google.protobuf.Empty) returns (GetJWTTokenResponse) {
     option (google.api.http) = {
       get: "/api/v1/um/token"
     };
@@ -78,7 +78,6 @@ message RegisterMasterUserResponse {
   ResponseMeta meta = 2;
 }
 
-message GetJWTTokenRequest {}
 
 message GetJWTTokenResponse {
   TokenData data = 1;
