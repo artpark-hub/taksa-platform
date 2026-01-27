@@ -1,0 +1,13 @@
+server:
+  http:
+    addr: 0.0.0.0:8001
+    timeout: 1s
+  grpc:
+    addr: 0.0.0.0:9001
+    timeout: 1s
+data:
+  database:
+    driver: postgres
+    source: postgres://taksa:taksa_123@127.0.0.1:5433/traceability_db?sslmode=disable
+  nats:
+    url: "nats://taksa_app:taksa_app123@127.0.0.1:4222"
