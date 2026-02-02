@@ -1,0 +1,36 @@
+package server
+
+import (
+	tenantsv1 "user-management/api/tenants/v1"
+	"user-management/internal/conf"
+	"user-management/internal/service"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/middleware/recovery"
+	"github.com/go-kratos/kratos/v2/transport/http"
+)
+
+// NewHTTPServer new HTTP server.
+// Notice we REMOVED GreeterService and ADDED TenantsService
+func NewHTTPServer(c *conf.Server, tenants *service.TenantsService, logger log.Logger) *http.Server {
+	var opts = []http.ServerOption{
+		http.Middleware(
+			recovery.Recovery(),
+		),
+	}
+	if c.Http.Network != "" {
+		opts = append(opts, http.Network(c.Http.Network))
+	}
+	if c.Http.Addr != "" {
+		opts = append(opts, http.Address(c.Http.Addr))
+	}
+	if c.Http.Timeout != nil {
+		opts = append(opts, http.Timeout(c.Http.Timeout.AsDuration()))
+	}
+	srv := http.NewServer(opts...)
+
+	// Register the Tenants Service
+	tenantsv1.RegisterTenantsServiceHTTPServer(srv, tenants)
+
+	return srv
+}

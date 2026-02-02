@@ -1,0 +1,238 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: ""
+    version: 0.0.1
+paths:
+    /api/v1/um/master_user:
+        post:
+            tags:
+                - TenantsService
+            operationId: TenantsService_RegisterMasterUser
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/tenants.v1.RegisterMasterUserRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.RegisterMasterUserResponse'
+    /api/v1/um/master_user/{identityId}:
+        delete:
+            tags:
+                - TenantsService
+            operationId: TenantsService_DeleteMasterUser
+            parameters:
+                - name: identityId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.DeleteUserResponse'
+    /api/v1/um/token:
+        get:
+            tags:
+                - TenantsService
+            operationId: TenantsService_GetJWTToken
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.GetJWTTokenResponse'
+    /api/v1/um/user:
+        post:
+            tags:
+                - TenantsService
+            operationId: TenantsService_CreateSubUser
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/tenants.v1.CreateSubUserRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.CreateSubUserResponse'
+    /api/v1/um/user/{identityId}:
+        delete:
+            tags:
+                - TenantsService
+            operationId: TenantsService_DeleteSubUser
+            parameters:
+                - name: identityId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.DeleteUserResponse'
+    /api/v1/um/users:
+        get:
+            tags:
+                - TenantsService
+            operationId: TenantsService_ListSubUsers
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.ListSubUsersResponse'
+    /helloworld/{name}:
+        get:
+            tags:
+                - Greeter
+            description: Sends a greeting
+            operationId: Greeter_SayHello
+            parameters:
+                - name: name
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/helloworld.v1.HelloReply'
+components:
+    schemas:
+        helloworld.v1.HelloReply:
+            type: object
+            properties:
+                message:
+                    type: string
+            description: The response message containing the greetings
+        tenants.v1.CreateSubUserRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+                password:
+                    type: string
+                firstName:
+                    type: string
+                lastName:
+                    type: string
+        tenants.v1.CreateSubUserResponse:
+            type: object
+            properties:
+                data:
+                    $ref: '#/components/schemas/tenants.v1.UserData'
+                meta:
+                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
+        tenants.v1.DeleteUserResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                message:
+                    type: string
+                meta:
+                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
+        tenants.v1.GetJWTTokenResponse:
+            type: object
+            properties:
+                data:
+                    $ref: '#/components/schemas/tenants.v1.TokenData'
+                meta:
+                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
+        tenants.v1.ListSubUsersResponse:
+            type: object
+            properties:
+                users:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/tenants.v1.UserSummary'
+                meta:
+                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
+        tenants.v1.RegisterMasterUserRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+                password:
+                    type: string
+                firstName:
+                    type: string
+                lastName:
+                    type: string
+                organizationName:
+                    type: string
+        tenants.v1.RegisterMasterUserResponse:
+            type: object
+            properties:
+                data:
+                    $ref: '#/components/schemas/tenants.v1.TenantData'
+                meta:
+                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
+        tenants.v1.ResponseMeta:
+            type: object
+            properties:
+                timestamp:
+                    type: string
+        tenants.v1.TenantData:
+            type: object
+            properties:
+                identityId:
+                    type: string
+                organizationName:
+                    type: string
+                status:
+                    type: string
+            description: THIS IS THE MISSING STRUCT CAUSING YOUR ERROR
+        tenants.v1.TokenData:
+            type: object
+            properties:
+                jwtToken:
+                    type: string
+        tenants.v1.UserData:
+            type: object
+            properties:
+                identityId:
+                    type: string
+                organizationName:
+                    type: string
+        tenants.v1.UserSummary:
+            type: object
+            properties:
+                identityId:
+                    type: string
+                email:
+                    type: string
+                firstName:
+                    type: string
+                lastName:
+                    type: string
+                organizationName:
+                    type: string
+tags:
+    - name: Greeter
+      description: The greeting service definition.
+    - name: TenantsService

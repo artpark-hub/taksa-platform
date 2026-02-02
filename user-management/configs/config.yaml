@@ -1,0 +1,22 @@
+server:
+  http:
+    addr: 0.0.0.0:8080
+    timeout: 1s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 1s
+
+data:
+  database:
+    driver: postgres
+    source: postgres://taksa:taksa_123@172.25.60.23:5433/taksa?sslmode=disable
+
+kratos:
+  admin_url: http://172.25.60.23:4434
+  public_url: http://172.25.60.23:4433
+
+nats:
+# since the env and the stack.sh code is written in such a way that i passess the env variables to the docker compose code and that is why we cannot pass the env variables here that is why setting exact variables 
+  addr: nats://localhost:4222
+  user: taksa_app
+  password: taksa_app_123
