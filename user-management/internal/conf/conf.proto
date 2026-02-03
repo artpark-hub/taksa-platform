@@ -9,7 +9,6 @@ message Bootstrap {
   Server server = 1;
   Data data = 2;
   Kratos kratos = 3;
-  Nats nats = 4;
 }
 
 message Server {
@@ -45,10 +44,4 @@ message Data {
 message Kratos {
   string public_url = 1;
   string admin_url = 2;
-}
-
-message Nats {
-  string addr = 1;
-  string user = 2;
-  string password = 3;
 }

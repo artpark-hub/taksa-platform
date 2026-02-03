@@ -3,7 +3,7 @@
 
 openapi: 3.0.3
 info:
-    title: ""
+    title: TenantsService API
     version: 0.0.1
 paths:
     /api/v1/um/master_user:
@@ -102,33 +102,8 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/tenants.v1.ListSubUsersResponse'
-    /helloworld/{name}:
-        get:
-            tags:
-                - Greeter
-            description: Sends a greeting
-            operationId: Greeter_SayHello
-            parameters:
-                - name: name
-                  in: path
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/helloworld.v1.HelloReply'
 components:
     schemas:
-        helloworld.v1.HelloReply:
-            type: object
-            properties:
-                message:
-                    type: string
-            description: The response message containing the greetings
         tenants.v1.CreateSubUserRequest:
             type: object
             properties:
@@ -145,8 +120,6 @@ components:
             properties:
                 data:
                     $ref: '#/components/schemas/tenants.v1.UserData'
-                meta:
-                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
         tenants.v1.DeleteUserResponse:
             type: object
             properties:
@@ -154,15 +127,11 @@ components:
                     type: string
                 message:
                     type: string
-                meta:
-                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
         tenants.v1.GetJWTTokenResponse:
             type: object
             properties:
                 data:
                     $ref: '#/components/schemas/tenants.v1.TokenData'
-                meta:
-                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
         tenants.v1.ListSubUsersResponse:
             type: object
             properties:
@@ -170,8 +139,6 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/tenants.v1.UserSummary'
-                meta:
-                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
         tenants.v1.RegisterMasterUserRequest:
             type: object
             properties:
@@ -190,13 +157,6 @@ components:
             properties:
                 data:
                     $ref: '#/components/schemas/tenants.v1.TenantData'
-                meta:
-                    $ref: '#/components/schemas/tenants.v1.ResponseMeta'
-        tenants.v1.ResponseMeta:
-            type: object
-            properties:
-                timestamp:
-                    type: string
         tenants.v1.TenantData:
             type: object
             properties:
@@ -206,7 +166,6 @@ components:
                     type: string
                 status:
                     type: string
-            description: THIS IS THE MISSING STRUCT CAUSING YOUR ERROR
         tenants.v1.TokenData:
             type: object
             properties:
@@ -233,6 +192,4 @@ components:
                 organizationName:
                     type: string
 tags:
-    - name: Greeter
-      description: The greeting service definition.
     - name: TenantsService

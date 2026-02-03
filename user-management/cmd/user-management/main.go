@@ -17,7 +17,6 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
-// go build -ldflags "-X main.Version=x.y.z"
 var (
 	Name     = "user-management"
 	Version  = "1.0.0"
@@ -71,10 +70,7 @@ func main() {
 		panic(err)
 	}
 
-	// ---------------------------------------------------------
-	// UPDATE HERE: Added 'bc.Nats' to the arguments
-	// ---------------------------------------------------------
-	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Kratos, bc.Nats, logger)
+	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Kratos, logger)
 	if err != nil {
 		panic(err)
 	}

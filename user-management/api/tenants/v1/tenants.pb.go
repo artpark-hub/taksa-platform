@@ -101,7 +101,6 @@ func (x *RegisterMasterUserRequest) GetOrganizationName() string {
 type RegisterMasterUserResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          *TenantData            `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-	Meta          *ResponseMeta          `protobuf:"bytes,2,opt,name=meta,proto3" json:"meta,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -139,13 +138,6 @@ func (*RegisterMasterUserResponse) Descriptor() ([]byte, []int) {
 func (x *RegisterMasterUserResponse) GetData() *TenantData {
 	if x != nil {
 		return x.Data
-	}
-	return nil
-}
-
-func (x *RegisterMasterUserResponse) GetMeta() *ResponseMeta {
-	if x != nil {
-		return x.Meta
 	}
 	return nil
 }
@@ -189,7 +181,6 @@ func (*GetJWTTokenRequest) Descriptor() ([]byte, []int) {
 type GetJWTTokenResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          *TokenData             `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-	Meta          *ResponseMeta          `protobuf:"bytes,2,opt,name=meta,proto3" json:"meta,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -227,13 +218,6 @@ func (*GetJWTTokenResponse) Descriptor() ([]byte, []int) {
 func (x *GetJWTTokenResponse) GetData() *TokenData {
 	if x != nil {
 		return x.Data
-	}
-	return nil
-}
-
-func (x *GetJWTTokenResponse) GetMeta() *ResponseMeta {
-	if x != nil {
-		return x.Meta
 	}
 	return nil
 }
@@ -309,7 +293,6 @@ func (x *CreateSubUserRequest) GetLastName() string {
 type CreateSubUserResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          *UserData              `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-	Meta          *ResponseMeta          `protobuf:"bytes,2,opt,name=meta,proto3" json:"meta,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -347,13 +330,6 @@ func (*CreateSubUserResponse) Descriptor() ([]byte, []int) {
 func (x *CreateSubUserResponse) GetData() *UserData {
 	if x != nil {
 		return x.Data
-	}
-	return nil
-}
-
-func (x *CreateSubUserResponse) GetMeta() *ResponseMeta {
-	if x != nil {
-		return x.Meta
 	}
 	return nil
 }
@@ -397,7 +373,6 @@ func (*ListSubUsersRequest) Descriptor() ([]byte, []int) {
 type ListSubUsersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Users         []*UserSummary         `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
-	Meta          *ResponseMeta          `protobuf:"bytes,2,opt,name=meta,proto3" json:"meta,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -435,13 +410,6 @@ func (*ListSubUsersResponse) Descriptor() ([]byte, []int) {
 func (x *ListSubUsersResponse) GetUsers() []*UserSummary {
 	if x != nil {
 		return x.Users
-	}
-	return nil
-}
-
-func (x *ListSubUsersResponse) GetMeta() *ResponseMeta {
-	if x != nil {
-		return x.Meta
 	}
 	return nil
 }
@@ -494,7 +462,6 @@ type DeleteUserResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Meta          *ResponseMeta          `protobuf:"bytes,3,opt,name=meta,proto3" json:"meta,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -543,14 +510,6 @@ func (x *DeleteUserResponse) GetMessage() string {
 	return ""
 }
 
-func (x *DeleteUserResponse) GetMeta() *ResponseMeta {
-	if x != nil {
-		return x.Meta
-	}
-	return nil
-}
-
-// THIS IS THE MISSING STRUCT CAUSING YOUR ERROR
 type TenantData struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	IdentityId       string                 `protobuf:"bytes,1,opt,name=identity_id,json=identityId,proto3" json:"identity_id,omitempty"`
@@ -783,50 +742,6 @@ func (x *UserSummary) GetOrganizationName() string {
 	return ""
 }
 
-type ResponseMeta struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Timestamp     string                 `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ResponseMeta) Reset() {
-	*x = ResponseMeta{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[14]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ResponseMeta) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ResponseMeta) ProtoMessage() {}
-
-func (x *ResponseMeta) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[14]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ResponseMeta.ProtoReflect.Descriptor instead.
-func (*ResponseMeta) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{14}
-}
-
-func (x *ResponseMeta) GetTimestamp() string {
-	if x != nil {
-		return x.Timestamp
-	}
-	return ""
-}
-
 var File_tenants_v1_tenants_proto protoreflect.FileDescriptor
 
 const file_tenants_v1_tenants_proto_rawDesc = "" +
@@ -839,34 +754,29 @@ const file_tenants_v1_tenants_proto_rawDesc = "" +
 	"\n" +
 	"first_name\x18\x03 \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12+\n" +
-	"\x11organization_name\x18\x05 \x01(\tR\x10organizationName\"v\n" +
+	"\x11organization_name\x18\x05 \x01(\tR\x10organizationName\"H\n" +
 	"\x1aRegisterMasterUserResponse\x12*\n" +
-	"\x04data\x18\x01 \x01(\v2\x16.tenants.v1.TenantDataR\x04data\x12,\n" +
-	"\x04meta\x18\x02 \x01(\v2\x18.tenants.v1.ResponseMetaR\x04meta\"\x14\n" +
-	"\x12GetJWTTokenRequest\"n\n" +
+	"\x04data\x18\x01 \x01(\v2\x16.tenants.v1.TenantDataR\x04data\"\x14\n" +
+	"\x12GetJWTTokenRequest\"@\n" +
 	"\x13GetJWTTokenResponse\x12)\n" +
-	"\x04data\x18\x01 \x01(\v2\x15.tenants.v1.TokenDataR\x04data\x12,\n" +
-	"\x04meta\x18\x02 \x01(\v2\x18.tenants.v1.ResponseMetaR\x04meta\"\x84\x01\n" +
+	"\x04data\x18\x01 \x01(\v2\x15.tenants.v1.TokenDataR\x04data\"\x84\x01\n" +
 	"\x14CreateSubUserRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1d\n" +
 	"\n" +
 	"first_name\x18\x03 \x01(\tR\tfirstName\x12\x1b\n" +
-	"\tlast_name\x18\x04 \x01(\tR\blastName\"o\n" +
+	"\tlast_name\x18\x04 \x01(\tR\blastName\"A\n" +
 	"\x15CreateSubUserResponse\x12(\n" +
-	"\x04data\x18\x01 \x01(\v2\x14.tenants.v1.UserDataR\x04data\x12,\n" +
-	"\x04meta\x18\x02 \x01(\v2\x18.tenants.v1.ResponseMetaR\x04meta\"\x15\n" +
-	"\x13ListSubUsersRequest\"s\n" +
+	"\x04data\x18\x01 \x01(\v2\x14.tenants.v1.UserDataR\x04data\"\x15\n" +
+	"\x13ListSubUsersRequest\"E\n" +
 	"\x14ListSubUsersResponse\x12-\n" +
-	"\x05users\x18\x01 \x03(\v2\x17.tenants.v1.UserSummaryR\x05users\x12,\n" +
-	"\x04meta\x18\x02 \x01(\v2\x18.tenants.v1.ResponseMetaR\x04meta\"4\n" +
+	"\x05users\x18\x01 \x03(\v2\x17.tenants.v1.UserSummaryR\x05users\"4\n" +
 	"\x11DeleteUserRequest\x12\x1f\n" +
 	"\videntity_id\x18\x01 \x01(\tR\n" +
-	"identityId\"t\n" +
+	"identityId\"F\n" +
 	"\x12DeleteUserResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12,\n" +
-	"\x04meta\x18\x03 \x01(\v2\x18.tenants.v1.ResponseMetaR\x04meta\"r\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"r\n" +
 	"\n" +
 	"TenantData\x12\x1f\n" +
 	"\videntity_id\x18\x01 \x01(\tR\n" +
@@ -886,9 +796,7 @@ const file_tenants_v1_tenants_proto_rawDesc = "" +
 	"\n" +
 	"first_name\x18\x03 \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12+\n" +
-	"\x11organization_name\x18\x05 \x01(\tR\x10organizationName\",\n" +
-	"\fResponseMeta\x12\x1c\n" +
-	"\ttimestamp\x18\x01 \x01(\tR\ttimestamp2\xda\x05\n" +
+	"\x11organization_name\x18\x05 \x01(\tR\x10organizationName2\xda\x05\n" +
 	"\x0eTenantsService\x12\x86\x01\n" +
 	"\x12RegisterMasterUser\x12%.tenants.v1.RegisterMasterUserRequest\x1a&.tenants.v1.RegisterMasterUserResponse\"!\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/api/v1/um/master_user\x12h\n" +
 	"\vGetJWTToken\x12\x1e.tenants.v1.GetJWTTokenRequest\x1a\x1f.tenants.v1.GetJWTTokenResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/um/token\x12p\n" +
@@ -909,7 +817,7 @@ func file_tenants_v1_tenants_proto_rawDescGZIP() []byte {
 	return file_tenants_v1_tenants_proto_rawDescData
 }
 
-var file_tenants_v1_tenants_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_tenants_v1_tenants_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_tenants_v1_tenants_proto_goTypes = []any{
 	(*RegisterMasterUserRequest)(nil),  // 0: tenants.v1.RegisterMasterUserRequest
 	(*RegisterMasterUserResponse)(nil), // 1: tenants.v1.RegisterMasterUserResponse
@@ -925,35 +833,29 @@ var file_tenants_v1_tenants_proto_goTypes = []any{
 	(*TokenData)(nil),                  // 11: tenants.v1.TokenData
 	(*UserData)(nil),                   // 12: tenants.v1.UserData
 	(*UserSummary)(nil),                // 13: tenants.v1.UserSummary
-	(*ResponseMeta)(nil),               // 14: tenants.v1.ResponseMeta
 }
 var file_tenants_v1_tenants_proto_depIdxs = []int32{
 	10, // 0: tenants.v1.RegisterMasterUserResponse.data:type_name -> tenants.v1.TenantData
-	14, // 1: tenants.v1.RegisterMasterUserResponse.meta:type_name -> tenants.v1.ResponseMeta
-	11, // 2: tenants.v1.GetJWTTokenResponse.data:type_name -> tenants.v1.TokenData
-	14, // 3: tenants.v1.GetJWTTokenResponse.meta:type_name -> tenants.v1.ResponseMeta
-	12, // 4: tenants.v1.CreateSubUserResponse.data:type_name -> tenants.v1.UserData
-	14, // 5: tenants.v1.CreateSubUserResponse.meta:type_name -> tenants.v1.ResponseMeta
-	13, // 6: tenants.v1.ListSubUsersResponse.users:type_name -> tenants.v1.UserSummary
-	14, // 7: tenants.v1.ListSubUsersResponse.meta:type_name -> tenants.v1.ResponseMeta
-	14, // 8: tenants.v1.DeleteUserResponse.meta:type_name -> tenants.v1.ResponseMeta
-	0,  // 9: tenants.v1.TenantsService.RegisterMasterUser:input_type -> tenants.v1.RegisterMasterUserRequest
-	2,  // 10: tenants.v1.TenantsService.GetJWTToken:input_type -> tenants.v1.GetJWTTokenRequest
-	4,  // 11: tenants.v1.TenantsService.CreateSubUser:input_type -> tenants.v1.CreateSubUserRequest
-	6,  // 12: tenants.v1.TenantsService.ListSubUsers:input_type -> tenants.v1.ListSubUsersRequest
-	8,  // 13: tenants.v1.TenantsService.DeleteSubUser:input_type -> tenants.v1.DeleteUserRequest
-	8,  // 14: tenants.v1.TenantsService.DeleteMasterUser:input_type -> tenants.v1.DeleteUserRequest
-	1,  // 15: tenants.v1.TenantsService.RegisterMasterUser:output_type -> tenants.v1.RegisterMasterUserResponse
-	3,  // 16: tenants.v1.TenantsService.GetJWTToken:output_type -> tenants.v1.GetJWTTokenResponse
-	5,  // 17: tenants.v1.TenantsService.CreateSubUser:output_type -> tenants.v1.CreateSubUserResponse
-	7,  // 18: tenants.v1.TenantsService.ListSubUsers:output_type -> tenants.v1.ListSubUsersResponse
-	9,  // 19: tenants.v1.TenantsService.DeleteSubUser:output_type -> tenants.v1.DeleteUserResponse
-	9,  // 20: tenants.v1.TenantsService.DeleteMasterUser:output_type -> tenants.v1.DeleteUserResponse
-	15, // [15:21] is the sub-list for method output_type
-	9,  // [9:15] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	11, // 1: tenants.v1.GetJWTTokenResponse.data:type_name -> tenants.v1.TokenData
+	12, // 2: tenants.v1.CreateSubUserResponse.data:type_name -> tenants.v1.UserData
+	13, // 3: tenants.v1.ListSubUsersResponse.users:type_name -> tenants.v1.UserSummary
+	0,  // 4: tenants.v1.TenantsService.RegisterMasterUser:input_type -> tenants.v1.RegisterMasterUserRequest
+	2,  // 5: tenants.v1.TenantsService.GetJWTToken:input_type -> tenants.v1.GetJWTTokenRequest
+	4,  // 6: tenants.v1.TenantsService.CreateSubUser:input_type -> tenants.v1.CreateSubUserRequest
+	6,  // 7: tenants.v1.TenantsService.ListSubUsers:input_type -> tenants.v1.ListSubUsersRequest
+	8,  // 8: tenants.v1.TenantsService.DeleteSubUser:input_type -> tenants.v1.DeleteUserRequest
+	8,  // 9: tenants.v1.TenantsService.DeleteMasterUser:input_type -> tenants.v1.DeleteUserRequest
+	1,  // 10: tenants.v1.TenantsService.RegisterMasterUser:output_type -> tenants.v1.RegisterMasterUserResponse
+	3,  // 11: tenants.v1.TenantsService.GetJWTToken:output_type -> tenants.v1.GetJWTTokenResponse
+	5,  // 12: tenants.v1.TenantsService.CreateSubUser:output_type -> tenants.v1.CreateSubUserResponse
+	7,  // 13: tenants.v1.TenantsService.ListSubUsers:output_type -> tenants.v1.ListSubUsersResponse
+	9,  // 14: tenants.v1.TenantsService.DeleteSubUser:output_type -> tenants.v1.DeleteUserResponse
+	9,  // 15: tenants.v1.TenantsService.DeleteMasterUser:output_type -> tenants.v1.DeleteUserResponse
+	10, // [10:16] is the sub-list for method output_type
+	4,  // [4:10] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_tenants_v1_tenants_proto_init() }
@@ -967,7 +869,7 @@ func file_tenants_v1_tenants_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_tenants_v1_tenants_proto_rawDesc), len(file_tenants_v1_tenants_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

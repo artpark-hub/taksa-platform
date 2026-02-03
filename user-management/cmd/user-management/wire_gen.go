@@ -17,16 +17,14 @@ import (
 )
 
 import (
-	_ "github.com/fsnotify/fsnotify"
 	_ "go.uber.org/automaxprocs"
 )
 
 // Injectors from wire.go:
 
-// wireApp init kratos application.
-// FIXED: Added *conf.Kratos to the parameters list
-func wireApp(confServer *conf.Server, confData *conf.Data, confKratos *conf.Kratos, nats *conf.Nats, logger log.Logger) (*kratos.App, func(), error) {
-	dataData, cleanup, err := data.NewData(confData, confKratos, nats, logger)
+// REMOVED: *conf.Nats from arguments
+func wireApp(confServer *conf.Server, confData *conf.Data, confKratos *conf.Kratos, logger log.Logger) (*kratos.App, func(), error) {
+	dataData, cleanup, err := data.NewData(confData, confKratos, logger)
 	if err != nil {
 		return nil, nil, err
 	}

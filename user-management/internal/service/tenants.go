@@ -41,12 +41,12 @@ func (s *TenantsService) RegisterMasterUser(ctx context.Context, req *v1.Registe
 	}
 
 	return &v1.RegisterMasterUserResponse{
-		Data: &v1.TenantData{ // Changed from OrganizationData to TenantData
+		Data: &v1.TenantData{
 			IdentityId:       data.IdentityID,
 			OrganizationName: data.OrganizationName,
-			Status:           "active", // data.Status might be empty if not passed back, defaulting to active
+			Status:           "active",
 		},
-		Meta: &v1.ResponseMeta{Timestamp: "now"},
+		// Removed Meta
 	}, nil
 }
 
@@ -71,7 +71,7 @@ func (s *TenantsService) GetJWTToken(ctx context.Context, req *v1.GetJWTTokenReq
 			Data: &v1.TokenData{
 				JwtToken: token,
 			},
-			Meta: &v1.ResponseMeta{Timestamp: "now"},
+			// Removed Meta
 		}, nil
 	}
 
@@ -100,7 +100,7 @@ func (s *TenantsService) CreateSubUser(ctx context.Context, req *v1.CreateSubUse
 			IdentityId:       data.IdentityID,
 			OrganizationName: data.OrganizationName,
 		},
-		Meta: &v1.ResponseMeta{Timestamp: "now"},
+		// Removed Meta
 	}, nil
 }
 
@@ -131,7 +131,7 @@ func (s *TenantsService) ListSubUsers(ctx context.Context, req *v1.ListSubUsersR
 
 	return &v1.ListSubUsersResponse{
 		Users: protoUsers,
-		Meta:  &v1.ResponseMeta{Timestamp: "now"},
+		// Removed Meta
 	}, nil
 }
 
@@ -147,7 +147,7 @@ func (s *TenantsService) DeleteSubUser(ctx context.Context, req *v1.DeleteUserRe
 	return &v1.DeleteUserResponse{
 		Status:  "success",
 		Message: "User deleted successfully",
-		Meta:    &v1.ResponseMeta{Timestamp: "now"},
+		// Removed Meta
 	}, nil
 }
 
@@ -163,7 +163,7 @@ func (s *TenantsService) DeleteMasterUser(ctx context.Context, req *v1.DeleteUse
 	return &v1.DeleteUserResponse{
 		Status:  "success",
 		Message: "Master user deleted successfully",
-		Meta:    &v1.ResponseMeta{Timestamp: "now"},
+		// Removed Meta
 	}, nil
 }
 

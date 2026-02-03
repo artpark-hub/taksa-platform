@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
-	"github.com/nats-io/nats.go"
 
 	// Import the Kratos client library
 	kratos "github.com/ory/kratos-client-go"
@@ -18,7 +17,6 @@ import (
 // ProviderSet is data providers.
 var ProviderSet = wire.NewSet(
 	NewData,
-	NewGreeterRepo,
 	NewTenantsRepo,
 )
 
@@ -29,11 +27,10 @@ type Data struct {
 	kratosPublicURL string
 	httpClient      *http.Client
 	kratos          *kratos.APIClient
-	nats            *nats.Conn
 	log             *log.Helper
 }
 
-func NewData(c *conf.Data, kConf *conf.Kratos, nConf *conf.Nats, logger log.Logger) (*Data, func(), error) {
+func NewData(c *conf.Data, kConf *conf.Kratos, logger log.Logger) (*Data, func(), error) {
 	helper := log.NewHelper(logger)
 
 	db, err := sql.Open(c.Database.Driver, c.Database.Source)
@@ -53,17 +50,7 @@ func NewData(c *conf.Data, kConf *conf.Kratos, nConf *conf.Nats, logger log.Logg
 	}
 	kratosClient := kratos.NewAPIClient(kratosConfig)
 
-	helper.Infof("Connecting to NATS at %s...", nConf.Addr)
-	nc, err := nats.Connect(
-		nConf.Addr,
-		nats.UserInfo(nConf.User, nConf.Password),
-		nats.MaxReconnects(5),
-	)
-	if err != nil {
-		helper.Errorf("Failed to connect to NATS: %v", err)
-		return nil, nil, err
-	}
-	helper.Info("NATS connected successfully")
+	// REMOVED: NATS Connection Block
 
 	data := &Data{
 		db:              db,
@@ -71,8 +58,8 @@ func NewData(c *conf.Data, kConf *conf.Kratos, nConf *conf.Nats, logger log.Logg
 		kratosPublicURL: kConf.PublicUrl,
 		httpClient:      &http.Client{},
 		kratos:          kratosClient,
-		nats:            nc, // Store connection
 		log:             helper,
+		// REMOVED: nats: nc,
 	}
 
 	cleanup := func() {
@@ -80,10 +67,7 @@ func NewData(c *conf.Data, kConf *conf.Kratos, nConf *conf.Nats, logger log.Logg
 		if err := db.Close(); err != nil {
 			helper.Errorf("Failed to close database: %v", err)
 		}
-		// Close NATS
-		nc.Drain()
-		nc.Close()
-		helper.Info("NATS connection closed")
+		// REMOVED: NATS cleanup
 	}
 
 	return data, cleanup, nil
@@ -109,8 +93,4 @@ func (d *Data) HTTPClient() *http.Client {
 
 func (d *Data) KratosClient() *kratos.APIClient {
 	return d.kratos
-}
-
-func (d *Data) NatsClient() *nats.Conn {
-	return d.nats
 }

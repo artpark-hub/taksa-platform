@@ -56,14 +56,12 @@ message RegisterMasterUserRequest {
 
 message RegisterMasterUserResponse {
   TenantData data = 1;
-  ResponseMeta meta = 2;
 }
 
 message GetJWTTokenRequest {}
 
 message GetJWTTokenResponse {
   TokenData data = 1;
-  ResponseMeta meta = 2;
 }
 
 message CreateSubUserRequest {
@@ -75,14 +73,12 @@ message CreateSubUserRequest {
 
 message CreateSubUserResponse {
   UserData data = 1;
-  ResponseMeta meta = 2;
 }
 
 message ListSubUsersRequest {}
 
 message ListSubUsersResponse {
   repeated UserSummary users = 1;
-  ResponseMeta meta = 2;
 }
 
 message DeleteUserRequest {
@@ -92,10 +88,8 @@ message DeleteUserRequest {
 message DeleteUserResponse {
   string status = 1;
   string message = 2;
-  ResponseMeta meta = 3;
 }
 
-// THIS IS THE MISSING STRUCT CAUSING YOUR ERROR
 message TenantData {
   string identity_id = 1;
   string organization_name = 2;
@@ -119,6 +113,3 @@ message UserSummary {
   string organization_name = 5;
 }
 
-message ResponseMeta {
-  string timestamp = 1;
-}
