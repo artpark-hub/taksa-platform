@@ -1,16 +1,12 @@
 syntax = "proto3";
 
-package organization.v1;
+package tenants.v1;
 
 import "google/api/annotations.proto";
 
 option go_package = "user-management/api/tenants/v1;v1";
 
-service OrganizationService {
-  
-  // 1. RegisterMasterUser
-  // Input: Master User Details + Organization Name
-  // Logic: Creates Kratos identity (role="master", traits.org=organization_name)
+service TenantsService {
   rpc RegisterMasterUser (RegisterMasterUserRequest) returns (RegisterMasterUserResponse) {
     option (google.api.http) = {
       post: "/api/v1/um/master_user"
@@ -18,18 +14,12 @@ service OrganizationService {
     };
   }
   
-  // 2. GetJWTToken
-  // Logic: Exchanges Kratos session for Oathkeeper JWT.
-  // Returns: ONLY the JWT token.
-  rpc GetJWTToken (google.protobuf.Empty) returns (GetJWTTokenResponse) {
+  rpc GetJWTToken (GetJWTTokenRequest) returns (GetJWTTokenResponse) {
     option (google.api.http) = {
       get: "/api/v1/um/token"
     };
   }
   
-  // 3. CreateSubUser
-  // Input: User Details (No Org, No Role)
-  // Logic: Backend extracts Org from JWT -> Creates Kratos identity (role="sub", traits.org=extracted_org)
   rpc CreateSubUser (CreateSubUserRequest) returns (CreateSubUserResponse) {
     option (google.api.http) = {
       post: "/api/v1/um/user"
@@ -37,33 +27,24 @@ service OrganizationService {
     };
   }
 
-  // 4. ListSubUsers
-  // Input: Empty (uses JWT)
-  // Logic: Backend extracts Org from JWT -> Lists users where traits.org matches and role="sub"
   rpc ListSubUsers (ListSubUsersRequest) returns (ListSubUsersResponse) {
     option (google.api.http) = {
       get: "/api/v1/um/users"
     };
   }
 
-  // 5. DeleteSubUser
-  // Input: Identity ID
   rpc DeleteSubUser (DeleteUserRequest) returns (DeleteUserResponse) {
     option (google.api.http) = {
       delete: "/api/v1/um/user/{identity_id}"
     };
   }
 
-  // 6. DeleteMasterUser
-  // Input: Identity ID
   rpc DeleteMasterUser (DeleteUserRequest) returns (DeleteUserResponse) {
     option (google.api.http) = {
       delete: "/api/v1/um/master_user/{identity_id}"
     };
   }
 }
-
-// --- Request/Response Messages ---
 
 message RegisterMasterUserRequest {
   string email = 1;
@@ -74,14 +55,13 @@ message RegisterMasterUserRequest {
 }
 
 message RegisterMasterUserResponse {
-  OrganizationData data = 1;
-  ResponseMeta meta = 2;
+  TenantData data = 1;
 }
 
+message GetJWTTokenRequest {}
 
 message GetJWTTokenResponse {
   TokenData data = 1;
-  ResponseMeta meta = 2;
 }
 
 message CreateSubUserRequest {
@@ -93,15 +73,12 @@ message CreateSubUserRequest {
 
 message CreateSubUserResponse {
   UserData data = 1;
-  ResponseMeta meta = 2;
 }
 
 message ListSubUsersRequest {}
 
 message ListSubUsersResponse {
   repeated UserSummary users = 1;
-  //repeated cause we want the same structure to be followed for every sub user in the list. If it was not given as repeated then it would have taken only one users details instead of taking all the sub users details.  
-  ResponseMeta meta = 2;
 }
 
 message DeleteUserRequest {
@@ -111,16 +88,12 @@ message DeleteUserRequest {
 message DeleteUserResponse {
   string status = 1;
   string message = 2;
-  ResponseMeta meta = 3;
 }
 
-// --- Data Structures ---
-
-message OrganizationData {
+message TenantData {
   string identity_id = 1;
   string organization_name = 2;
   string status = 3;
-  //this status field stores the status of the user (a field given by kratos) and the values which they will be storing are active/inactive
 }
 
 message TokenData {
@@ -140,6 +113,3 @@ message UserSummary {
   string organization_name = 5;
 }
 
-message ResponseMeta {
-  string timestamp = 1;
-}
