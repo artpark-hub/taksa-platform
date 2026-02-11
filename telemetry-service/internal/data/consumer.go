@@ -3,6 +3,8 @@ package data
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -20,16 +22,12 @@ type LogORM struct {
 	EventTime     time.Time
 }
 
-// TableName overrides the default table name
 func (LogORM) TableName() string { return "traceability_log" }
 
-// UMHEvent defines the incoming JSON structure
-type UMHEvent struct {
-	EquipmentID   string `json:"equipment_id"`
-	EventType     string `json:"event_type"`
-	WorkOrderID   string `json:"work_order_id"`
-	MaterialLotID string `json:"material_lot_id"`
-	OperatorID    string `json:"operator_id"`
+// RawUMHEvent captures the raw UMH structure
+type RawUMHEvent struct {
+	TimestampMS int64       `json:"timestamp_ms"`
+	Value       interface{} `json:"value"`
 }
 
 type Consumer struct {
@@ -44,55 +42,76 @@ func NewConsumer(data *Data, logger log.Logger) *Consumer {
 	}
 }
 
-// Start subscribes to NATS and processes messages
 func (c *Consumer) Start(ctx context.Context) error {
 	js, err := c.data.nc.JetStream()
 	if err != nil {
 		return err
 	}
 
-	// The logic to run when a message arrives
 	callback := func(msg *nats.Msg) {
-		var event UMHEvent
-		if err := json.Unmarshal(msg.Data, &event); err != nil {
-			c.log.Errorf("JSON Parse Failed: %v", err)
-			msg.Ack() // Ack bad data to stop loops
-			return
+		parts := strings.Split(msg.Subject, ".")
+		equipmentID := "UNKNOWN"
+		if len(parts) > 0 {
+			equipmentID = parts[len(parts)-1]
 		}
 
-		if event.EquipmentID == "" {
-			c.log.Warn("⚠️ Skipping event: Missing EquipmentID")
+		// 2. Parse the Raw JSON
+		var rawEvent RawUMHEvent
+		if err := json.Unmarshal(msg.Data, &rawEvent); err != nil {
+			c.log.Errorf("JSON Parse Failed: %v", err)
 			msg.Ack()
 			return
 		}
 
-		logEntry := LogORM{
-			EquipmentID: event.EquipmentID,
-			EventType:   event.EventType,
-			WorkOrderID: event.WorkOrderID,
-			OperatorID:  event.OperatorID,
-			EventTime:   time.Now(),
+		// 3. Convert Timestamp
+		eventTime := time.UnixMilli(rawEvent.TimestampMS)
+
+		// 4. Determine Event Type based on Value
+		eventType := "STATUS_UPDATE"
+
+		// Use type assertion to check what 'Value' is
+		switch v := rawEvent.Value.(type) {
+		case float64:
+			eventType = fmt.Sprintf("METRIC_VALUE: %.0f", v)
+		case string:
+			if strings.Contains(v, "EncodingMask") {
+				eventType = "COMPLEX_STATE"
+			} else {
+				eventType = "TIMESTAMP_UPDATE"
+			}
 		}
 
-		// Save to Postgres
+		// 5. Construct DB Object
+		logEntry := LogORM{
+			EquipmentID: equipmentID,
+			EventType:   eventType,
+			WorkOrderID: "WO-AUTO",
+			OperatorID:  "OP-SYS",
+			EventTime:   eventTime,
+		}
+
+		// 6. Save to Postgres
 		if err := c.data.db.Create(&logEntry).Error; err != nil {
 			c.log.Errorf("DB Insert Failed: %v", err)
-			return // Do NOT Ack, let NATS retry
+			return
 		}
 
-		c.log.Infof("📥 Telemetry Saved: %s | %s", logEntry.EquipmentID, logEntry.EventType)
+		c.log.Infof("📥 Saved: %s | %s | %v", logEntry.EquipmentID, logEntry.EventType, rawEvent.Value)
 		msg.Ack()
 	}
 
-	// Subscribe to the Stream
+	// Subscribe to everything under "umh.>"
 	_, err = js.Subscribe("umh.>", callback, nats.BindStream("UMH_DATA"))
 	if err != nil {
-		return err
+
+		c.log.Warnf("JetStream subscribe failed (%v), trying standard sub...", err)
+		_, err = c.data.nc.Subscribe("umh.>", callback)
+		if err != nil {
+			return err
+		}
 	}
 
-	c.log.Info("🚀 Telemetry Service Started: Listening to UMH_DATA stream...")
-
-	// Block here until the server stops
+	c.log.Info("🚀 Telemetry Service Started: Listening to UMH real data...")
 	<-ctx.Done()
 	return nil
 }

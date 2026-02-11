@@ -11,7 +11,6 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"telemetry-service/internal/conf"
 	"telemetry-service/internal/data"
-	"telemetry-service/internal/server"
 )
 
 import (
@@ -21,15 +20,13 @@ import (
 // Injectors from wire.go:
 
 // initApp init kratos application.
-func initApp(confServer *conf.Server, confData *conf.Data, logger log.Logger) (*kratos.App, func(), error) {
-	grpcServer := server.NewGRPCServer(confServer, logger)
-	httpServer := server.NewHTTPServer(confServer, logger)
+func initApp(server *conf.Server, confData *conf.Data, logger log.Logger) (*kratos.App, func(), error) {
 	dataData, cleanup, err := data.NewData(confData, logger)
 	if err != nil {
 		return nil, nil, err
 	}
 	consumer := data.NewConsumer(dataData, logger)
-	app := newApp(logger, grpcServer, httpServer, consumer)
+	app := newApp(logger, consumer)
 	return app, func() {
 		cleanup()
 	}, nil
