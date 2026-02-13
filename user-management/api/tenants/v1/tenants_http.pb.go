@@ -24,6 +24,7 @@ const OperationTenantsServiceDeleteMasterUser = "/tenants.v1.TenantsService/Dele
 const OperationTenantsServiceDeleteSubUser = "/tenants.v1.TenantsService/DeleteSubUser"
 const OperationTenantsServiceGetJWTToken = "/tenants.v1.TenantsService/GetJWTToken"
 const OperationTenantsServiceListSubUsers = "/tenants.v1.TenantsService/ListSubUsers"
+const OperationTenantsServiceLoginUser = "/tenants.v1.TenantsService/LoginUser"
 const OperationTenantsServiceRegisterMasterUser = "/tenants.v1.TenantsService/RegisterMasterUser"
 
 type TenantsServiceHTTPServer interface {
@@ -32,17 +33,20 @@ type TenantsServiceHTTPServer interface {
 	DeleteSubUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
 	GetJWTToken(context.Context, *GetJWTTokenRequest) (*GetJWTTokenResponse, error)
 	ListSubUsers(context.Context, *ListSubUsersRequest) (*ListSubUsersResponse, error)
+	// LoginUser NEW: Login endpoint
+	LoginUser(context.Context, *LoginUserRequest) (*LoginUserResponse, error)
 	RegisterMasterUser(context.Context, *RegisterMasterUserRequest) (*RegisterMasterUserResponse, error)
 }
 
 func RegisterTenantsServiceHTTPServer(s *http.Server, srv TenantsServiceHTTPServer) {
 	r := s.Route("/")
-	r.POST("/api/v1/um/master_user", _TenantsService_RegisterMasterUser0_HTTP_Handler(srv))
+	r.POST("/api/v1/um/register_master_user", _TenantsService_RegisterMasterUser0_HTTP_Handler(srv))
+	r.POST("/api/v1/um/login", _TenantsService_LoginUser0_HTTP_Handler(srv))
 	r.GET("/api/v1/um/token", _TenantsService_GetJWTToken0_HTTP_Handler(srv))
-	r.POST("/api/v1/um/user", _TenantsService_CreateSubUser0_HTTP_Handler(srv))
-	r.GET("/api/v1/um/users", _TenantsService_ListSubUsers0_HTTP_Handler(srv))
-	r.DELETE("/api/v1/um/user/{identity_id}", _TenantsService_DeleteSubUser0_HTTP_Handler(srv))
-	r.DELETE("/api/v1/um/master_user/{identity_id}", _TenantsService_DeleteMasterUser0_HTTP_Handler(srv))
+	r.POST("/api/v1/um/create_sub_user", _TenantsService_CreateSubUser0_HTTP_Handler(srv))
+	r.GET("/api/v1/um/list_all_users", _TenantsService_ListSubUsers0_HTTP_Handler(srv))
+	r.DELETE("/api/v1/um/delete_sub_user/{identity_id}", _TenantsService_DeleteSubUser0_HTTP_Handler(srv))
+	r.DELETE("/api/v1/um/delete_master_user/{identity_id}", _TenantsService_DeleteMasterUser0_HTTP_Handler(srv))
 }
 
 func _TenantsService_RegisterMasterUser0_HTTP_Handler(srv TenantsServiceHTTPServer) func(ctx http.Context) error {
@@ -63,6 +67,28 @@ func _TenantsService_RegisterMasterUser0_HTTP_Handler(srv TenantsServiceHTTPServ
 			return err
 		}
 		reply := out.(*RegisterMasterUserResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _TenantsService_LoginUser0_HTTP_Handler(srv TenantsServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in LoginUserRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationTenantsServiceLoginUser)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.LoginUser(ctx, req.(*LoginUserRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*LoginUserResponse)
 		return ctx.Result(200, reply)
 	}
 }
@@ -177,6 +203,8 @@ type TenantsServiceHTTPClient interface {
 	DeleteSubUser(ctx context.Context, req *DeleteUserRequest, opts ...http.CallOption) (rsp *DeleteUserResponse, err error)
 	GetJWTToken(ctx context.Context, req *GetJWTTokenRequest, opts ...http.CallOption) (rsp *GetJWTTokenResponse, err error)
 	ListSubUsers(ctx context.Context, req *ListSubUsersRequest, opts ...http.CallOption) (rsp *ListSubUsersResponse, err error)
+	// LoginUser NEW: Login endpoint
+	LoginUser(ctx context.Context, req *LoginUserRequest, opts ...http.CallOption) (rsp *LoginUserResponse, err error)
 	RegisterMasterUser(ctx context.Context, req *RegisterMasterUserRequest, opts ...http.CallOption) (rsp *RegisterMasterUserResponse, err error)
 }
 
@@ -190,7 +218,7 @@ func NewTenantsServiceHTTPClient(client *http.Client) TenantsServiceHTTPClient {
 
 func (c *TenantsServiceHTTPClientImpl) CreateSubUser(ctx context.Context, in *CreateSubUserRequest, opts ...http.CallOption) (*CreateSubUserResponse, error) {
 	var out CreateSubUserResponse
-	pattern := "/api/v1/um/user"
+	pattern := "/api/v1/um/create_sub_user"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationTenantsServiceCreateSubUser))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -203,7 +231,7 @@ func (c *TenantsServiceHTTPClientImpl) CreateSubUser(ctx context.Context, in *Cr
 
 func (c *TenantsServiceHTTPClientImpl) DeleteMasterUser(ctx context.Context, in *DeleteUserRequest, opts ...http.CallOption) (*DeleteUserResponse, error) {
 	var out DeleteUserResponse
-	pattern := "/api/v1/um/master_user/{identity_id}"
+	pattern := "/api/v1/um/delete_master_user/{identity_id}"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationTenantsServiceDeleteMasterUser))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -216,7 +244,7 @@ func (c *TenantsServiceHTTPClientImpl) DeleteMasterUser(ctx context.Context, in 
 
 func (c *TenantsServiceHTTPClientImpl) DeleteSubUser(ctx context.Context, in *DeleteUserRequest, opts ...http.CallOption) (*DeleteUserResponse, error) {
 	var out DeleteUserResponse
-	pattern := "/api/v1/um/user/{identity_id}"
+	pattern := "/api/v1/um/delete_sub_user/{identity_id}"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationTenantsServiceDeleteSubUser))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -242,7 +270,7 @@ func (c *TenantsServiceHTTPClientImpl) GetJWTToken(ctx context.Context, in *GetJ
 
 func (c *TenantsServiceHTTPClientImpl) ListSubUsers(ctx context.Context, in *ListSubUsersRequest, opts ...http.CallOption) (*ListSubUsersResponse, error) {
 	var out ListSubUsersResponse
-	pattern := "/api/v1/um/users"
+	pattern := "/api/v1/um/list_all_users"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationTenantsServiceListSubUsers))
 	opts = append(opts, http.PathTemplate(pattern))
@@ -253,9 +281,23 @@ func (c *TenantsServiceHTTPClientImpl) ListSubUsers(ctx context.Context, in *Lis
 	return &out, nil
 }
 
+// LoginUser NEW: Login endpoint
+func (c *TenantsServiceHTTPClientImpl) LoginUser(ctx context.Context, in *LoginUserRequest, opts ...http.CallOption) (*LoginUserResponse, error) {
+	var out LoginUserResponse
+	pattern := "/api/v1/um/login"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationTenantsServiceLoginUser))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *TenantsServiceHTTPClientImpl) RegisterMasterUser(ctx context.Context, in *RegisterMasterUserRequest, opts ...http.CallOption) (*RegisterMasterUserResponse, error) {
 	var out RegisterMasterUserResponse
-	pattern := "/api/v1/um/master_user"
+	pattern := "/api/v1/um/register_master_user"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationTenantsServiceRegisterMasterUser))
 	opts = append(opts, http.PathTemplate(pattern))

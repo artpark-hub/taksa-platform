@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	TenantsService_RegisterMasterUser_FullMethodName = "/tenants.v1.TenantsService/RegisterMasterUser"
+	TenantsService_LoginUser_FullMethodName          = "/tenants.v1.TenantsService/LoginUser"
 	TenantsService_GetJWTToken_FullMethodName        = "/tenants.v1.TenantsService/GetJWTToken"
 	TenantsService_CreateSubUser_FullMethodName      = "/tenants.v1.TenantsService/CreateSubUser"
 	TenantsService_ListSubUsers_FullMethodName       = "/tenants.v1.TenantsService/ListSubUsers"
@@ -32,6 +33,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TenantsServiceClient interface {
 	RegisterMasterUser(ctx context.Context, in *RegisterMasterUserRequest, opts ...grpc.CallOption) (*RegisterMasterUserResponse, error)
+	// NEW: Login endpoint
+	LoginUser(ctx context.Context, in *LoginUserRequest, opts ...grpc.CallOption) (*LoginUserResponse, error)
 	GetJWTToken(ctx context.Context, in *GetJWTTokenRequest, opts ...grpc.CallOption) (*GetJWTTokenResponse, error)
 	CreateSubUser(ctx context.Context, in *CreateSubUserRequest, opts ...grpc.CallOption) (*CreateSubUserResponse, error)
 	ListSubUsers(ctx context.Context, in *ListSubUsersRequest, opts ...grpc.CallOption) (*ListSubUsersResponse, error)
@@ -51,6 +54,16 @@ func (c *tenantsServiceClient) RegisterMasterUser(ctx context.Context, in *Regis
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegisterMasterUserResponse)
 	err := c.cc.Invoke(ctx, TenantsService_RegisterMasterUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantsServiceClient) LoginUser(ctx context.Context, in *LoginUserRequest, opts ...grpc.CallOption) (*LoginUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LoginUserResponse)
+	err := c.cc.Invoke(ctx, TenantsService_LoginUser_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +125,8 @@ func (c *tenantsServiceClient) DeleteMasterUser(ctx context.Context, in *DeleteU
 // for forward compatibility.
 type TenantsServiceServer interface {
 	RegisterMasterUser(context.Context, *RegisterMasterUserRequest) (*RegisterMasterUserResponse, error)
+	// NEW: Login endpoint
+	LoginUser(context.Context, *LoginUserRequest) (*LoginUserResponse, error)
 	GetJWTToken(context.Context, *GetJWTTokenRequest) (*GetJWTTokenResponse, error)
 	CreateSubUser(context.Context, *CreateSubUserRequest) (*CreateSubUserResponse, error)
 	ListSubUsers(context.Context, *ListSubUsersRequest) (*ListSubUsersResponse, error)
@@ -129,6 +144,9 @@ type UnimplementedTenantsServiceServer struct{}
 
 func (UnimplementedTenantsServiceServer) RegisterMasterUser(context.Context, *RegisterMasterUserRequest) (*RegisterMasterUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegisterMasterUser not implemented")
+}
+func (UnimplementedTenantsServiceServer) LoginUser(context.Context, *LoginUserRequest) (*LoginUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LoginUser not implemented")
 }
 func (UnimplementedTenantsServiceServer) GetJWTToken(context.Context, *GetJWTTokenRequest) (*GetJWTTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetJWTToken not implemented")
@@ -180,6 +198,24 @@ func _TenantsService_RegisterMasterUser_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TenantsServiceServer).RegisterMasterUser(ctx, req.(*RegisterMasterUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantsService_LoginUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LoginUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantsServiceServer).LoginUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantsService_LoginUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantsServiceServer).LoginUser(ctx, req.(*LoginUserRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -284,6 +320,10 @@ var TenantsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RegisterMasterUser",
 			Handler:    _TenantsService_RegisterMasterUser_Handler,
+		},
+		{
+			MethodName: "LoginUser",
+			Handler:    _TenantsService_LoginUser_Handler,
 		},
 		{
 			MethodName: "GetJWTToken",

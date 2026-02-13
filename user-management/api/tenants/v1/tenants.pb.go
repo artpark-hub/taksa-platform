@@ -142,6 +142,186 @@ func (x *RegisterMasterUserResponse) GetData() *TenantData {
 	return nil
 }
 
+type LoginUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginUserRequest) Reset() {
+	*x = LoginUserRequest{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginUserRequest) ProtoMessage() {}
+
+func (x *LoginUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginUserRequest.ProtoReflect.Descriptor instead.
+func (*LoginUserRequest) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *LoginUserRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *LoginUserRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+type LoginUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionToken  string                 `protobuf:"bytes,1,opt,name=session_token,json=sessionToken,proto3" json:"session_token,omitempty"`
+	User          *UserInfo              `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginUserResponse) Reset() {
+	*x = LoginUserResponse{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginUserResponse) ProtoMessage() {}
+
+func (x *LoginUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginUserResponse.ProtoReflect.Descriptor instead.
+func (*LoginUserResponse) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *LoginUserResponse) GetSessionToken() string {
+	if x != nil {
+		return x.SessionToken
+	}
+	return ""
+}
+
+func (x *LoginUserResponse) GetUser() *UserInfo {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+type UserInfo struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Email            string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	FirstName        string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName         string                 `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	OrganizationName string                 `protobuf:"bytes,4,opt,name=organization_name,json=organizationName,proto3" json:"organization_name,omitempty"`
+	Role             string                 `protobuf:"bytes,5,opt,name=role,proto3" json:"role,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *UserInfo) Reset() {
+	*x = UserInfo{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserInfo) ProtoMessage() {}
+
+func (x *UserInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserInfo.ProtoReflect.Descriptor instead.
+func (*UserInfo) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UserInfo) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *UserInfo) GetFirstName() string {
+	if x != nil {
+		return x.FirstName
+	}
+	return ""
+}
+
+func (x *UserInfo) GetLastName() string {
+	if x != nil {
+		return x.LastName
+	}
+	return ""
+}
+
+func (x *UserInfo) GetOrganizationName() string {
+	if x != nil {
+		return x.OrganizationName
+	}
+	return ""
+}
+
+func (x *UserInfo) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
 type GetJWTTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -150,7 +330,7 @@ type GetJWTTokenRequest struct {
 
 func (x *GetJWTTokenRequest) Reset() {
 	*x = GetJWTTokenRequest{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[2]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -162,7 +342,7 @@ func (x *GetJWTTokenRequest) String() string {
 func (*GetJWTTokenRequest) ProtoMessage() {}
 
 func (x *GetJWTTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[2]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -175,7 +355,7 @@ func (x *GetJWTTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJWTTokenRequest.ProtoReflect.Descriptor instead.
 func (*GetJWTTokenRequest) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{2}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{5}
 }
 
 type GetJWTTokenResponse struct {
@@ -187,7 +367,7 @@ type GetJWTTokenResponse struct {
 
 func (x *GetJWTTokenResponse) Reset() {
 	*x = GetJWTTokenResponse{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[3]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -199,7 +379,7 @@ func (x *GetJWTTokenResponse) String() string {
 func (*GetJWTTokenResponse) ProtoMessage() {}
 
 func (x *GetJWTTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[3]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -212,7 +392,7 @@ func (x *GetJWTTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetJWTTokenResponse.ProtoReflect.Descriptor instead.
 func (*GetJWTTokenResponse) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{3}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetJWTTokenResponse) GetData() *TokenData {
@@ -234,7 +414,7 @@ type CreateSubUserRequest struct {
 
 func (x *CreateSubUserRequest) Reset() {
 	*x = CreateSubUserRequest{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[4]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -246,7 +426,7 @@ func (x *CreateSubUserRequest) String() string {
 func (*CreateSubUserRequest) ProtoMessage() {}
 
 func (x *CreateSubUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[4]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -259,7 +439,7 @@ func (x *CreateSubUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSubUserRequest.ProtoReflect.Descriptor instead.
 func (*CreateSubUserRequest) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{4}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CreateSubUserRequest) GetEmail() string {
@@ -299,7 +479,7 @@ type CreateSubUserResponse struct {
 
 func (x *CreateSubUserResponse) Reset() {
 	*x = CreateSubUserResponse{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[5]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -311,7 +491,7 @@ func (x *CreateSubUserResponse) String() string {
 func (*CreateSubUserResponse) ProtoMessage() {}
 
 func (x *CreateSubUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[5]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -324,7 +504,7 @@ func (x *CreateSubUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSubUserResponse.ProtoReflect.Descriptor instead.
 func (*CreateSubUserResponse) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{5}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateSubUserResponse) GetData() *UserData {
@@ -342,7 +522,7 @@ type ListSubUsersRequest struct {
 
 func (x *ListSubUsersRequest) Reset() {
 	*x = ListSubUsersRequest{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[6]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -354,7 +534,7 @@ func (x *ListSubUsersRequest) String() string {
 func (*ListSubUsersRequest) ProtoMessage() {}
 
 func (x *ListSubUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[6]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -367,7 +547,7 @@ func (x *ListSubUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSubUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListSubUsersRequest) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{6}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{9}
 }
 
 type ListSubUsersResponse struct {
@@ -379,7 +559,7 @@ type ListSubUsersResponse struct {
 
 func (x *ListSubUsersResponse) Reset() {
 	*x = ListSubUsersResponse{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[7]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +571,7 @@ func (x *ListSubUsersResponse) String() string {
 func (*ListSubUsersResponse) ProtoMessage() {}
 
 func (x *ListSubUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[7]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +584,7 @@ func (x *ListSubUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSubUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListSubUsersResponse) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{7}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListSubUsersResponse) GetUsers() []*UserSummary {
@@ -423,7 +603,7 @@ type DeleteUserRequest struct {
 
 func (x *DeleteUserRequest) Reset() {
 	*x = DeleteUserRequest{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[8]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -435,7 +615,7 @@ func (x *DeleteUserRequest) String() string {
 func (*DeleteUserRequest) ProtoMessage() {}
 
 func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[8]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -448,7 +628,7 @@ func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserRequest) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{8}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DeleteUserRequest) GetIdentityId() string {
@@ -468,7 +648,7 @@ type DeleteUserResponse struct {
 
 func (x *DeleteUserResponse) Reset() {
 	*x = DeleteUserResponse{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[9]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -480,7 +660,7 @@ func (x *DeleteUserResponse) String() string {
 func (*DeleteUserResponse) ProtoMessage() {}
 
 func (x *DeleteUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[9]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -493,7 +673,7 @@ func (x *DeleteUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserResponse.ProtoReflect.Descriptor instead.
 func (*DeleteUserResponse) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{9}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DeleteUserResponse) GetStatus() string {
@@ -521,7 +701,7 @@ type TenantData struct {
 
 func (x *TenantData) Reset() {
 	*x = TenantData{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[10]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -533,7 +713,7 @@ func (x *TenantData) String() string {
 func (*TenantData) ProtoMessage() {}
 
 func (x *TenantData) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[10]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -546,7 +726,7 @@ func (x *TenantData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TenantData.ProtoReflect.Descriptor instead.
 func (*TenantData) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{10}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *TenantData) GetIdentityId() string {
@@ -579,7 +759,7 @@ type TokenData struct {
 
 func (x *TokenData) Reset() {
 	*x = TokenData{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[11]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -591,7 +771,7 @@ func (x *TokenData) String() string {
 func (*TokenData) ProtoMessage() {}
 
 func (x *TokenData) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[11]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,7 +784,7 @@ func (x *TokenData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenData.ProtoReflect.Descriptor instead.
 func (*TokenData) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{11}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *TokenData) GetJwtToken() string {
@@ -624,7 +804,7 @@ type UserData struct {
 
 func (x *UserData) Reset() {
 	*x = UserData{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[12]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -636,7 +816,7 @@ func (x *UserData) String() string {
 func (*UserData) ProtoMessage() {}
 
 func (x *UserData) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[12]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +829,7 @@ func (x *UserData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserData.ProtoReflect.Descriptor instead.
 func (*UserData) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{12}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UserData) GetIdentityId() string {
@@ -673,13 +853,14 @@ type UserSummary struct {
 	FirstName        string                 `protobuf:"bytes,3,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
 	LastName         string                 `protobuf:"bytes,4,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
 	OrganizationName string                 `protobuf:"bytes,5,opt,name=organization_name,json=organizationName,proto3" json:"organization_name,omitempty"`
+	Role             string                 `protobuf:"bytes,6,opt,name=role,proto3" json:"role,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *UserSummary) Reset() {
 	*x = UserSummary{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[13]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -691,7 +872,7 @@ func (x *UserSummary) String() string {
 func (*UserSummary) ProtoMessage() {}
 
 func (x *UserSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[13]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -704,7 +885,7 @@ func (x *UserSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserSummary.ProtoReflect.Descriptor instead.
 func (*UserSummary) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{13}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *UserSummary) GetIdentityId() string {
@@ -742,6 +923,13 @@ func (x *UserSummary) GetOrganizationName() string {
 	return ""
 }
 
+func (x *UserSummary) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
 var File_tenants_v1_tenants_proto protoreflect.FileDescriptor
 
 const file_tenants_v1_tenants_proto_rawDesc = "" +
@@ -756,7 +944,20 @@ const file_tenants_v1_tenants_proto_rawDesc = "" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12+\n" +
 	"\x11organization_name\x18\x05 \x01(\tR\x10organizationName\"H\n" +
 	"\x1aRegisterMasterUserResponse\x12*\n" +
-	"\x04data\x18\x01 \x01(\v2\x16.tenants.v1.TenantDataR\x04data\"\x14\n" +
+	"\x04data\x18\x01 \x01(\v2\x16.tenants.v1.TenantDataR\x04data\"D\n" +
+	"\x10LoginUserRequest\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"b\n" +
+	"\x11LoginUserResponse\x12#\n" +
+	"\rsession_token\x18\x01 \x01(\tR\fsessionToken\x12(\n" +
+	"\x04user\x18\x02 \x01(\v2\x14.tenants.v1.UserInfoR\x04user\"\x9d\x01\n" +
+	"\bUserInfo\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1d\n" +
+	"\n" +
+	"first_name\x18\x02 \x01(\tR\tfirstName\x12\x1b\n" +
+	"\tlast_name\x18\x03 \x01(\tR\blastName\x12+\n" +
+	"\x11organization_name\x18\x04 \x01(\tR\x10organizationName\x12\x12\n" +
+	"\x04role\x18\x05 \x01(\tR\x04role\"\x14\n" +
 	"\x12GetJWTTokenRequest\"@\n" +
 	"\x13GetJWTTokenResponse\x12)\n" +
 	"\x04data\x18\x01 \x01(\v2\x15.tenants.v1.TokenDataR\x04data\"\x84\x01\n" +
@@ -788,7 +989,7 @@ const file_tenants_v1_tenants_proto_rawDesc = "" +
 	"\bUserData\x12\x1f\n" +
 	"\videntity_id\x18\x01 \x01(\tR\n" +
 	"identityId\x12+\n" +
-	"\x11organization_name\x18\x02 \x01(\tR\x10organizationName\"\xad\x01\n" +
+	"\x11organization_name\x18\x02 \x01(\tR\x10organizationName\"\xc1\x01\n" +
 	"\vUserSummary\x12\x1f\n" +
 	"\videntity_id\x18\x01 \x01(\tR\n" +
 	"identityId\x12\x14\n" +
@@ -796,14 +997,16 @@ const file_tenants_v1_tenants_proto_rawDesc = "" +
 	"\n" +
 	"first_name\x18\x03 \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12+\n" +
-	"\x11organization_name\x18\x05 \x01(\tR\x10organizationName2\xda\x05\n" +
-	"\x0eTenantsService\x12\x86\x01\n" +
-	"\x12RegisterMasterUser\x12%.tenants.v1.RegisterMasterUserRequest\x1a&.tenants.v1.RegisterMasterUserResponse\"!\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/api/v1/um/master_user\x12h\n" +
-	"\vGetJWTToken\x12\x1e.tenants.v1.GetJWTTokenRequest\x1a\x1f.tenants.v1.GetJWTTokenResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/um/token\x12p\n" +
-	"\rCreateSubUser\x12 .tenants.v1.CreateSubUserRequest\x1a!.tenants.v1.CreateSubUserResponse\"\x1a\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/api/v1/um/user\x12k\n" +
-	"\fListSubUsers\x12\x1f.tenants.v1.ListSubUsersRequest\x1a .tenants.v1.ListSubUsersResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/um/users\x12u\n" +
-	"\rDeleteSubUser\x12\x1d.tenants.v1.DeleteUserRequest\x1a\x1e.tenants.v1.DeleteUserResponse\"%\x82\xd3\xe4\x93\x02\x1f*\x1d/api/v1/um/user/{identity_id}\x12\x7f\n" +
-	"\x10DeleteMasterUser\x12\x1d.tenants.v1.DeleteUserRequest\x1a\x1e.tenants.v1.DeleteUserResponse\",\x82\xd3\xe4\x93\x02&*$/api/v1/um/master_user/{identity_id}B#Z!user-management/api/tenants/v1;v1b\x06proto3"
+	"\x11organization_name\x18\x05 \x01(\tR\x10organizationName\x12\x12\n" +
+	"\x04role\x18\x06 \x01(\tR\x04role2\xf2\x06\n" +
+	"\x0eTenantsService\x12\x8f\x01\n" +
+	"\x12RegisterMasterUser\x12%.tenants.v1.RegisterMasterUserRequest\x1a&.tenants.v1.RegisterMasterUserResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/um/register_master_user\x12e\n" +
+	"\tLoginUser\x12\x1c.tenants.v1.LoginUserRequest\x1a\x1d.tenants.v1.LoginUserResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/um/login\x12h\n" +
+	"\vGetJWTToken\x12\x1e.tenants.v1.GetJWTTokenRequest\x1a\x1f.tenants.v1.GetJWTTokenResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/um/token\x12{\n" +
+	"\rCreateSubUser\x12 .tenants.v1.CreateSubUserRequest\x1a!.tenants.v1.CreateSubUserResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/um/create_sub_user\x12t\n" +
+	"\fListSubUsers\x12\x1f.tenants.v1.ListSubUsersRequest\x1a .tenants.v1.ListSubUsersResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/um/list_all_users\x12\x80\x01\n" +
+	"\rDeleteSubUser\x12\x1d.tenants.v1.DeleteUserRequest\x1a\x1e.tenants.v1.DeleteUserResponse\"0\x82\xd3\xe4\x93\x02**(/api/v1/um/delete_sub_user/{identity_id}\x12\x86\x01\n" +
+	"\x10DeleteMasterUser\x12\x1d.tenants.v1.DeleteUserRequest\x1a\x1e.tenants.v1.DeleteUserResponse\"3\x82\xd3\xe4\x93\x02-*+/api/v1/um/delete_master_user/{identity_id}B#Z!user-management/api/tenants/v1;v1b\x06proto3"
 
 var (
 	file_tenants_v1_tenants_proto_rawDescOnce sync.Once
@@ -817,45 +1020,51 @@ func file_tenants_v1_tenants_proto_rawDescGZIP() []byte {
 	return file_tenants_v1_tenants_proto_rawDescData
 }
 
-var file_tenants_v1_tenants_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_tenants_v1_tenants_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_tenants_v1_tenants_proto_goTypes = []any{
 	(*RegisterMasterUserRequest)(nil),  // 0: tenants.v1.RegisterMasterUserRequest
 	(*RegisterMasterUserResponse)(nil), // 1: tenants.v1.RegisterMasterUserResponse
-	(*GetJWTTokenRequest)(nil),         // 2: tenants.v1.GetJWTTokenRequest
-	(*GetJWTTokenResponse)(nil),        // 3: tenants.v1.GetJWTTokenResponse
-	(*CreateSubUserRequest)(nil),       // 4: tenants.v1.CreateSubUserRequest
-	(*CreateSubUserResponse)(nil),      // 5: tenants.v1.CreateSubUserResponse
-	(*ListSubUsersRequest)(nil),        // 6: tenants.v1.ListSubUsersRequest
-	(*ListSubUsersResponse)(nil),       // 7: tenants.v1.ListSubUsersResponse
-	(*DeleteUserRequest)(nil),          // 8: tenants.v1.DeleteUserRequest
-	(*DeleteUserResponse)(nil),         // 9: tenants.v1.DeleteUserResponse
-	(*TenantData)(nil),                 // 10: tenants.v1.TenantData
-	(*TokenData)(nil),                  // 11: tenants.v1.TokenData
-	(*UserData)(nil),                   // 12: tenants.v1.UserData
-	(*UserSummary)(nil),                // 13: tenants.v1.UserSummary
+	(*LoginUserRequest)(nil),           // 2: tenants.v1.LoginUserRequest
+	(*LoginUserResponse)(nil),          // 3: tenants.v1.LoginUserResponse
+	(*UserInfo)(nil),                   // 4: tenants.v1.UserInfo
+	(*GetJWTTokenRequest)(nil),         // 5: tenants.v1.GetJWTTokenRequest
+	(*GetJWTTokenResponse)(nil),        // 6: tenants.v1.GetJWTTokenResponse
+	(*CreateSubUserRequest)(nil),       // 7: tenants.v1.CreateSubUserRequest
+	(*CreateSubUserResponse)(nil),      // 8: tenants.v1.CreateSubUserResponse
+	(*ListSubUsersRequest)(nil),        // 9: tenants.v1.ListSubUsersRequest
+	(*ListSubUsersResponse)(nil),       // 10: tenants.v1.ListSubUsersResponse
+	(*DeleteUserRequest)(nil),          // 11: tenants.v1.DeleteUserRequest
+	(*DeleteUserResponse)(nil),         // 12: tenants.v1.DeleteUserResponse
+	(*TenantData)(nil),                 // 13: tenants.v1.TenantData
+	(*TokenData)(nil),                  // 14: tenants.v1.TokenData
+	(*UserData)(nil),                   // 15: tenants.v1.UserData
+	(*UserSummary)(nil),                // 16: tenants.v1.UserSummary
 }
 var file_tenants_v1_tenants_proto_depIdxs = []int32{
-	10, // 0: tenants.v1.RegisterMasterUserResponse.data:type_name -> tenants.v1.TenantData
-	11, // 1: tenants.v1.GetJWTTokenResponse.data:type_name -> tenants.v1.TokenData
-	12, // 2: tenants.v1.CreateSubUserResponse.data:type_name -> tenants.v1.UserData
-	13, // 3: tenants.v1.ListSubUsersResponse.users:type_name -> tenants.v1.UserSummary
-	0,  // 4: tenants.v1.TenantsService.RegisterMasterUser:input_type -> tenants.v1.RegisterMasterUserRequest
-	2,  // 5: tenants.v1.TenantsService.GetJWTToken:input_type -> tenants.v1.GetJWTTokenRequest
-	4,  // 6: tenants.v1.TenantsService.CreateSubUser:input_type -> tenants.v1.CreateSubUserRequest
-	6,  // 7: tenants.v1.TenantsService.ListSubUsers:input_type -> tenants.v1.ListSubUsersRequest
-	8,  // 8: tenants.v1.TenantsService.DeleteSubUser:input_type -> tenants.v1.DeleteUserRequest
-	8,  // 9: tenants.v1.TenantsService.DeleteMasterUser:input_type -> tenants.v1.DeleteUserRequest
-	1,  // 10: tenants.v1.TenantsService.RegisterMasterUser:output_type -> tenants.v1.RegisterMasterUserResponse
-	3,  // 11: tenants.v1.TenantsService.GetJWTToken:output_type -> tenants.v1.GetJWTTokenResponse
-	5,  // 12: tenants.v1.TenantsService.CreateSubUser:output_type -> tenants.v1.CreateSubUserResponse
-	7,  // 13: tenants.v1.TenantsService.ListSubUsers:output_type -> tenants.v1.ListSubUsersResponse
-	9,  // 14: tenants.v1.TenantsService.DeleteSubUser:output_type -> tenants.v1.DeleteUserResponse
-	9,  // 15: tenants.v1.TenantsService.DeleteMasterUser:output_type -> tenants.v1.DeleteUserResponse
-	10, // [10:16] is the sub-list for method output_type
-	4,  // [4:10] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	13, // 0: tenants.v1.RegisterMasterUserResponse.data:type_name -> tenants.v1.TenantData
+	4,  // 1: tenants.v1.LoginUserResponse.user:type_name -> tenants.v1.UserInfo
+	14, // 2: tenants.v1.GetJWTTokenResponse.data:type_name -> tenants.v1.TokenData
+	15, // 3: tenants.v1.CreateSubUserResponse.data:type_name -> tenants.v1.UserData
+	16, // 4: tenants.v1.ListSubUsersResponse.users:type_name -> tenants.v1.UserSummary
+	0,  // 5: tenants.v1.TenantsService.RegisterMasterUser:input_type -> tenants.v1.RegisterMasterUserRequest
+	2,  // 6: tenants.v1.TenantsService.LoginUser:input_type -> tenants.v1.LoginUserRequest
+	5,  // 7: tenants.v1.TenantsService.GetJWTToken:input_type -> tenants.v1.GetJWTTokenRequest
+	7,  // 8: tenants.v1.TenantsService.CreateSubUser:input_type -> tenants.v1.CreateSubUserRequest
+	9,  // 9: tenants.v1.TenantsService.ListSubUsers:input_type -> tenants.v1.ListSubUsersRequest
+	11, // 10: tenants.v1.TenantsService.DeleteSubUser:input_type -> tenants.v1.DeleteUserRequest
+	11, // 11: tenants.v1.TenantsService.DeleteMasterUser:input_type -> tenants.v1.DeleteUserRequest
+	1,  // 12: tenants.v1.TenantsService.RegisterMasterUser:output_type -> tenants.v1.RegisterMasterUserResponse
+	3,  // 13: tenants.v1.TenantsService.LoginUser:output_type -> tenants.v1.LoginUserResponse
+	6,  // 14: tenants.v1.TenantsService.GetJWTToken:output_type -> tenants.v1.GetJWTTokenResponse
+	8,  // 15: tenants.v1.TenantsService.CreateSubUser:output_type -> tenants.v1.CreateSubUserResponse
+	10, // 16: tenants.v1.TenantsService.ListSubUsers:output_type -> tenants.v1.ListSubUsersResponse
+	12, // 17: tenants.v1.TenantsService.DeleteSubUser:output_type -> tenants.v1.DeleteUserResponse
+	12, // 18: tenants.v1.TenantsService.DeleteMasterUser:output_type -> tenants.v1.DeleteUserResponse
+	12, // [12:19] is the sub-list for method output_type
+	5,  // [5:12] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_tenants_v1_tenants_proto_init() }
@@ -869,7 +1078,7 @@ func file_tenants_v1_tenants_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_tenants_v1_tenants_proto_rawDesc), len(file_tenants_v1_tenants_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

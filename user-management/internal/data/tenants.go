@@ -108,30 +108,31 @@ func (r *tenantsRepo) ListIdentitiesByOrg(ctx context.Context, orgName string) (
 
 	var users []*biz.User
 	for _, id := range identities {
-		// Filter by Organization
+		// Filter ONLY by Organization (removed role filter)
 		if tOrg, ok := id.Traits["organization_name"].(string); ok && tOrg == orgName {
-			// Check Role
-			if role, ok := id.Traits["role"].(string); ok && role == "sub" {
 
-				// 1. Extract Email
-				email, _ := id.Traits["email"].(string)
+			// Extract Email
+			email, _ := id.Traits["email"].(string)
 
-				// 2. Extract Nested Name Fields (The Missing Part)
-				var firstName, lastName string
-				if nameMap, ok := id.Traits["name"].(map[string]interface{}); ok {
-					firstName, _ = nameMap["first"].(string)
-					lastName, _ = nameMap["last"].(string)
-				}
+			// Extract Role
+			role, _ := id.Traits["role"].(string)
 
-				// 3. Append to Result
-				users = append(users, &biz.User{
-					IdentityID:       id.ID,
-					Email:            email,
-					FirstName:        firstName, // Now populated
-					LastName:         lastName,  // Now populated
-					OrganizationName: orgName,
-				})
+			// Extract Nested Name Fields
+			var firstName, lastName string
+			if nameMap, ok := id.Traits["name"].(map[string]interface{}); ok {
+				firstName, _ = nameMap["first"].(string)
+				lastName, _ = nameMap["last"].(string)
 			}
+
+			// Append to Result (all users, not just sub)
+			users = append(users, &biz.User{
+				IdentityID:       id.ID,
+				Email:            email,
+				FirstName:        firstName,
+				LastName:         lastName,
+				OrganizationName: orgName,
+				Role:             role, // Include role
+			})
 		}
 	}
 	return users, nil

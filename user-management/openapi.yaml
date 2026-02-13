@@ -6,55 +6,7 @@ info:
     title: TenantsService API
     version: 0.0.1
 paths:
-    /api/v1/um/master_user:
-        post:
-            tags:
-                - TenantsService
-            operationId: TenantsService_RegisterMasterUser
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/tenants.v1.RegisterMasterUserRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/tenants.v1.RegisterMasterUserResponse'
-    /api/v1/um/master_user/{identityId}:
-        delete:
-            tags:
-                - TenantsService
-            operationId: TenantsService_DeleteMasterUser
-            parameters:
-                - name: identityId
-                  in: path
-                  required: true
-                  schema:
-                    type: string
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/tenants.v1.DeleteUserResponse'
-    /api/v1/um/token:
-        get:
-            tags:
-                - TenantsService
-            operationId: TenantsService_GetJWTToken
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/tenants.v1.GetJWTTokenResponse'
-    /api/v1/um/user:
+    /api/v1/um/create_sub_user:
         post:
             tags:
                 - TenantsService
@@ -72,7 +24,25 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/tenants.v1.CreateSubUserResponse'
-    /api/v1/um/user/{identityId}:
+    /api/v1/um/delete_master_user/{identityId}:
+        delete:
+            tags:
+                - TenantsService
+            operationId: TenantsService_DeleteMasterUser
+            parameters:
+                - name: identityId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.DeleteUserResponse'
+    /api/v1/um/delete_sub_user/{identityId}:
         delete:
             tags:
                 - TenantsService
@@ -90,7 +60,7 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/tenants.v1.DeleteUserResponse'
-    /api/v1/um/users:
+    /api/v1/um/list_all_users:
         get:
             tags:
                 - TenantsService
@@ -102,6 +72,55 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/tenants.v1.ListSubUsersResponse'
+    /api/v1/um/login:
+        post:
+            tags:
+                - TenantsService
+            description: 'NEW: Login endpoint'
+            operationId: TenantsService_LoginUser
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/tenants.v1.LoginUserRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.LoginUserResponse'
+    /api/v1/um/register_master_user:
+        post:
+            tags:
+                - TenantsService
+            operationId: TenantsService_RegisterMasterUser
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/tenants.v1.RegisterMasterUserRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.RegisterMasterUserResponse'
+    /api/v1/um/token:
+        get:
+            tags:
+                - TenantsService
+            operationId: TenantsService_GetJWTToken
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.GetJWTTokenResponse'
 components:
     schemas:
         tenants.v1.CreateSubUserRequest:
@@ -139,6 +158,20 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/tenants.v1.UserSummary'
+        tenants.v1.LoginUserRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+                password:
+                    type: string
+        tenants.v1.LoginUserResponse:
+            type: object
+            properties:
+                sessionToken:
+                    type: string
+                user:
+                    $ref: '#/components/schemas/tenants.v1.UserInfo'
         tenants.v1.RegisterMasterUserRequest:
             type: object
             properties:
@@ -178,6 +211,19 @@ components:
                     type: string
                 organizationName:
                     type: string
+        tenants.v1.UserInfo:
+            type: object
+            properties:
+                email:
+                    type: string
+                firstName:
+                    type: string
+                lastName:
+                    type: string
+                organizationName:
+                    type: string
+                role:
+                    type: string
         tenants.v1.UserSummary:
             type: object
             properties:
@@ -190,6 +236,8 @@ components:
                 lastName:
                     type: string
                 organizationName:
+                    type: string
+                role:
                     type: string
 tags:
     - name: TenantsService

@@ -30,7 +30,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, confKratos *conf.Krat
 	}
 	tenantsRepo := data.NewTenantsRepo(dataData, logger)
 	tenantsUsecase := biz.NewTenantsUsecase(tenantsRepo, logger)
-	tenantsService := service.NewTenantsService(tenantsUsecase, logger)
+	tenantsService := service.NewTenantsService(tenantsUsecase, dataData, logger)
 	grpcServer := server.NewGRPCServer(confServer, tenantsService, logger)
 	httpServer := server.NewHTTPServer(confServer, tenantsService, logger)
 	app := newApp(logger, grpcServer, httpServer)

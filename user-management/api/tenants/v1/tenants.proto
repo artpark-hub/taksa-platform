@@ -9,7 +9,15 @@ option go_package = "user-management/api/tenants/v1;v1";
 service TenantsService {
   rpc RegisterMasterUser (RegisterMasterUserRequest) returns (RegisterMasterUserResponse) {
     option (google.api.http) = {
-      post: "/api/v1/um/master_user"
+      post: "/api/v1/um/register_master_user"
+      body: "*"
+    };
+  }
+  
+  // NEW: Login endpoint
+  rpc LoginUser (LoginUserRequest) returns (LoginUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/login"
       body: "*"
     };
   }
@@ -22,26 +30,26 @@ service TenantsService {
   
   rpc CreateSubUser (CreateSubUserRequest) returns (CreateSubUserResponse) {
     option (google.api.http) = {
-      post: "/api/v1/um/user"
+      post: "/api/v1/um/create_sub_user"
       body: "*"
     };
   }
 
   rpc ListSubUsers (ListSubUsersRequest) returns (ListSubUsersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/um/users"
+      get: "/api/v1/um/list_all_users"
     };
   }
 
   rpc DeleteSubUser (DeleteUserRequest) returns (DeleteUserResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/um/user/{identity_id}"
+      delete: "/api/v1/um/delete_sub_user/{identity_id}"
     };
   }
 
   rpc DeleteMasterUser (DeleteUserRequest) returns (DeleteUserResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/um/master_user/{identity_id}"
+      delete: "/api/v1/um/delete_master_user/{identity_id}"
     };
   }
 }
@@ -56,6 +64,24 @@ message RegisterMasterUserRequest {
 
 message RegisterMasterUserResponse {
   TenantData data = 1;
+}
+
+message LoginUserRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginUserResponse {
+  string session_token = 1;
+  UserInfo user = 2;
+}
+
+message UserInfo {
+  string email = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string organization_name = 4;
+  string role = 5;
 }
 
 message GetJWTTokenRequest {}
@@ -111,5 +137,5 @@ message UserSummary {
   string first_name = 3;
   string last_name = 4;
   string organization_name = 5;
+  string role = 6;
 }
-
