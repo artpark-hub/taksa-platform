@@ -17,17 +17,21 @@ const DashboardLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
+    // --- LOGOUT HANDLER ---
     const handleLogout = () => {
+        // Clear user session
+        localStorage.removeItem('taksa_user');
+        // Redirect to login
         navigate('/login');
     };
 
     // --- LOGIC TO KEEP SIDEBAR ACTIVE ---
-    // If we are on /data-flow, /instances, OR /visualize, this returns true
     const isDataFlowActive =
         location.pathname.includes('/data-flow') ||
         location.pathname.includes('/instances') ||
         location.pathname.includes('/visualise') ||
         location.pathname.includes('/InstanceDetails');
+    const isSettingsActive = location.pathname.includes('/Settings');
 
     return (
         <div className="dashboard-container">
@@ -53,18 +57,27 @@ const DashboardLayout = () => {
                     </div>
                 )}
 
+                {/* Main Navigation Menu */}
                 <nav className="sidebar-menu">
-                    {/* Linked to Data Flow / Edge AI Devices */}
                     <Link to="/data-flow" className={`menu-item ${isDataFlowActive ? 'active' : ''}`}>
                         <Server size={20} />
                         {!isCollapsed && <span>Edge Devices</span>}
                     </Link>
 
-                    <Link to="/settings" className={`menu-item ${location.pathname === '/settings' ? 'active' : ''}`}>
+                    <Link to="/Settings" className={`menu-item ${isSettingsActive ? 'active' : ''}`}>
                         <Settings size={20} />
                         {!isCollapsed && <span>Settings</span>}
                     </Link>
                 </nav>
+
+                {/* --- FOOTER (LOGOUT) --- */}
+                {/* Placed at the bottom via CSS flex layout */}
+                <div className="sidebar-footer">
+                    <button onClick={handleLogout} className="menu-item logout-btn">
+                        <LogOut size={20} />
+                        {!isCollapsed && <span>Logout</span>}
+                    </button>
+                </div>
             </aside>
 
             {/* MAIN CONTENT */}

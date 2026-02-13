@@ -8,6 +8,7 @@ import Instances from './components/Instances';
 import Visualise from './components/Visualise';
 import InstanceDetails from './components/InstanceDetails';
 import { InstanceProvider } from './components/InstanceContext';
+import Settings from './components/Settings';
 import './App.css';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
             <Route path="/data-flow" element={<DataFlow />} />
             <Route path="/instances" element={<Instances />} />
             <Route path="/visualise" element={<Visualise />} />
+            <Route path="/Settings" element={<Settings />} />
             <Route path="/InstanceDetails" element={<InstanceDetails />} />
           </Route>
 

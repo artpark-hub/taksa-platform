@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Plus, Search, Loader2, CheckCircle, X, CornerDownRight } from 'lucide-react';
+import { MoreVertical, Plus, Search, Loader2, CheckCircle, X, CornerDownRight, AlertCircle } from 'lucide-react';
 import { useInstanceContext } from './InstanceContext';
 import './DataFlow.css';
 
@@ -16,13 +16,18 @@ const DataFlow = () => {
         setShowDiscovery    // From Context
     } = useInstanceContext();
 
-    // --- LOCAL UI STATE (Only for things that should reset on navigation) ---
+    // --- LOCAL UI STATE ---
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [activeTableType, setActiveTableType] = useState(null);
     const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
     const [firstName, setFirstName] = useState('');
-    const [isConnecting, setIsConnecting] = useState(false);
+
+    // UI States
+    const [isConnecting, setIsConnecting] = useState(false); // For instance connection
+    const [isDiscovering, setIsDiscovering] = useState(false); // For discovery process
     const [showToast, setShowToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState(''); // Custom toast message
+    const [toastType, setToastType] = useState('success'); // 'success' or 'info' for styling icon
 
     // --- INITIALIZATION ---
     useEffect(() => {
@@ -71,18 +76,40 @@ const DataFlow = () => {
         }
     };
 
-    // --- DISCOVER HANDLER (Updates Global Context) ---
+    // --- DISCOVER HANDLER (UPDATED LOGIC) ---
     const handleDiscover = () => {
-        if (showDiscovery) return;
-        setShowDiscovery(true); // Persists until reload
-        setActiveDropdown(null);
+        setActiveDropdown(null); // Close dropdown immediately
+
+        // 1. If Discovery is ALREADY done -> Show "No new device found"
+        if (showDiscovery) {
+            setToastMessage("No new device found");
+            setToastType('info'); // You can style this differently if needed
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+            return; // Stop here
+        }
+
+        // 2. First Time -> Start Loading Process
+        setIsDiscovering(true);
+
+        // Simulate 5 seconds buffer
+        setTimeout(() => {
+            setIsDiscovering(false);
+            setShowDiscovery(true); // Reveal the drawer (Persists until reload)
+
+            // Show Success Toast
+            setToastMessage("Device found successfully");
+            setToastType('success');
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        }, 5000);
     };
 
     // --- INSTANCE LOGIC ---
     const activeInstance = instances.find(inst => inst.id === activeDropdown);
     const isInstanceConnected = activeInstance?.status === 'active';
 
-    const handleNavigation = (e, path) => {
+    const handleInstanceNavigation = (e, path) => {
         e.stopPropagation();
         if (isInstanceConnected) navigate(path);
     };
@@ -98,32 +125,43 @@ const DataFlow = () => {
         setTimeout(() => {
             setIsConnecting(false);
             updateInstanceStatus(id, 'active');
+
+            // Show Success Toast
+            setToastMessage("Connected successfully");
+            setToastType('success');
             setShowToast(true);
             setTimeout(() => setShowToast(false), 3000);
         }, 5000);
     };
 
+    // Hardcoded Main Server
     const servers = [
         { id: 999, serial: '1', name: 'ArtPark Device-1', status: 'Active' }
     ];
 
+    // Consolidated loading state text
+    const isLoading = isConnecting || isDiscovering;
+    const loadingText = isDiscovering ? "Discovering devices..." : "Establishing connection...";
+
     return (
         <div className="data-flow-page">
 
-            {/* --- LOADING & TOAST --- */}
-            {isConnecting && (
+            {/* --- LOADING OVERLAY --- */}
+            {isLoading && (
                 <div className="loading-overlay">
                     <div className="loading-box">
                         <Loader2 className="spinner" size={32} />
-                        <p>Establishing connection...</p>
+                        <p>{loadingText}</p>
                     </div>
                 </div>
             )}
 
+            {/* --- TOAST NOTIFICATION --- */}
             {showToast && (
                 <div className="success-toast">
-                    <CheckCircle size={20} />
-                    <span>Connected successfully</span>
+                    {/* Change icon based on message type */}
+                    {toastType === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+                    <span>{toastMessage}</span>
                     <button onClick={() => setShowToast(false)} className="toast-close">
                         <X size={16} />
                     </button>
@@ -174,6 +212,7 @@ const DataFlow = () => {
                                 {/* PARENT ROW */}
                                 <tr className={showDiscovery ? 'parent-active' : ''}>
                                     <td>{server.serial}</td>
+                                    {/* Name keeps style but no navigation */}
                                     <td className="device-name-link">
                                         {server.name}
                                     </td>
@@ -281,20 +320,23 @@ const DataFlow = () => {
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
+                    {/* DROPDOWN FOR MAIN TABLE (ArtPark Device-1) */}
                     {activeTableType === 'main' && (
                         <>
+                            {/* Always clickable - Logic handles success vs info message */}
                             <div
-                                className={`dropdown-item ${showDiscovery ? 'disabled' : ''}`}
+                                className="dropdown-item"
                                 onClick={handleDiscover}
-                                title={showDiscovery ? "Discovery already done" : ""}
                             >
                                 Discover
                             </div>
                             <div className="dropdown-item" onClick={() => navigate('/InstanceDetails')}>Device Details</div>
+                            <div className="dropdown-item">Edit</div>
                             <div className="dropdown-item delete">Delete</div>
                         </>
                     )}
 
+                    {/* DROPDOWN FOR INSTANCE TABLE (Mitsubishi PLC) */}
                     {activeTableType === 'instance' && (
                         <>
                             <div
@@ -305,7 +347,7 @@ const DataFlow = () => {
                             </div>
                             <div
                                 className={`dropdown-item ${!isInstanceConnected ? 'disabled' : ''}`}
-                                onClick={(e) => handleNavigation(e, '/visualise')}
+                                onClick={(e) => handleInstanceNavigation(e, '/visualise')}
                             >
                                 Visualize
                             </div>

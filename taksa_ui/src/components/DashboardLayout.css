@@ -22,10 +22,14 @@
 /* SIDEBAR */
 .sidebar {
     width: 220px;
+    /* --- REVERTED TO YOUR ORIGINAL STYLE --- */
     backdrop-filter: blur(1px);
     border-right: 1px solid rgba(0, 0, 0, 0.08);
+
+    /* Only these lines are added for the footer layout */
     display: flex;
     flex-direction: column;
+
     transition: width 0.3s ease;
     flex-shrink: 0;
     z-index: 20;
@@ -94,6 +98,7 @@
 
 /* Menu */
 .sidebar-menu {
+    /* Added flex: 1 to push footer to bottom */
     flex: 1;
     padding: 20px 10px;
     display: flex;
@@ -115,6 +120,7 @@
     font-size: 0.9rem;
     white-space: nowrap;
     gap: 12px;
+    background: transparent;
 }
 
 .menu-item:hover {
@@ -136,9 +142,21 @@
     padding: 12px;
 }
 
+/* --- SIDEBAR FOOTER (Added margin-top: auto) --- */
 .sidebar-footer {
     padding: 15px;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: auto;
+}
+
+/* --- LOGOUT BUTTON STYLES --- */
+.logout-btn {
+    color: #d32f2f;
+    /* Red Text */
+}
+
+.logout-btn:hover {
+    background-color: #ffebee;
+    color: #b71c1c;
 }
 
 /* MAIN CONTENT */
@@ -154,16 +172,16 @@
 .top-header {
     height: 60px;
     box-sizing: border-box;
+    /* --- REVERTED TO YOUR ORIGINAL STYLE --- */
     backdrop-filter: blur(1px);
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     display: flex;
     align-items: center;
-    /* CHANGED: Spread content apart (Breadcrumbs left, User right) */
     justify-content: space-between;
     padding: 0 30px;
 }
 
-/* --- BREADCRUMB STYLES --- */
+/* BREADCRUMB STYLES */
 .header-left-breadcrumb {
     display: flex;
     align-items: center;

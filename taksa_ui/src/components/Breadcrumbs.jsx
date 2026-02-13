@@ -17,7 +17,6 @@ const Breadcrumbs = () => {
         ],
         '/InstanceDetails': [
             { name: 'Edge Devices', link: '/data-flow' },
-            { name: 'Mitsubishi PLC', link: null }, // No link, just text
             { name: 'Device Details', link: null } // Current Page
         ]
     };
