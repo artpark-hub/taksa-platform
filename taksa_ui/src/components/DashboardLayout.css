@@ -1,0 +1,219 @@
+/* src/components/DashboardLayout.css */
+
+:root {
+    --foreground: #000000;
+    --background: #f8f9fa;
+    --accent: #0056b3;
+}
+
+.dashboard-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    font-family: 'Segoe UI', 'Roboto', sans-serif;
+    overflow: hidden;
+    background-color: var(--background);
+    background-image:
+        radial-gradient(circle, color-mix(in srgb, var(--foreground), transparent 90%) 1px, transparent 1px),
+        radial-gradient(farthest-corner at 0% 210%, color-mix(in srgb, var(--accent), transparent 50%) 0%, transparent 60%);
+    background-size: 22px 22px, 100% 100%;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 220px;
+    backdrop-filter: blur(1px);
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.3s ease;
+    flex-shrink: 0;
+    z-index: 20;
+}
+
+.sidebar.collapsed {
+    width: 90px;
+}
+
+.sidebar-header {
+    height: 60px;
+    min-height: 60px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 15px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.sidebar.collapsed .sidebar-header {
+    justify-content: center;
+    padding: 0;
+}
+
+.brand-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-logo {
+    width: 110px;
+    height: auto;
+    object-fit: contain;
+    transition: width 0.3s;
+}
+
+.sidebar.collapsed .sidebar-logo {
+    width: 70px;
+}
+
+.collapsed-toggle-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+}
+
+.toggle-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #000;
+}
+
+/* Menu */
+.sidebar-menu {
+    flex: 1;
+    padding: 20px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    color: #555;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    gap: 12px;
+}
+
+.menu-item:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    color: #333;
+}
+
+.menu-item.active {
+    background-color: #000;
+    color: #fff;
+}
+
+.sidebar.collapsed .menu-item span {
+    display: none;
+}
+
+.sidebar.collapsed .menu-item {
+    justify-content: center;
+    padding: 12px;
+}
+
+.sidebar-footer {
+    padding: 15px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* MAIN CONTENT */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: transparent;
+}
+
+/* TOP HEADER */
+.top-header {
+    height: 60px;
+    box-sizing: border-box;
+    backdrop-filter: blur(1px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    /* CHANGED: Spread content apart (Breadcrumbs left, User right) */
+    justify-content: space-between;
+    padding: 0 30px;
+}
+
+/* --- BREADCRUMB STYLES --- */
+.header-left-breadcrumb {
+    display: flex;
+    align-items: center;
+    font-size: 0.95rem;
+    color: #666;
+}
+
+.breadcrumb-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.breadcrumb-link {
+    color: #666;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+    font-size: small;
+}
+
+.breadcrumb-link:hover {
+    color: #000;
+    text-decoration: underline;
+}
+
+.breadcrumb-separator {
+    color: #999;
+}
+
+.breadcrumb-current {
+    color: #000;
+    font-weight: 500;
+    font-size: small;
+}
+
+/* Header Right */
+.user-icon {
+    width: 36px;
+    height: 36px;
+    background-color: #000;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.page-body {
+    flex: 1;
+    padding: 15px 30px 30px 30px;
+    overflow-y: auto;
+}

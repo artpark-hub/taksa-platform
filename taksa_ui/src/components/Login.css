@@ -1,0 +1,206 @@
+/* src/components/Login.css */
+
+:root {
+    --foreground: #000000;
+    --background: #f8f9fa;
+    --accent: #0056b3;
+}
+
+/* 1. MAIN CONTAINER: Apply the Background HERE for the whole page */
+.login-page {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    font-family: 'Segoe UI', 'Roboto', sans-serif;
+    overflow: hidden;
+
+    /* BACKGROUND SETTINGS MOVED HERE */
+    background-color: var(--background);
+    background-image:
+        radial-gradient(circle, color-mix(in srgb, var(--foreground), transparent 90%) 1px, transparent 1px),
+        radial-gradient(farthest-corner at 0% 150%, color-mix(in srgb, var(--accent), transparent 50%) 0%, transparent 60%);
+    background-size: 22px 22px, 100% 100%;
+}
+
+/* 2. LEFT PANEL: Just structure, no background */
+.login-left-panel {
+    flex: 1.5;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    /* Background removed from here */
+    border-right: none;
+    /* Removed border to make it seamless */
+}
+
+.brand-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.brand-logo {
+    width: 200px;
+    height: auto;
+    object-fit: contain;
+}
+
+.brand-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+    padding-left: 4px;
+}
+
+/* 3. RIGHT PANEL: Transparent to let dots show through */
+.login-right-panel {
+    flex: 1;
+    height: 100%;
+    background-color: transparent;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-shadow: none;
+}
+
+/* Form Container */
+.login-form-container {
+    width: 100%;
+    max-width: 450px;
+    display: flex;
+    flex-direction: column;
+    /* Optional: If text is hard to read, you can add a semi-transparent background here */
+    /* background: rgba(255,255,255,0.5); */
+    /* backdrop-filter: blur(5px); */
+    /* border-radius: 12px; */
+    /* padding: 30px; */
+    padding: 40px;
+
+    /* 3. Add rounded corners */
+    border-radius: 12px;
+
+    /* 4. The Shadow Effect: Soft and large for a modern floating look */
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+
+    /* Optional: A very subtle border to define the edges */
+
+    height: inherit;
+    justify-content: center;
+}
+
+/* Header & Text Styling */
+.form-header {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #000;
+    margin-bottom: 20px;
+}
+
+.form-subtext {
+    color: #555;
+    font-size: 0.95rem;
+    margin-bottom: 30px;
+}
+
+/* Form Inputs */
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: all 0.2s;
+    background: #ffffff;
+    /* Keep inputs white so they pop */
+}
+
+.form-group input:focus {
+    border-color: #000;
+    outline: none;
+}
+
+.input-error {
+    border-color: #ef4444 !important;
+    background-color: rgba(254, 242, 242, 1);
+}
+
+.error-text {
+    color: #ef4444;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    display: block;
+}
+
+/* Black Button */
+.signin-btn {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    background-color: #111;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.signin-btn:hover {
+    background-color: #333;
+}
+
+/* Footer */
+.login-footer {
+    margin-top: 25px;
+    text-align: left;
+    font-size: 0.9rem;
+    color: #666;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.login-footer a {
+    color: #0056b3;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .login-page {
+        flex-direction: column;
+    }
+
+    .login-left-panel {
+        display: none;
+    }
+
+    .login-right-panel {
+        flex: 1;
+        padding: 20px;
+        justify-content: flex-start;
+        padding-top: 60px;
+    }
+}
