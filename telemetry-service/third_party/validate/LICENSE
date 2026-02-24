@@ -1,0 +1,5 @@
+This directory vendors parts of the Envoy protoc-gen-validate project.
+
+Please add the upstream license text from https://github.com/envoyproxy/protoc-gen-validate corresponding to the version/commit you vendored.
+
+(Placeholder file added by automation to remind reviewers to include the correct license.)

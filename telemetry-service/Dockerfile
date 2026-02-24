@@ -1,7 +1,9 @@
-FROM golang:1.24 AS builder
+FROM golang:1.24.6 AS builder
 COPY . /src
 WORKDIR /src
-RUN go env -w GOPROXY=direct
+ARG GOPROXY=""
+# If a GOPROXY is provided at build-time, set it; otherwise leave Go defaults intact.
+RUN if [ -n "$GOPROXY" ]; then go env -w GOPROXY="$GOPROXY"; fi
 RUN go mod download
 RUN go build -o /app/telemetry-service ./cmd/telemetry-service
 
