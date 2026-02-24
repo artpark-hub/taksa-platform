@@ -356,7 +356,11 @@ type Data_Nats struct {
 	// Subject to subscribe to (supports wildcards, e.g. "umh.>")
 	Subject string `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
 	// Queue group name for subscriptions (optional)
-	QueueGroup    string `protobuf:"bytes,3,opt,name=queue_group,json=queueGroup,proto3" json:"queue_group,omitempty"`
+	QueueGroup string `protobuf:"bytes,3,opt,name=queue_group,json=queueGroup,proto3" json:"queue_group,omitempty"`
+	// JetStream stream name to bind consumers to (optional)
+	Stream string `protobuf:"bytes,4,opt,name=stream,proto3" json:"stream,omitempty"`
+	// Optional dead-letter subject to publish malformed or poison messages
+	Dlq           string `protobuf:"bytes,5,opt,name=dlq,proto3" json:"dlq,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -412,6 +416,20 @@ func (x *Data_Nats) GetQueueGroup() string {
 	return ""
 }
 
+func (x *Data_Nats) GetStream() string {
+	if x != nil {
+		return x.Stream
+	}
+	return ""
+}
+
+func (x *Data_Nats) GetDlq() string {
+	if x != nil {
+		return x.Dlq
+	}
+	return ""
+}
+
 var File_conf_conf_proto protoreflect.FileDescriptor
 
 const file_conf_conf_proto_rawDesc = "" +
@@ -431,18 +449,20 @@ const file_conf_conf_proto_rawDesc = "" +
 	"\x04GRPC\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x123\n" +
-	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"\xf9\x01\n" +
+	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"\xa3\x02\n" +
 	"\x04Data\x125\n" +
 	"\bdatabase\x18\x01 \x01(\v2\x19.kratos.api.Data.DatabaseR\bdatabase\x12)\n" +
 	"\x04nats\x18\x02 \x01(\v2\x15.kratos.api.Data.NatsR\x04nats\x1a:\n" +
 	"\bDatabase\x12\x16\n" +
 	"\x06driver\x18\x01 \x01(\tR\x06driver\x12\x16\n" +
-	"\x06source\x18\x02 \x01(\tR\x06source\x1aS\n" +
+	"\x06source\x18\x02 \x01(\tR\x06source\x1a}\n" +
 	"\x04Nats\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x18\n" +
 	"\asubject\x18\x02 \x01(\tR\asubject\x12\x1f\n" +
 	"\vqueue_group\x18\x03 \x01(\tR\n" +
-	"queueGroupB&Z$telemetry-service/internal/conf;confb\x06proto3"
+	"queueGroup\x12\x16\n" +
+	"\x06stream\x18\x04 \x01(\tR\x06stream\x12\x10\n" +
+	"\x03dlq\x18\x05 \x01(\tR\x03dlqB&Z$telemetry-service/internal/conf;confb\x06proto3"
 
 var (
 	file_conf_conf_proto_rawDescOnce sync.Once

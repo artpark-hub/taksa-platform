@@ -36,6 +36,10 @@ message Data {
     string subject = 2;
     // Queue group name for subscriptions (optional)
     string queue_group = 3;
+    // JetStream stream name to bind consumers to (optional)
+    string stream = 4;
+    // Optional dead-letter subject to publish malformed or poison messages
+    string dlq = 5;
   }
   Database database = 1;
   Nats nats = 2;
