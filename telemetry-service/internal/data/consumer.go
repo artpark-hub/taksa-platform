@@ -75,11 +75,33 @@ func (c *Consumer) handleMsg(msg *nats.Msg) {
 	var rawEvent RawUMHEvent
 	if err := json.Unmarshal(msg.Data, &rawEvent); err != nil {
 		c.log.Errorf("JSON Parse Failed: %v", err)
-		if _, merr := msg.Metadata(); merr == nil {
-			if err := msg.Ack(); err != nil {
-				c.log.Errorf("failed to ack message after JSON error: %v", err)
+		// If DLQ is configured, publish the raw payload with an annotation
+		// so operators can inspect and troubleshoot malformed messages.
+		dlq := c.data.dlqSubject
+		if dlq != "" {
+			// Include original subject and error in the DLQ payload header
+			meta := map[string]string{"source_subject": msg.Subject, "error": err.Error()}
+			metaB, _ := json.Marshal(meta)
+			payload := append(metaB, '\n')
+			payload = append(payload, msg.Data...)
+			if perr := c.data.nc.Publish(dlq, payload); perr != nil {
+				c.log.Errorf("failed to publish to DLQ %s: %v", dlq, perr)
+			} else {
+				c.log.Infof("published malformed message to DLQ %s", dlq)
 			}
+			// For JetStream messages, ACK after publishing to DLQ to avoid redelivery
+			if _, merr := msg.Metadata(); merr == nil {
+				if err := msg.Ack(); err != nil {
+					c.log.Errorf("failed to ack message after DLQ publish: %v", err)
+				}
+			}
+			return
 		}
+
+		// No DLQ configured: log raw payload for inspection and do NOT ACK so
+		// JetStream can retry; if this is plain NATS the message will be lost,
+		// so we log the payload to help debugging.
+		c.log.Errorf("malformed message (no DLQ configured): subject=%s payload=%s", msg.Subject, string(msg.Data))
 		return
 	}
 
@@ -138,21 +160,33 @@ func (c *Consumer) Subscribe() error {
 		return err
 	}
 
-	// Determine subject and queue group from configuration (fall back to hardcoded)
+	// Determine subject, queue group, and stream from configuration (fall back to hardcoded)
 	subject := c.data.subject
 	if subject == "" {
 		subject = "umh.>"
 	}
 	queueGroup := c.data.queueGroup
+	stream := c.data.streamName
+	if stream == "" {
+		stream = "UMH_DATA"
+	}
 
-	// Subscribe according to configured subject/queue
+	// Subscribe according to configured subject/queue; bind to configured stream when provided
 	if queueGroup != "" {
-		_, err = js.QueueSubscribe(subject, queueGroup, c.handleMsg, nats.BindStream("UMH_DATA"))
+		_, err = js.QueueSubscribe(subject, queueGroup, c.handleMsg, nats.BindStream(stream))
 	} else {
-		_, err = js.Subscribe(subject, c.handleMsg, nats.BindStream("UMH_DATA"))
+		_, err = js.Subscribe(subject, c.handleMsg, nats.BindStream(stream))
 	}
 	if err != nil {
-		c.log.Warnf("JetStream subscribe failed (%v), trying standard sub...", err)
+		// Log error details; if this looks like an auth/permission issue, surface it
+		c.log.Warnf("JetStream subscribe failed (%v), evaluating fallback...", err)
+		low := strings.ToLower(err.Error())
+		if strings.Contains(low, "auth") || strings.Contains(low, "permission") || strings.Contains(low, "authorization") {
+			// Likely an auth/perm issue — don't silently fall back to plain NATS
+			return err
+		}
+
+		c.log.Warnf("Falling back to plain NATS subscription for subject %s", subject)
 		if queueGroup != "" {
 			_, err = c.data.nc.QueueSubscribe(subject, queueGroup, c.handleMsg)
 		} else {

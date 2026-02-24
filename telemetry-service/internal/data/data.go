@@ -20,6 +20,8 @@ type Data struct {
 	nc         *nats.Conn
 	subject    string
 	queueGroup string
+	streamName string
+	dlqSubject string
 }
 
 // NewData connects to Postgres and NATS
@@ -54,6 +56,8 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		nc:         nc,
 		subject:    c.Nats.GetSubject(),
 		queueGroup: c.Nats.GetQueueGroup(),
+		streamName: c.Nats.GetStream(),
+		dlqSubject: c.Nats.GetDlq(),
 	}
 
 	cleanup := func() {

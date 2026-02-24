@@ -8,8 +8,11 @@ server:
 data:
   database:
     driver: postgres
-    source: postgres://taksa:taksa_123@127.0.0.1:5433/taksa?sslmode=disable
+    # Use environment variables for credentials to avoid committing secrets in config
+    source: postgres://${DB_USER:-taksa}:${DB_PASSWORD:-taksa_123}@127.0.0.1:5433/taksa?sslmode=disable
   nats:
     url: "nats://taksa_app:taksa_app123@172.25.60.28:4222"
     subject: "umh.>"
     queue_group: "traceability_workers"
+    stream: "UMH_DATA"
+    dlq: "umh.DLQ"

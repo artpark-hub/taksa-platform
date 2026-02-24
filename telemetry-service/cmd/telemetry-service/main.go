@@ -47,9 +47,11 @@ func newApp(logger log.Logger, consumer *data.Consumer) *kratos.App {
 			if err := consumer.Subscribe(); err != nil {
 				return err
 			}
+			l := log.NewHelper(logger)
 			go func() {
 				if err := consumer.Start(ctx); err != nil {
-					panic(err)
+					l.Errorf("consumer runtime error: %v", err)
+					os.Exit(1)
 				}
 			}()
 			return nil
