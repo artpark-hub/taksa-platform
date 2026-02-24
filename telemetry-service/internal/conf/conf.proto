@@ -32,6 +32,10 @@ message Data {
   }
   message Nats {
     string url = 1;
+    // Subject to subscribe to (supports wildcards, e.g. "umh.>")
+    string subject = 2;
+    // Queue group name for subscriptions (optional)
+    string queue_group = 3;
   }
   Database database = 1;
   Nats nats = 2;

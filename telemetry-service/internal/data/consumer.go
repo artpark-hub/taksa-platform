@@ -31,8 +31,9 @@ type RawUMHEvent struct {
 }
 
 type Consumer struct {
-	data *Data
-	log  *log.Helper
+	data       *Data
+	log        *log.Helper
+	subscribed bool
 }
 
 func NewConsumer(data *Data, logger log.Logger) *Consumer {
@@ -43,75 +44,125 @@ func NewConsumer(data *Data, logger log.Logger) *Consumer {
 }
 
 func (c *Consumer) Start(ctx context.Context) error {
-	js, err := c.data.nc.JetStream()
-	if err != nil {
-		return err
-	}
-
-	callback := func(msg *nats.Msg) {
-		parts := strings.Split(msg.Subject, ".")
-		equipmentID := "UNKNOWN"
-		if len(parts) > 0 {
-			equipmentID = parts[len(parts)-1]
-		}
-
-		// 2. Parse the Raw JSON
-		var rawEvent RawUMHEvent
-		if err := json.Unmarshal(msg.Data, &rawEvent); err != nil {
-			c.log.Errorf("JSON Parse Failed: %v", err)
-			msg.Ack()
-			return
-		}
-
-		// 3. Convert Timestamp
-		eventTime := time.UnixMilli(rawEvent.TimestampMS)
-
-		// 4. Determine Event Type based on Value
-		eventType := "STATUS_UPDATE"
-
-		// Use type assertion to check what 'Value' is
-		switch v := rawEvent.Value.(type) {
-		case float64:
-			eventType = fmt.Sprintf("METRIC_VALUE: %.0f", v)
-		case string:
-			if strings.Contains(v, "EncodingMask") {
-				eventType = "COMPLEX_STATE"
-			} else {
-				eventType = "TIMESTAMP_UPDATE"
-			}
-		}
-
-		// 5. Construct DB Object
-		logEntry := LogORM{
-			EquipmentID: equipmentID,
-			EventType:   eventType,
-			WorkOrderID: "WO-AUTO",
-			OperatorID:  "OP-SYS",
-			EventTime:   eventTime,
-		}
-
-		// 6. Save to Postgres
-		if err := c.data.db.Create(&logEntry).Error; err != nil {
-			c.log.Errorf("DB Insert Failed: %v", err)
-			return
-		}
-
-		c.log.Infof("📥 Saved: %s | %s | %v", logEntry.EquipmentID, logEntry.EventType, rawEvent.Value)
-		msg.Ack()
-	}
-
-	// Subscribe to everything under "umh.>"
-	_, err = js.Subscribe("umh.>", callback, nats.BindStream("UMH_DATA"))
-	if err != nil {
-
-		c.log.Warnf("JetStream subscribe failed (%v), trying standard sub...", err)
-		_, err = c.data.nc.Subscribe("umh.>", callback)
-		if err != nil {
+	// Ensure there's a subscription; if Subscribe() has already been called elsewhere,
+	// don't attempt to subscribe again.
+	if !c.subscribed {
+		if err := c.Subscribe(); err != nil {
 			return err
 		}
 	}
 
 	c.log.Info("🚀 Telemetry Service Started: Listening to UMH real data...")
 	<-ctx.Done()
+	return nil
+}
+
+const (
+	// EncodingMaskKeyword is used to detect complex UMH state blobs.
+	// If the UMH protocol changes this marker, update this constant and document the format.
+	EncodingMaskKeyword = "EncodingMask"
+)
+
+// handleMsg processes a single NATS message.
+func (c *Consumer) handleMsg(msg *nats.Msg) {
+	parts := strings.Split(msg.Subject, ".")
+	equipmentID := "UNKNOWN"
+	if len(parts) > 0 {
+		equipmentID = parts[len(parts)-1]
+	}
+
+	// 2. Parse the Raw JSON
+	var rawEvent RawUMHEvent
+	if err := json.Unmarshal(msg.Data, &rawEvent); err != nil {
+		c.log.Errorf("JSON Parse Failed: %v", err)
+		if _, merr := msg.Metadata(); merr == nil {
+			if err := msg.Ack(); err != nil {
+				c.log.Errorf("failed to ack message after JSON error: %v", err)
+			}
+		}
+		return
+	}
+
+	// 3. Convert Timestamp
+	eventTime := time.UnixMilli(rawEvent.TimestampMS)
+
+	// 4. Determine Event Type based on Value
+	eventType := "STATUS_UPDATE"
+
+	// Use type assertion to check what 'Value' is
+	switch v := rawEvent.Value.(type) {
+	case float64:
+		eventType = fmt.Sprintf("METRIC_VALUE: %.0f", v)
+	case string:
+		if strings.Contains(v, EncodingMaskKeyword) {
+			eventType = "COMPLEX_STATE"
+		} else {
+			eventType = "TIMESTAMP_UPDATE"
+		}
+	}
+
+	// 5. Construct DB Object
+	logEntry := LogORM{
+		EquipmentID: equipmentID,
+		EventType:   eventType,
+		WorkOrderID: "WO-AUTO",
+		OperatorID:  "OP-SYS",
+		EventTime:   eventTime,
+	}
+
+	// 6. Save to Postgres
+	if err := c.data.db.Create(&logEntry).Error; err != nil {
+		c.log.Errorf("DB Insert Failed: %v", err)
+		// For JetStream messages, avoid ACK so it can be retried; for plain NATS just log and return
+		return
+	}
+
+	c.log.Infof("📥 Saved: %s | %s | %v", logEntry.EquipmentID, logEntry.EventType, rawEvent.Value)
+
+	if _, merr := msg.Metadata(); merr == nil {
+		if err := msg.Ack(); err != nil {
+			c.log.Errorf("failed to ack message: %v", err)
+		}
+	}
+}
+
+// Subscribe creates the subscription(s) according to configuration. It is safe to call
+// multiple times; subsequent calls are no-ops after a successful subscribe.
+func (c *Consumer) Subscribe() error {
+	if c.subscribed {
+		return nil
+	}
+
+	js, err := c.data.nc.JetStream()
+	if err != nil {
+		return err
+	}
+
+	// Determine subject and queue group from configuration (fall back to hardcoded)
+	subject := c.data.subject
+	if subject == "" {
+		subject = "umh.>"
+	}
+	queueGroup := c.data.queueGroup
+
+	// Subscribe according to configured subject/queue
+	if queueGroup != "" {
+		_, err = js.QueueSubscribe(subject, queueGroup, c.handleMsg, nats.BindStream("UMH_DATA"))
+	} else {
+		_, err = js.Subscribe(subject, c.handleMsg, nats.BindStream("UMH_DATA"))
+	}
+	if err != nil {
+		c.log.Warnf("JetStream subscribe failed (%v), trying standard sub...", err)
+		if queueGroup != "" {
+			_, err = c.data.nc.QueueSubscribe(subject, queueGroup, c.handleMsg)
+		} else {
+			_, err = c.data.nc.Subscribe(subject, c.handleMsg)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	c.subscribed = true
 	return nil
 }

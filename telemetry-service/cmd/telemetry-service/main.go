@@ -41,8 +41,17 @@ func newApp(logger log.Logger, consumer *data.Consumer) *kratos.App {
 		// CLEANED: Removed kratos.Server(gs, hs)
 
 		// This is the ONLY thing your app does now: Start the NATS Consumer
+		// Ensure subscription setup succeeds during startup; run the long-lived
+		// consumer loop in a goroutine so app startup isn't blocked.
 		kratos.AfterStart(func(ctx context.Context) error {
-			go consumer.Start(ctx)
+			if err := consumer.Subscribe(); err != nil {
+				return err
+			}
+			go func() {
+				if err := consumer.Start(ctx); err != nil {
+					panic(err)
+				}
+			}()
 			return nil
 		}),
 	)

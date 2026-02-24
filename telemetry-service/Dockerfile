@@ -10,4 +10,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /app
 COPY --from=builder /app/telemetry-service /app/telemetry-service
 COPY configs /app/configs
-CMD ["./telemetry-service", "-conf", "/app/configs/config.yaml"]
+CMD ["./telemetry-service", "-conf", "/app/configs/config_docker.yaml"]

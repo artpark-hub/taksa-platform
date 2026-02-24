@@ -36,13 +36,17 @@ config:
 .PHONY: api
 # generate api proto
 api:
-	protoc --proto_path=./api \
-	       --proto_path=./third_party \
- 	       --go_out=paths=source_relative:./api \
- 	       --go-http_out=paths=source_relative:./api \
- 	       --go-grpc_out=paths=source_relative:./api \
-	       --openapi_out=fq_schema_naming=true,default_response=false:. \
-	       $(API_PROTO_FILES)
+	@if [ -z "$(API_PROTO_FILES)" ]; then \
+		echo "no api proto files found, skipping api generate"; \
+	else \
+		protoc --proto_path=./api \
+			   --proto_path=./third_party \
+			   --go_out=paths=source_relative:./api \
+			   --go-http_out=paths=source_relative:./api \
+			   --go-grpc_out=paths=source_relative:./api \
+			   --openapi_out=fq_schema_naming=true,default_response=false:. \
+			   $(API_PROTO_FILES); \
+	fi
 
 .PHONY: build
 # build
