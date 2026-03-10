@@ -14,6 +14,8 @@ import (
 	"user-management/internal/biz"
 	"user-management/internal/data"
 
+	"net/url"
+
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport"
 	jwtv5 "github.com/golang-jwt/jwt/v5"
@@ -23,26 +25,26 @@ type TenantsService struct {
 	v1.UnimplementedTenantsServiceServer
 
 	uc              *biz.TenantsUsecase
-	kratosPublicURL string
 	log             *log.Helper
+	data            *data.Data
+	kratosPublicURL string
+	kratosAdminURL  string
 }
 
-// JWTDetails holds all the information extracted from JWT
 type JWTDetails struct {
 	OrganizationName string
 	Role             string
 	Email            string
 	Subject          string
-	// Add more fields here as needed in the future
-	// FirstName        string
-	// LastName         string
 }
 
 func NewTenantsService(uc *biz.TenantsUsecase, d *data.Data, logger log.Logger) *TenantsService {
 	return &TenantsService{
 		uc:              uc,
-		kratosPublicURL: d.KratosPublicURL(),
+		data:            d,
 		log:             log.NewHelper(logger),
+		kratosPublicURL: d.KratosPublicURL(),
+		kratosAdminURL:  d.KratosAdminURL(),
 	}
 }
 
@@ -72,7 +74,6 @@ func (s *TenantsService) RegisterMasterUser(ctx context.Context, req *v1.Registe
 func (s *TenantsService) LoginUser(ctx context.Context, req *v1.LoginUserRequest) (*v1.LoginUserResponse, error) {
 	s.log.WithContext(ctx).Infof("LoginUser: %s", req.Email)
 
-	// Step 1: Get login flow from Kratos
 	flowURL := fmt.Sprintf("%s/self-service/login/api", s.kratosPublicURL)
 	flowResp, err := http.Get(flowURL)
 	if err != nil {
@@ -97,7 +98,6 @@ func (s *TenantsService) LoginUser(ctx context.Context, req *v1.LoginUserRequest
 
 	s.log.Infof("Login flow ID: %s", flow.ID)
 
-	// Step 2: Submit login credentials
 	loginData := map[string]interface{}{
 		"method":     "password",
 		"identifier": req.Email,
@@ -123,7 +123,6 @@ func (s *TenantsService) LoginUser(ctx context.Context, req *v1.LoginUserRequest
 		return nil, fmt.Errorf("login failed: invalid credentials or error")
 	}
 
-	// Parse the FULL response to get session and identity
 	var kratosLogin struct {
 		SessionToken string `json:"session_token"`
 		Session      struct {
@@ -143,14 +142,12 @@ func (s *TenantsService) LoginUser(ctx context.Context, req *v1.LoginUserRequest
 		return nil, fmt.Errorf("no session token received from Kratos")
 	}
 
-	// Extract user information from traits
 	traits := kratosLogin.Session.Identity.Traits
 
 	email, _ := traits["email"].(string)
 	orgName, _ := traits["organization_name"].(string)
 	role, _ := traits["role"].(string)
 
-	// Extract name fields
 	var firstName, lastName string
 	if nameMap, ok := traits["name"].(map[string]interface{}); ok {
 		firstName, _ = nameMap["first"].(string)
@@ -178,7 +175,6 @@ func (s *TenantsService) GetJWTToken(ctx context.Context, req *v1.GetJWTTokenReq
 	if tr, ok := transport.FromServerContext(ctx); ok {
 		authHeader := tr.RequestHeader().Get("Authorization")
 
-		// Strip "Bearer " prefix if present to return pure token
 		token := authHeader
 		if len(authHeader) > 7 && strings.EqualFold(authHeader[0:7], "Bearer ") {
 			token = authHeader[7:]
@@ -202,14 +198,13 @@ func (s *TenantsService) GetJWTToken(ctx context.Context, req *v1.GetJWTTokenReq
 // 4. CreateSubUser - ONLY MASTERS CAN CREATE
 // ---------------------------------------------------------
 func (s *TenantsService) CreateSubUser(ctx context.Context, req *v1.CreateSubUserRequest) (*v1.CreateSubUserResponse, error) {
-	// Get details from JWT
+
 	details, err := s.getDetailsFromJWT(ctx)
 	if err != nil {
 		s.log.Errorf("Failed to extract details from JWT: %v", err)
 		return nil, err
 	}
 
-	// Check if user is a master
 	if details.Role != "master" {
 		s.log.Warnf("Unauthorized create sub-user attempt by role: %s", details.Role)
 		return nil, errors.New("forbidden: only master users can create sub-users")
@@ -234,7 +229,7 @@ func (s *TenantsService) CreateSubUser(ctx context.Context, req *v1.CreateSubUse
 // 5. ListSubUsers
 // ---------------------------------------------------------
 func (s *TenantsService) ListSubUsers(ctx context.Context, req *v1.ListSubUsersRequest) (*v1.ListSubUsersResponse, error) {
-	// Get details from JWT
+
 	details, err := s.getDetailsFromJWT(ctx)
 	if err != nil {
 		s.log.Errorf("Failed to extract details from JWT: %v", err)
@@ -267,14 +262,13 @@ func (s *TenantsService) ListSubUsers(ctx context.Context, req *v1.ListSubUsersR
 // 6. DeleteSubUser - ONLY MASTERS CAN DELETE
 // ---------------------------------------------------------
 func (s *TenantsService) DeleteSubUser(ctx context.Context, req *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error) {
-	// Get details from JWT
+
 	details, err := s.getDetailsFromJWT(ctx)
 	if err != nil {
 		s.log.Errorf("Failed to extract details from JWT: %v", err)
 		return nil, errors.New("unauthorized: unable to verify user role")
 	}
 
-	// Check if user is a master
 	if details.Role != "master" {
 		s.log.Warnf("Unauthorized delete attempt by non-master user with role: %s", details.Role)
 		return nil, errors.New("forbidden: only master users can delete other users")
@@ -297,14 +291,13 @@ func (s *TenantsService) DeleteSubUser(ctx context.Context, req *v1.DeleteUserRe
 // 7. DeleteMasterUser - ONLY MASTERS CAN DELETE
 // ---------------------------------------------------------
 func (s *TenantsService) DeleteMasterUser(ctx context.Context, req *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error) {
-	// Get details from JWT
+
 	details, err := s.getDetailsFromJWT(ctx)
 	if err != nil {
 		s.log.Errorf("Failed to extract details from JWT: %v", err)
 		return nil, errors.New("unauthorized: unable to verify user role")
 	}
 
-	// Check if user is a master
 	if details.Role != "master" {
 		s.log.Warnf("Unauthorized delete master user attempt by role: %s", details.Role)
 		return nil, errors.New("forbidden: only master users can delete other users")
@@ -324,10 +317,308 @@ func (s *TenantsService) DeleteMasterUser(ctx context.Context, req *v1.DeleteUse
 }
 
 // ---------------------------------------------------------
+// 8. ChangePassword - User changes their own password
+// ---------------------------------------------------------
+func (s *TenantsService) ChangePassword(ctx context.Context, req *v1.ChangePasswordRequest) (*v1.ChangePasswordResponse, error) {
+
+	var sessionToken string
+	if tr, ok := transport.FromServerContext(ctx); ok {
+		authHeader := tr.RequestHeader().Get("Authorization")
+		if len(authHeader) > 7 && strings.EqualFold(authHeader[0:7], "Bearer ") {
+			sessionToken = authHeader[7:]
+		} else {
+			sessionToken = authHeader
+		}
+	}
+
+	if sessionToken == "" {
+		return nil, errors.New("session token missing")
+	}
+
+	s.log.Infof("ChangePassword: initiating password change")
+
+	flowURL := fmt.Sprintf("%s/self-service/settings/api", s.kratosPublicURL)
+	flowReq, err := http.NewRequest("GET", flowURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create flow request: %w", err)
+	}
+	flowReq.Header.Set("Authorization", "Bearer "+sessionToken)
+
+	flowResp, err := http.DefaultClient.Do(flowReq)
+	if err != nil {
+		s.log.Errorf("Failed to initialize settings flow: %v", err)
+		return nil, fmt.Errorf("failed to initialize settings flow: %w", err)
+	}
+	defer flowResp.Body.Close()
+
+	if flowResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(flowResp.Body)
+		s.log.Errorf("Settings flow init failed: %s", string(body))
+		return nil, fmt.Errorf("settings flow init failed")
+	}
+
+	var flow struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(flowResp.Body).Decode(&flow); err != nil {
+		return nil, fmt.Errorf("failed to decode flow: %w", err)
+	}
+
+	s.log.Infof("Settings flow ID: %s", flow.ID)
+
+	updateURL := fmt.Sprintf("%s/self-service/settings?flow=%s", s.kratosPublicURL, flow.ID)
+	updateData := map[string]interface{}{
+		"method":   "password",
+		"password": req.NewPassword,
+	}
+
+	updateJSON, err := json.Marshal(updateData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update data: %w", err)
+	}
+
+	updateReq, err := http.NewRequest("POST", updateURL, bytes.NewBuffer(updateJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create update request: %w", err)
+	}
+	updateReq.Header.Set("Authorization", "Bearer "+sessionToken)
+	updateReq.Header.Set("Content-Type", "application/json")
+
+	updateResp, err := http.DefaultClient.Do(updateReq)
+	if err != nil {
+		s.log.Errorf("Password update failed: %v", err)
+		return nil, fmt.Errorf("password update failed: %w", err)
+	}
+	defer updateResp.Body.Close()
+
+	if updateResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(updateResp.Body)
+		s.log.Errorf("Password update failed: %s", string(body))
+		return nil, fmt.Errorf("password update failed")
+	}
+
+	s.log.Info("Password changed successfully")
+
+	return &v1.ChangePasswordResponse{
+		Status:  "success",
+		Message: "Password updated successfully",
+	}, nil
+}
+
+// ---------------------------------------------------------
+//  9. UpdateUserProfile - Authorization Logic
+//     Master Users:
+//     - Can update ANYONE (including self)
+//     - Can change: first_name, last_name, role
+//     - CANNOT change: email (email is read-only)
+//     Normal Users:
+//     - Can ONLY update SELF
+//     - Can change: first_name, last_name
+//     - CANNOT change: role, email
+//
+// ---------------------------------------------------------
+func (s *TenantsService) UpdateUserProfile(ctx context.Context, req *v1.UpdateUserProfileRequest) (*v1.UpdateUserProfileResponse, error) {
+	details, err := s.getDetailsFromJWT(ctx)
+	if err != nil {
+		s.log.Errorf("Failed to extract details from JWT: %v", err)
+		return nil, errors.New("unauthorized: unable to verify user role")
+	}
+
+	isSelf := details.Subject == req.IdentityId
+
+	isChangingRole := req.Role != ""
+
+	if details.Role == "master" {
+		if isSelf {
+			s.log.Infof("Master user %s updating their own profile", details.Subject)
+		} else {
+			s.log.Infof("Master user %s updating profile for %s", details.Subject, req.IdentityId)
+		}
+
+		if isChangingRole && req.Role != "master" && req.Role != "sub" {
+			return nil, errors.New("invalid role: must be 'master' or 'sub'")
+		}
+
+	} else {
+		if !isSelf {
+			s.log.Warnf("Non-master user %s attempted to update another user's profile", details.Subject)
+			return nil, errors.New("forbidden: you can only update your own profile")
+		}
+
+		if isChangingRole {
+			s.log.Warnf("Non-master user %s attempted to change role", details.Subject)
+			return nil, errors.New("forbidden: you cannot change your role")
+		}
+
+		s.log.Infof("User %s updating their own profile", details.Subject)
+	}
+
+	if req.Email != "" {
+		s.log.Warnf("Email change attempted but will be ignored (email is read-only)")
+	}
+
+	user, err := s.uc.UpdateUserProfile(ctx, req.IdentityId, req.FirstName, req.LastName, req.Role)
+	if err != nil {
+		s.log.Errorf("Failed to update user profile: %v", err)
+		return nil, err
+	}
+
+	return &v1.UpdateUserProfileResponse{
+		Status:  "success",
+		Message: "User profile updated successfully",
+		User: &v1.UserInfo{
+			Email:            user.Email,
+			FirstName:        user.FirstName,
+			LastName:         user.LastName,
+			OrganizationName: user.OrganizationName,
+			Role:             user.Role,
+		},
+	}, nil
+}
+
+// ---------------------------------------------------------
+// 10. ForgotPassword - Initiate OTP Recovery Flow
+// ---------------------------------------------------------
+func (s *TenantsService) ForgotPassword(ctx context.Context, req *v1.ForgotPasswordRequest) (*v1.ForgotPasswordResponse, error) {
+	s.log.Infof("ForgotPassword: initiating OTP recovery for email: %s", req.Email)
+
+	flowURL := fmt.Sprintf("%s/self-service/recovery/api", s.kratosPublicURL)
+	flowReq, err := http.NewRequest("GET", flowURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create recovery flow request: %w", err)
+	}
+
+	flowResp, err := http.DefaultClient.Do(flowReq)
+	if err != nil {
+		s.log.Errorf("Failed to initialize recovery flow: %v", err)
+		return nil, fmt.Errorf("failed to initialize recovery flow: %w", err)
+	}
+	defer flowResp.Body.Close()
+
+	if flowResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("recovery flow init failed with status: %d", flowResp.StatusCode)
+	}
+
+	var flow struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(flowResp.Body).Decode(&flow); err != nil {
+		return nil, fmt.Errorf("failed to decode recovery flow: %w", err)
+	}
+
+	s.log.Infof("API Recovery flow created: %s", flow.ID)
+
+	recoveryURL := fmt.Sprintf("%s/self-service/recovery?flow=%s", s.kratosPublicURL, flow.ID)
+	recoveryData := map[string]interface{}{
+		"method": "code",
+		"email":  req.Email,
+	}
+
+	recoveryJSON, _ := json.Marshal(recoveryData)
+	recoveryReq, _ := http.NewRequest("POST", recoveryURL, bytes.NewBuffer(recoveryJSON))
+	recoveryReq.Header.Set("Content-Type", "application/json")
+	recoveryReq.Header.Set("Accept", "application/json")
+
+	recoveryResp, err := http.DefaultClient.Do(recoveryReq)
+	if err != nil {
+		s.log.Errorf("Recovery email send failed: %v", err)
+		return nil, fmt.Errorf("recovery email send failed: %w", err)
+	}
+	defer recoveryResp.Body.Close()
+
+	if recoveryResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(recoveryResp.Body)
+		s.log.Errorf("Failed to send OTP code: %s", string(body))
+		return nil, fmt.Errorf("failed to process recovery request")
+	}
+
+	s.log.Infof("OTP code sent to: %s", req.Email)
+
+	return &v1.ForgotPasswordResponse{
+		Status:  "success",
+		Message: "If an account exists, a 6-digit code has been sent to your email.",
+		FlowId:  flow.ID,
+	}, nil
+}
+
+// ---------------------------------------------------------
+// 11. ResetPassword - Validate Code & Update Password
+// ---------------------------------------------------------
+func (s *TenantsService) ResetPassword(ctx context.Context, req *v1.ResetPasswordRequest) (*v1.ResetPasswordResponse, error) {
+	if req.Code == "" || req.NewPassword == "" || req.Email == "" {
+		return nil, fmt.Errorf("email, OTP code, and new password are required")
+	}
+
+	recoveryURL := fmt.Sprintf("%s/self-service/recovery?flow=%s", s.kratosPublicURL, req.FlowId)
+	codeData := map[string]interface{}{"method": "code", "code": req.Code}
+	codeJSON, _ := json.Marshal(codeData)
+	codeReq, _ := http.NewRequest("POST", recoveryURL, bytes.NewBuffer(codeJSON))
+	codeReq.Header.Set("Content-Type", "application/json")
+	codeReq.Header.Set("Accept", "application/json")
+
+	codeResp, err := http.DefaultClient.Do(codeReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify code: %w", err)
+	}
+	defer codeResp.Body.Close()
+
+	if codeResp.StatusCode != http.StatusOK && codeResp.StatusCode != http.StatusUnprocessableEntity {
+		return nil, fmt.Errorf("invalid or expired verification code")
+	}
+
+	searchURL := fmt.Sprintf("%s/admin/identities?credentials_identifier=%s", s.kratosAdminURL, url.QueryEscape(req.Email))
+	searchReq, _ := http.NewRequest("GET", searchURL, nil)
+	searchResp, err := http.DefaultClient.Do(searchReq)
+	if err != nil || searchResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to lookup user identity")
+	}
+	defer searchResp.Body.Close()
+
+	var identities []struct {
+		ID     string                 `json:"id"`
+		Traits map[string]interface{} `json:"traits"`
+	}
+	if err := json.NewDecoder(searchResp.Body).Decode(&identities); err != nil || len(identities) == 0 {
+		return nil, fmt.Errorf("user not found in system")
+	}
+
+	identity := identities[0]
+
+	updateURL := fmt.Sprintf("%s/admin/identities/%s", s.kratosAdminURL, identity.ID)
+	updateData := map[string]interface{}{
+		"schema_id": "default",
+		"state":     "active",
+		"traits":    identity.Traits,
+		"credentials": map[string]interface{}{
+			"password": map[string]interface{}{
+				"config": map[string]string{
+					"password": req.NewPassword,
+				},
+			},
+		},
+	}
+
+	updateJSON, _ := json.Marshal(updateData)
+	updateReq, _ := http.NewRequest("PUT", updateURL, bytes.NewBuffer(updateJSON))
+	updateReq.Header.Set("Content-Type", "application/json")
+
+	updateResp, err := http.DefaultClient.Do(updateReq)
+	if err != nil || updateResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to save new password")
+	}
+	defer updateResp.Body.Close()
+
+	return &v1.ResetPasswordResponse{
+		Status:  "success",
+		Message: "Password updated successfully!",
+	}, nil
+}
+
+// ---------------------------------------------------------
 // Helper: Extract All Details from JWT (Single Source of Truth)
 // ---------------------------------------------------------
 func (s *TenantsService) getDetailsFromJWT(ctx context.Context) (*JWTDetails, error) {
-	// 1. Get the token string from the Authorization header
+
 	var tokenString string
 	if tr, ok := transport.FromServerContext(ctx); ok {
 		authHeader := tr.RequestHeader().Get("Authorization")
@@ -338,7 +629,6 @@ func (s *TenantsService) getDetailsFromJWT(ctx context.Context) (*JWTDetails, er
 		}
 	}
 
-	// Clean up whitespace/quotes
 	tokenString = strings.TrimSpace(tokenString)
 	tokenString = strings.Trim(tokenString, "\"")
 
@@ -346,18 +636,16 @@ func (s *TenantsService) getDetailsFromJWT(ctx context.Context) (*JWTDetails, er
 		return nil, errors.New("jwt token missing from headers")
 	}
 
-	// 2. Parse the token (WITHOUT verifying signature, since Oathkeeper did it)
 	token, _, err := new(jwtv5.Parser).ParseUnverified(tokenString, jwtv5.MapClaims{})
 	if err != nil {
 		s.log.Errorf("Token Parsing Failed: %v", err)
 		return nil, errors.New("failed to parse jwt token")
 	}
 
-	// 3. Extract all claims into JWTDetails struct
 	details := &JWTDetails{}
 
 	if claims, ok := token.Claims.(jwtv5.MapClaims); ok {
-		// Extract from root level
+
 		if org, found := claims["organization_name"]; found {
 			details.OrganizationName, _ = org.(string)
 		}
@@ -371,7 +659,6 @@ func (s *TenantsService) getDetailsFromJWT(ctx context.Context) (*JWTDetails, er
 			details.Subject, _ = sub.(string)
 		}
 
-		// Fallback: Check inside 'traits' object
 		if traits, found := claims["traits"].(map[string]interface{}); found {
 			if details.OrganizationName == "" {
 				if org, ok := traits["organization_name"].(string); ok {
@@ -391,7 +678,6 @@ func (s *TenantsService) getDetailsFromJWT(ctx context.Context) (*JWTDetails, er
 		}
 	}
 
-	// Validate required fields
 	if details.OrganizationName == "" {
 		return nil, errors.New("organization_name claim not found in token")
 	}

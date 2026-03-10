@@ -7,9 +7,7 @@ toolchain go1.24.6
 require (
 	github.com/go-kratos/kratos/v2 v2.9.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/google/wire v0.6.0
-	github.com/lib/pq v1.11.1
-	github.com/ory/kratos-client-go v1.3.8
+	github.com/google/wire v0.7.0
 	go.uber.org/automaxprocs v1.5.1
 	google.golang.org/genproto/googleapis/api v0.0.0-20251029180050-ab9386a59fda
 	google.golang.org/grpc v1.78.0

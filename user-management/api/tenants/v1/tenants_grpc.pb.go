@@ -26,6 +26,10 @@ const (
 	TenantsService_ListSubUsers_FullMethodName       = "/tenants.v1.TenantsService/ListSubUsers"
 	TenantsService_DeleteSubUser_FullMethodName      = "/tenants.v1.TenantsService/DeleteSubUser"
 	TenantsService_DeleteMasterUser_FullMethodName   = "/tenants.v1.TenantsService/DeleteMasterUser"
+	TenantsService_ChangePassword_FullMethodName     = "/tenants.v1.TenantsService/ChangePassword"
+	TenantsService_UpdateUserProfile_FullMethodName  = "/tenants.v1.TenantsService/UpdateUserProfile"
+	TenantsService_ForgotPassword_FullMethodName     = "/tenants.v1.TenantsService/ForgotPassword"
+	TenantsService_ResetPassword_FullMethodName      = "/tenants.v1.TenantsService/ResetPassword"
 )
 
 // TenantsServiceClient is the client API for TenantsService service.
@@ -33,13 +37,16 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TenantsServiceClient interface {
 	RegisterMasterUser(ctx context.Context, in *RegisterMasterUserRequest, opts ...grpc.CallOption) (*RegisterMasterUserResponse, error)
-	// NEW: Login endpoint
 	LoginUser(ctx context.Context, in *LoginUserRequest, opts ...grpc.CallOption) (*LoginUserResponse, error)
 	GetJWTToken(ctx context.Context, in *GetJWTTokenRequest, opts ...grpc.CallOption) (*GetJWTTokenResponse, error)
 	CreateSubUser(ctx context.Context, in *CreateSubUserRequest, opts ...grpc.CallOption) (*CreateSubUserResponse, error)
 	ListSubUsers(ctx context.Context, in *ListSubUsersRequest, opts ...grpc.CallOption) (*ListSubUsersResponse, error)
 	DeleteSubUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error)
 	DeleteMasterUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error)
+	ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*ChangePasswordResponse, error)
+	UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UpdateUserProfileResponse, error)
+	ForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...grpc.CallOption) (*ForgotPasswordResponse, error)
+	ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...grpc.CallOption) (*ResetPasswordResponse, error)
 }
 
 type tenantsServiceClient struct {
@@ -120,18 +127,61 @@ func (c *tenantsServiceClient) DeleteMasterUser(ctx context.Context, in *DeleteU
 	return out, nil
 }
 
+func (c *tenantsServiceClient) ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*ChangePasswordResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChangePasswordResponse)
+	err := c.cc.Invoke(ctx, TenantsService_ChangePassword_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantsServiceClient) UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...grpc.CallOption) (*UpdateUserProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateUserProfileResponse)
+	err := c.cc.Invoke(ctx, TenantsService_UpdateUserProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantsServiceClient) ForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...grpc.CallOption) (*ForgotPasswordResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ForgotPasswordResponse)
+	err := c.cc.Invoke(ctx, TenantsService_ForgotPassword_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantsServiceClient) ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...grpc.CallOption) (*ResetPasswordResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResetPasswordResponse)
+	err := c.cc.Invoke(ctx, TenantsService_ResetPassword_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TenantsServiceServer is the server API for TenantsService service.
 // All implementations must embed UnimplementedTenantsServiceServer
 // for forward compatibility.
 type TenantsServiceServer interface {
 	RegisterMasterUser(context.Context, *RegisterMasterUserRequest) (*RegisterMasterUserResponse, error)
-	// NEW: Login endpoint
 	LoginUser(context.Context, *LoginUserRequest) (*LoginUserResponse, error)
 	GetJWTToken(context.Context, *GetJWTTokenRequest) (*GetJWTTokenResponse, error)
 	CreateSubUser(context.Context, *CreateSubUserRequest) (*CreateSubUserResponse, error)
 	ListSubUsers(context.Context, *ListSubUsersRequest) (*ListSubUsersResponse, error)
 	DeleteSubUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
 	DeleteMasterUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
+	ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordResponse, error)
+	UpdateUserProfile(context.Context, *UpdateUserProfileRequest) (*UpdateUserProfileResponse, error)
+	ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error)
+	ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error)
 	mustEmbedUnimplementedTenantsServiceServer()
 }
 
@@ -162,6 +212,18 @@ func (UnimplementedTenantsServiceServer) DeleteSubUser(context.Context, *DeleteU
 }
 func (UnimplementedTenantsServiceServer) DeleteMasterUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteMasterUser not implemented")
+}
+func (UnimplementedTenantsServiceServer) ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ChangePassword not implemented")
+}
+func (UnimplementedTenantsServiceServer) UpdateUserProfile(context.Context, *UpdateUserProfileRequest) (*UpdateUserProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateUserProfile not implemented")
+}
+func (UnimplementedTenantsServiceServer) ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ForgotPassword not implemented")
+}
+func (UnimplementedTenantsServiceServer) ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResetPassword not implemented")
 }
 func (UnimplementedTenantsServiceServer) mustEmbedUnimplementedTenantsServiceServer() {}
 func (UnimplementedTenantsServiceServer) testEmbeddedByValue()                        {}
@@ -310,6 +372,78 @@ func _TenantsService_DeleteMasterUser_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantsService_ChangePassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangePasswordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantsServiceServer).ChangePassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantsService_ChangePassword_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantsServiceServer).ChangePassword(ctx, req.(*ChangePasswordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantsService_UpdateUserProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUserProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantsServiceServer).UpdateUserProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantsService_UpdateUserProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantsServiceServer).UpdateUserProfile(ctx, req.(*UpdateUserProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantsService_ForgotPassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForgotPasswordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantsServiceServer).ForgotPassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantsService_ForgotPassword_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantsServiceServer).ForgotPassword(ctx, req.(*ForgotPasswordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantsService_ResetPassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetPasswordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantsServiceServer).ResetPassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantsService_ResetPassword_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantsServiceServer).ResetPassword(ctx, req.(*ResetPasswordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TenantsService_ServiceDesc is the grpc.ServiceDesc for TenantsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -344,6 +478,22 @@ var TenantsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteMasterUser",
 			Handler:    _TenantsService_DeleteMasterUser_Handler,
+		},
+		{
+			MethodName: "ChangePassword",
+			Handler:    _TenantsService_ChangePassword_Handler,
+		},
+		{
+			MethodName: "UpdateUserProfile",
+			Handler:    _TenantsService_UpdateUserProfile_Handler,
+		},
+		{
+			MethodName: "ForgotPassword",
+			Handler:    _TenantsService_ForgotPassword_Handler,
+		},
+		{
+			MethodName: "ResetPassword",
+			Handler:    _TenantsService_ResetPassword_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

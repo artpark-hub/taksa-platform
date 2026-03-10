@@ -14,7 +14,6 @@ service TenantsService {
     };
   }
   
-  // NEW: Login endpoint
   rpc LoginUser (LoginUserRequest) returns (LoginUserResponse) {
     option (google.api.http) = {
       post: "/api/v1/um/login"
@@ -52,7 +51,37 @@ service TenantsService {
       delete: "/api/v1/um/delete_master_user/{identity_id}"
     };
   }
+
+  rpc ChangePassword (ChangePasswordRequest) returns (ChangePasswordResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/change_password"
+      body: "*"
+    };
+  }
+
+  rpc UpdateUserProfile (UpdateUserProfileRequest) returns (UpdateUserProfileResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/update_profile"
+      body: "*"
+    };
+  }
+
+  rpc ForgotPassword (ForgotPasswordRequest) returns (ForgotPasswordResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/forgot_password"
+      body: "*"
+    };
+  }
+
+  rpc ResetPassword (ResetPasswordRequest) returns (ResetPasswordResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/reset_password"
+      body: "*"
+    };
+  }
 }
+
+
 
 message RegisterMasterUserRequest {
   string email = 1;
@@ -116,6 +145,29 @@ message DeleteUserResponse {
   string message = 2;
 }
 
+message ChangePasswordRequest {
+  string new_password = 1;
+}
+
+message ChangePasswordResponse {
+  string status = 1;
+  string message = 2;
+}
+
+message UpdateUserProfileRequest {
+  string identity_id = 1;      
+  string first_name = 2;       
+  string last_name = 3;        
+  string email = 4;            
+  string role = 5;             
+}
+
+message UpdateUserProfileResponse {
+  string status = 1;
+  string message = 2;
+  UserInfo user = 3;
+}
+
 message TenantData {
   string identity_id = 1;
   string organization_name = 2;
@@ -138,4 +190,26 @@ message UserSummary {
   string last_name = 4;
   string organization_name = 5;
   string role = 6;
+}
+
+message ForgotPasswordRequest {
+  string email = 1;
+}
+
+message ForgotPasswordResponse {
+  string status = 1;
+  string message = 2;
+  string flow_id = 3; 
+}
+
+message ResetPasswordRequest {
+  string flow_id = 1;
+  string code = 2;          
+  string new_password = 3;
+  string email = 4;
+}
+
+message ResetPasswordResponse {
+  string status = 1;
+  string message = 2;
 }

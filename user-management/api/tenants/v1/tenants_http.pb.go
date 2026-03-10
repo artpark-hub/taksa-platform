@@ -19,23 +19,30 @@ var _ = binding.EncodeURL
 
 const _ = http.SupportPackageIsVersion1
 
+const OperationTenantsServiceChangePassword = "/tenants.v1.TenantsService/ChangePassword"
 const OperationTenantsServiceCreateSubUser = "/tenants.v1.TenantsService/CreateSubUser"
 const OperationTenantsServiceDeleteMasterUser = "/tenants.v1.TenantsService/DeleteMasterUser"
 const OperationTenantsServiceDeleteSubUser = "/tenants.v1.TenantsService/DeleteSubUser"
+const OperationTenantsServiceForgotPassword = "/tenants.v1.TenantsService/ForgotPassword"
 const OperationTenantsServiceGetJWTToken = "/tenants.v1.TenantsService/GetJWTToken"
 const OperationTenantsServiceListSubUsers = "/tenants.v1.TenantsService/ListSubUsers"
 const OperationTenantsServiceLoginUser = "/tenants.v1.TenantsService/LoginUser"
 const OperationTenantsServiceRegisterMasterUser = "/tenants.v1.TenantsService/RegisterMasterUser"
+const OperationTenantsServiceResetPassword = "/tenants.v1.TenantsService/ResetPassword"
+const OperationTenantsServiceUpdateUserProfile = "/tenants.v1.TenantsService/UpdateUserProfile"
 
 type TenantsServiceHTTPServer interface {
+	ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordResponse, error)
 	CreateSubUser(context.Context, *CreateSubUserRequest) (*CreateSubUserResponse, error)
 	DeleteMasterUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
 	DeleteSubUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
+	ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error)
 	GetJWTToken(context.Context, *GetJWTTokenRequest) (*GetJWTTokenResponse, error)
 	ListSubUsers(context.Context, *ListSubUsersRequest) (*ListSubUsersResponse, error)
-	// LoginUser NEW: Login endpoint
 	LoginUser(context.Context, *LoginUserRequest) (*LoginUserResponse, error)
 	RegisterMasterUser(context.Context, *RegisterMasterUserRequest) (*RegisterMasterUserResponse, error)
+	ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error)
+	UpdateUserProfile(context.Context, *UpdateUserProfileRequest) (*UpdateUserProfileResponse, error)
 }
 
 func RegisterTenantsServiceHTTPServer(s *http.Server, srv TenantsServiceHTTPServer) {
@@ -47,6 +54,10 @@ func RegisterTenantsServiceHTTPServer(s *http.Server, srv TenantsServiceHTTPServ
 	r.GET("/api/v1/um/list_all_users", _TenantsService_ListSubUsers0_HTTP_Handler(srv))
 	r.DELETE("/api/v1/um/delete_sub_user/{identity_id}", _TenantsService_DeleteSubUser0_HTTP_Handler(srv))
 	r.DELETE("/api/v1/um/delete_master_user/{identity_id}", _TenantsService_DeleteMasterUser0_HTTP_Handler(srv))
+	r.POST("/api/v1/um/change_password", _TenantsService_ChangePassword0_HTTP_Handler(srv))
+	r.POST("/api/v1/um/update_profile", _TenantsService_UpdateUserProfile0_HTTP_Handler(srv))
+	r.POST("/api/v1/um/forgot_password", _TenantsService_ForgotPassword0_HTTP_Handler(srv))
+	r.POST("/api/v1/um/reset_password", _TenantsService_ResetPassword0_HTTP_Handler(srv))
 }
 
 func _TenantsService_RegisterMasterUser0_HTTP_Handler(srv TenantsServiceHTTPServer) func(ctx http.Context) error {
@@ -197,15 +208,106 @@ func _TenantsService_DeleteMasterUser0_HTTP_Handler(srv TenantsServiceHTTPServer
 	}
 }
 
+func _TenantsService_ChangePassword0_HTTP_Handler(srv TenantsServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ChangePasswordRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationTenantsServiceChangePassword)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ChangePassword(ctx, req.(*ChangePasswordRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ChangePasswordResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _TenantsService_UpdateUserProfile0_HTTP_Handler(srv TenantsServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateUserProfileRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationTenantsServiceUpdateUserProfile)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateUserProfile(ctx, req.(*UpdateUserProfileRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*UpdateUserProfileResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _TenantsService_ForgotPassword0_HTTP_Handler(srv TenantsServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ForgotPasswordRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationTenantsServiceForgotPassword)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ForgotPassword(ctx, req.(*ForgotPasswordRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ForgotPasswordResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _TenantsService_ResetPassword0_HTTP_Handler(srv TenantsServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ResetPasswordRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationTenantsServiceResetPassword)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ResetPassword(ctx, req.(*ResetPasswordRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ResetPasswordResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 type TenantsServiceHTTPClient interface {
+	ChangePassword(ctx context.Context, req *ChangePasswordRequest, opts ...http.CallOption) (rsp *ChangePasswordResponse, err error)
 	CreateSubUser(ctx context.Context, req *CreateSubUserRequest, opts ...http.CallOption) (rsp *CreateSubUserResponse, err error)
 	DeleteMasterUser(ctx context.Context, req *DeleteUserRequest, opts ...http.CallOption) (rsp *DeleteUserResponse, err error)
 	DeleteSubUser(ctx context.Context, req *DeleteUserRequest, opts ...http.CallOption) (rsp *DeleteUserResponse, err error)
+	ForgotPassword(ctx context.Context, req *ForgotPasswordRequest, opts ...http.CallOption) (rsp *ForgotPasswordResponse, err error)
 	GetJWTToken(ctx context.Context, req *GetJWTTokenRequest, opts ...http.CallOption) (rsp *GetJWTTokenResponse, err error)
 	ListSubUsers(ctx context.Context, req *ListSubUsersRequest, opts ...http.CallOption) (rsp *ListSubUsersResponse, err error)
-	// LoginUser NEW: Login endpoint
 	LoginUser(ctx context.Context, req *LoginUserRequest, opts ...http.CallOption) (rsp *LoginUserResponse, err error)
 	RegisterMasterUser(ctx context.Context, req *RegisterMasterUserRequest, opts ...http.CallOption) (rsp *RegisterMasterUserResponse, err error)
+	ResetPassword(ctx context.Context, req *ResetPasswordRequest, opts ...http.CallOption) (rsp *ResetPasswordResponse, err error)
+	UpdateUserProfile(ctx context.Context, req *UpdateUserProfileRequest, opts ...http.CallOption) (rsp *UpdateUserProfileResponse, err error)
 }
 
 type TenantsServiceHTTPClientImpl struct {
@@ -214,6 +316,19 @@ type TenantsServiceHTTPClientImpl struct {
 
 func NewTenantsServiceHTTPClient(client *http.Client) TenantsServiceHTTPClient {
 	return &TenantsServiceHTTPClientImpl{client}
+}
+
+func (c *TenantsServiceHTTPClientImpl) ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...http.CallOption) (*ChangePasswordResponse, error) {
+	var out ChangePasswordResponse
+	pattern := "/api/v1/um/change_password"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationTenantsServiceChangePassword))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 func (c *TenantsServiceHTTPClientImpl) CreateSubUser(ctx context.Context, in *CreateSubUserRequest, opts ...http.CallOption) (*CreateSubUserResponse, error) {
@@ -255,6 +370,19 @@ func (c *TenantsServiceHTTPClientImpl) DeleteSubUser(ctx context.Context, in *De
 	return &out, nil
 }
 
+func (c *TenantsServiceHTTPClientImpl) ForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...http.CallOption) (*ForgotPasswordResponse, error) {
+	var out ForgotPasswordResponse
+	pattern := "/api/v1/um/forgot_password"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationTenantsServiceForgotPassword))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *TenantsServiceHTTPClientImpl) GetJWTToken(ctx context.Context, in *GetJWTTokenRequest, opts ...http.CallOption) (*GetJWTTokenResponse, error) {
 	var out GetJWTTokenResponse
 	pattern := "/api/v1/um/token"
@@ -281,7 +409,6 @@ func (c *TenantsServiceHTTPClientImpl) ListSubUsers(ctx context.Context, in *Lis
 	return &out, nil
 }
 
-// LoginUser NEW: Login endpoint
 func (c *TenantsServiceHTTPClientImpl) LoginUser(ctx context.Context, in *LoginUserRequest, opts ...http.CallOption) (*LoginUserResponse, error) {
 	var out LoginUserResponse
 	pattern := "/api/v1/um/login"
@@ -300,6 +427,32 @@ func (c *TenantsServiceHTTPClientImpl) RegisterMasterUser(ctx context.Context, i
 	pattern := "/api/v1/um/register_master_user"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationTenantsServiceRegisterMasterUser))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *TenantsServiceHTTPClientImpl) ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...http.CallOption) (*ResetPasswordResponse, error) {
+	var out ResetPasswordResponse
+	pattern := "/api/v1/um/reset_password"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationTenantsServiceResetPassword))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *TenantsServiceHTTPClientImpl) UpdateUserProfile(ctx context.Context, in *UpdateUserProfileRequest, opts ...http.CallOption) (*UpdateUserProfileResponse, error) {
+	var out UpdateUserProfileResponse
+	pattern := "/api/v1/um/update_profile"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationTenantsServiceUpdateUserProfile))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {

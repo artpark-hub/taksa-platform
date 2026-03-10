@@ -6,6 +6,24 @@ info:
     title: TenantsService API
     version: 0.0.1
 paths:
+    /api/v1/um/change_password:
+        post:
+            tags:
+                - TenantsService
+            operationId: TenantsService_ChangePassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/tenants.v1.ChangePasswordRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.ChangePasswordResponse'
     /api/v1/um/create_sub_user:
         post:
             tags:
@@ -60,6 +78,24 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/tenants.v1.DeleteUserResponse'
+    /api/v1/um/forgot_password:
+        post:
+            tags:
+                - TenantsService
+            operationId: TenantsService_ForgotPassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/tenants.v1.ForgotPasswordRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.ForgotPasswordResponse'
     /api/v1/um/list_all_users:
         get:
             tags:
@@ -76,7 +112,6 @@ paths:
         post:
             tags:
                 - TenantsService
-            description: 'NEW: Login endpoint'
             operationId: TenantsService_LoginUser
             requestBody:
                 content:
@@ -109,6 +144,24 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/tenants.v1.RegisterMasterUserResponse'
+    /api/v1/um/reset_password:
+        post:
+            tags:
+                - TenantsService
+            operationId: TenantsService_ResetPassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/tenants.v1.ResetPasswordRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.ResetPasswordResponse'
     /api/v1/um/token:
         get:
             tags:
@@ -121,8 +174,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/tenants.v1.GetJWTTokenResponse'
+    /api/v1/um/update_profile:
+        post:
+            tags:
+                - TenantsService
+            operationId: TenantsService_UpdateUserProfile
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/tenants.v1.UpdateUserProfileRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/tenants.v1.UpdateUserProfileResponse'
 components:
     schemas:
+        tenants.v1.ChangePasswordRequest:
+            type: object
+            properties:
+                newPassword:
+                    type: string
+        tenants.v1.ChangePasswordResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                message:
+                    type: string
         tenants.v1.CreateSubUserRequest:
             type: object
             properties:
@@ -145,6 +228,20 @@ components:
                 status:
                     type: string
                 message:
+                    type: string
+        tenants.v1.ForgotPasswordRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+        tenants.v1.ForgotPasswordResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                message:
+                    type: string
+                flowId:
                     type: string
         tenants.v1.GetJWTTokenResponse:
             type: object
@@ -190,6 +287,24 @@ components:
             properties:
                 data:
                     $ref: '#/components/schemas/tenants.v1.TenantData'
+        tenants.v1.ResetPasswordRequest:
+            type: object
+            properties:
+                flowId:
+                    type: string
+                code:
+                    type: string
+                newPassword:
+                    type: string
+                email:
+                    type: string
+        tenants.v1.ResetPasswordResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                message:
+                    type: string
         tenants.v1.TenantData:
             type: object
             properties:
@@ -204,6 +319,28 @@ components:
             properties:
                 jwtToken:
                     type: string
+        tenants.v1.UpdateUserProfileRequest:
+            type: object
+            properties:
+                identityId:
+                    type: string
+                firstName:
+                    type: string
+                lastName:
+                    type: string
+                email:
+                    type: string
+                role:
+                    type: string
+        tenants.v1.UpdateUserProfileResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                message:
+                    type: string
+                user:
+                    $ref: '#/components/schemas/tenants.v1.UserInfo'
         tenants.v1.UserData:
             type: object
             properties:

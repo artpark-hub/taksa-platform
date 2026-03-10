@@ -22,9 +22,8 @@ import (
 
 // Injectors from wire.go:
 
-// REMOVED: *conf.Nats from arguments
-func wireApp(confServer *conf.Server, confData *conf.Data, confKratos *conf.Kratos, logger log.Logger) (*kratos.App, func(), error) {
-	dataData, cleanup, err := data.NewData(confData, confKratos, logger)
+func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger) (*kratos.App, func(), error) {
+	dataData, cleanup, err := data.NewData(confData, logger)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -19,6 +19,7 @@ type TenantsRepo interface {
 	CreateKratosIdentity(ctx context.Context, email, password, firstName, lastName, orgName, role string) (*User, error)
 	ListIdentitiesByOrg(ctx context.Context, orgName string) ([]*User, error)
 	DeleteIdentity(ctx context.Context, id string) error
+	UpdateIdentity(ctx context.Context, id, firstName, lastName, role string) (*User, error) // UPDATED: removed email
 }
 
 type TenantsUsecase struct {
@@ -48,4 +49,8 @@ func (uc *TenantsUsecase) DeleteSubUser(ctx context.Context, id string) error {
 
 func (uc *TenantsUsecase) DeleteMasterUser(ctx context.Context, id string) error {
 	return uc.repo.DeleteIdentity(ctx, id)
+}
+
+func (uc *TenantsUsecase) UpdateUserProfile(ctx context.Context, id, firstName, lastName, role string) (*User, error) {
+	return uc.repo.UpdateIdentity(ctx, id, firstName, lastName, role)
 }

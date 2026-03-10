@@ -690,6 +690,238 @@ func (x *DeleteUserResponse) GetMessage() string {
 	return ""
 }
 
+type ChangePasswordRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NewPassword   string                 `protobuf:"bytes,1,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChangePasswordRequest) Reset() {
+	*x = ChangePasswordRequest{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangePasswordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangePasswordRequest) ProtoMessage() {}
+
+func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangePasswordRequest.ProtoReflect.Descriptor instead.
+func (*ChangePasswordRequest) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ChangePasswordRequest) GetNewPassword() string {
+	if x != nil {
+		return x.NewPassword
+	}
+	return ""
+}
+
+type ChangePasswordResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChangePasswordResponse) Reset() {
+	*x = ChangePasswordResponse{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChangePasswordResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChangePasswordResponse) ProtoMessage() {}
+
+func (x *ChangePasswordResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChangePasswordResponse.ProtoReflect.Descriptor instead.
+func (*ChangePasswordResponse) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ChangePasswordResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ChangePasswordResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type UpdateUserProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IdentityId    string                 `protobuf:"bytes,1,opt,name=identity_id,json=identityId,proto3" json:"identity_id,omitempty"`
+	FirstName     string                 `protobuf:"bytes,2,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName      string                 `protobuf:"bytes,3,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
+	Role          string                 `protobuf:"bytes,5,opt,name=role,proto3" json:"role,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateUserProfileRequest) Reset() {
+	*x = UpdateUserProfileRequest{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateUserProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateUserProfileRequest) ProtoMessage() {}
+
+func (x *UpdateUserProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateUserProfileRequest.ProtoReflect.Descriptor instead.
+func (*UpdateUserProfileRequest) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *UpdateUserProfileRequest) GetIdentityId() string {
+	if x != nil {
+		return x.IdentityId
+	}
+	return ""
+}
+
+func (x *UpdateUserProfileRequest) GetFirstName() string {
+	if x != nil {
+		return x.FirstName
+	}
+	return ""
+}
+
+func (x *UpdateUserProfileRequest) GetLastName() string {
+	if x != nil {
+		return x.LastName
+	}
+	return ""
+}
+
+func (x *UpdateUserProfileRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *UpdateUserProfileRequest) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+type UpdateUserProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	User          *UserInfo              `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateUserProfileResponse) Reset() {
+	*x = UpdateUserProfileResponse{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateUserProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateUserProfileResponse) ProtoMessage() {}
+
+func (x *UpdateUserProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateUserProfileResponse.ProtoReflect.Descriptor instead.
+func (*UpdateUserProfileResponse) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UpdateUserProfileResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *UpdateUserProfileResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *UpdateUserProfileResponse) GetUser() *UserInfo {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
 type TenantData struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	IdentityId       string                 `protobuf:"bytes,1,opt,name=identity_id,json=identityId,proto3" json:"identity_id,omitempty"`
@@ -701,7 +933,7 @@ type TenantData struct {
 
 func (x *TenantData) Reset() {
 	*x = TenantData{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[13]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -713,7 +945,7 @@ func (x *TenantData) String() string {
 func (*TenantData) ProtoMessage() {}
 
 func (x *TenantData) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[13]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -726,7 +958,7 @@ func (x *TenantData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TenantData.ProtoReflect.Descriptor instead.
 func (*TenantData) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{13}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *TenantData) GetIdentityId() string {
@@ -759,7 +991,7 @@ type TokenData struct {
 
 func (x *TokenData) Reset() {
 	*x = TokenData{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[14]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -771,7 +1003,7 @@ func (x *TokenData) String() string {
 func (*TokenData) ProtoMessage() {}
 
 func (x *TokenData) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[14]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -784,7 +1016,7 @@ func (x *TokenData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenData.ProtoReflect.Descriptor instead.
 func (*TokenData) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{14}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *TokenData) GetJwtToken() string {
@@ -804,7 +1036,7 @@ type UserData struct {
 
 func (x *UserData) Reset() {
 	*x = UserData{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[15]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -816,7 +1048,7 @@ func (x *UserData) String() string {
 func (*UserData) ProtoMessage() {}
 
 func (x *UserData) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[15]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -829,7 +1061,7 @@ func (x *UserData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserData.ProtoReflect.Descriptor instead.
 func (*UserData) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{15}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UserData) GetIdentityId() string {
@@ -860,7 +1092,7 @@ type UserSummary struct {
 
 func (x *UserSummary) Reset() {
 	*x = UserSummary{}
-	mi := &file_tenants_v1_tenants_proto_msgTypes[16]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -872,7 +1104,7 @@ func (x *UserSummary) String() string {
 func (*UserSummary) ProtoMessage() {}
 
 func (x *UserSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_tenants_v1_tenants_proto_msgTypes[16]
+	mi := &file_tenants_v1_tenants_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -885,7 +1117,7 @@ func (x *UserSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserSummary.ProtoReflect.Descriptor instead.
 func (*UserSummary) Descriptor() ([]byte, []int) {
-	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{16}
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *UserSummary) GetIdentityId() string {
@@ -926,6 +1158,230 @@ func (x *UserSummary) GetOrganizationName() string {
 func (x *UserSummary) GetRole() string {
 	if x != nil {
 		return x.Role
+	}
+	return ""
+}
+
+type ForgotPasswordRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForgotPasswordRequest) Reset() {
+	*x = ForgotPasswordRequest{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForgotPasswordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForgotPasswordRequest) ProtoMessage() {}
+
+func (x *ForgotPasswordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForgotPasswordRequest.ProtoReflect.Descriptor instead.
+func (*ForgotPasswordRequest) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ForgotPasswordRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+type ForgotPasswordResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	FlowId        string                 `protobuf:"bytes,3,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForgotPasswordResponse) Reset() {
+	*x = ForgotPasswordResponse{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForgotPasswordResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForgotPasswordResponse) ProtoMessage() {}
+
+func (x *ForgotPasswordResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForgotPasswordResponse.ProtoReflect.Descriptor instead.
+func (*ForgotPasswordResponse) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ForgotPasswordResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ForgotPasswordResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ForgotPasswordResponse) GetFlowId() string {
+	if x != nil {
+		return x.FlowId
+	}
+	return ""
+}
+
+type ResetPasswordRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FlowId        string                 `protobuf:"bytes,1,opt,name=flow_id,json=flowId,proto3" json:"flow_id,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	NewPassword   string                 `protobuf:"bytes,3,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetPasswordRequest) Reset() {
+	*x = ResetPasswordRequest{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetPasswordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetPasswordRequest) ProtoMessage() {}
+
+func (x *ResetPasswordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetPasswordRequest.ProtoReflect.Descriptor instead.
+func (*ResetPasswordRequest) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ResetPasswordRequest) GetFlowId() string {
+	if x != nil {
+		return x.FlowId
+	}
+	return ""
+}
+
+func (x *ResetPasswordRequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ResetPasswordRequest) GetNewPassword() string {
+	if x != nil {
+		return x.NewPassword
+	}
+	return ""
+}
+
+func (x *ResetPasswordRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+type ResetPasswordResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetPasswordResponse) Reset() {
+	*x = ResetPasswordResponse{}
+	mi := &file_tenants_v1_tenants_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetPasswordResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetPasswordResponse) ProtoMessage() {}
+
+func (x *ResetPasswordResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_tenants_v1_tenants_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetPasswordResponse.ProtoReflect.Descriptor instead.
+func (*ResetPasswordResponse) Descriptor() ([]byte, []int) {
+	return file_tenants_v1_tenants_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ResetPasswordResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ResetPasswordResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
 	}
 	return ""
 }
@@ -977,7 +1433,24 @@ const file_tenants_v1_tenants_proto_rawDesc = "" +
 	"identityId\"F\n" +
 	"\x12DeleteUserResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"r\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\":\n" +
+	"\x15ChangePasswordRequest\x12!\n" +
+	"\fnew_password\x18\x01 \x01(\tR\vnewPassword\"J\n" +
+	"\x16ChangePasswordResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xa1\x01\n" +
+	"\x18UpdateUserProfileRequest\x12\x1f\n" +
+	"\videntity_id\x18\x01 \x01(\tR\n" +
+	"identityId\x12\x1d\n" +
+	"\n" +
+	"first_name\x18\x02 \x01(\tR\tfirstName\x12\x1b\n" +
+	"\tlast_name\x18\x03 \x01(\tR\blastName\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\x12\x12\n" +
+	"\x04role\x18\x05 \x01(\tR\x04role\"w\n" +
+	"\x19UpdateUserProfileResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12(\n" +
+	"\x04user\x18\x03 \x01(\v2\x14.tenants.v1.UserInfoR\x04user\"r\n" +
 	"\n" +
 	"TenantData\x12\x1f\n" +
 	"\videntity_id\x18\x01 \x01(\tR\n" +
@@ -998,7 +1471,22 @@ const file_tenants_v1_tenants_proto_rawDesc = "" +
 	"first_name\x18\x03 \x01(\tR\tfirstName\x12\x1b\n" +
 	"\tlast_name\x18\x04 \x01(\tR\blastName\x12+\n" +
 	"\x11organization_name\x18\x05 \x01(\tR\x10organizationName\x12\x12\n" +
-	"\x04role\x18\x06 \x01(\tR\x04role2\xf2\x06\n" +
+	"\x04role\x18\x06 \x01(\tR\x04role\"-\n" +
+	"\x15ForgotPasswordRequest\x12\x14\n" +
+	"\x05email\x18\x01 \x01(\tR\x05email\"c\n" +
+	"\x16ForgotPasswordResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x17\n" +
+	"\aflow_id\x18\x03 \x01(\tR\x06flowId\"|\n" +
+	"\x14ResetPasswordRequest\x12\x17\n" +
+	"\aflow_id\x18\x01 \x01(\tR\x06flowId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12!\n" +
+	"\fnew_password\x18\x03 \x01(\tR\vnewPassword\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\"I\n" +
+	"\x15ResetPasswordResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xf7\n" +
+	"\n" +
 	"\x0eTenantsService\x12\x8f\x01\n" +
 	"\x12RegisterMasterUser\x12%.tenants.v1.RegisterMasterUserRequest\x1a&.tenants.v1.RegisterMasterUserResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/um/register_master_user\x12e\n" +
 	"\tLoginUser\x12\x1c.tenants.v1.LoginUserRequest\x1a\x1d.tenants.v1.LoginUserResponse\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/um/login\x12h\n" +
@@ -1006,7 +1494,11 @@ const file_tenants_v1_tenants_proto_rawDesc = "" +
 	"\rCreateSubUser\x12 .tenants.v1.CreateSubUserRequest\x1a!.tenants.v1.CreateSubUserResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/um/create_sub_user\x12t\n" +
 	"\fListSubUsers\x12\x1f.tenants.v1.ListSubUsersRequest\x1a .tenants.v1.ListSubUsersResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/um/list_all_users\x12\x80\x01\n" +
 	"\rDeleteSubUser\x12\x1d.tenants.v1.DeleteUserRequest\x1a\x1e.tenants.v1.DeleteUserResponse\"0\x82\xd3\xe4\x93\x02**(/api/v1/um/delete_sub_user/{identity_id}\x12\x86\x01\n" +
-	"\x10DeleteMasterUser\x12\x1d.tenants.v1.DeleteUserRequest\x1a\x1e.tenants.v1.DeleteUserResponse\"3\x82\xd3\xe4\x93\x02-*+/api/v1/um/delete_master_user/{identity_id}B#Z!user-management/api/tenants/v1;v1b\x06proto3"
+	"\x10DeleteMasterUser\x12\x1d.tenants.v1.DeleteUserRequest\x1a\x1e.tenants.v1.DeleteUserResponse\"3\x82\xd3\xe4\x93\x02-*+/api/v1/um/delete_master_user/{identity_id}\x12~\n" +
+	"\x0eChangePassword\x12!.tenants.v1.ChangePasswordRequest\x1a\".tenants.v1.ChangePasswordResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/um/change_password\x12\x86\x01\n" +
+	"\x11UpdateUserProfile\x12$.tenants.v1.UpdateUserProfileRequest\x1a%.tenants.v1.UpdateUserProfileResponse\"$\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/api/v1/um/update_profile\x12~\n" +
+	"\x0eForgotPassword\x12!.tenants.v1.ForgotPasswordRequest\x1a\".tenants.v1.ForgotPasswordResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/um/forgot_password\x12z\n" +
+	"\rResetPassword\x12 .tenants.v1.ResetPasswordRequest\x1a!.tenants.v1.ResetPasswordResponse\"$\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/api/v1/um/reset_passwordB#Z!user-management/api/tenants/v1;v1b\x06proto3"
 
 var (
 	file_tenants_v1_tenants_proto_rawDescOnce sync.Once
@@ -1020,7 +1512,7 @@ func file_tenants_v1_tenants_proto_rawDescGZIP() []byte {
 	return file_tenants_v1_tenants_proto_rawDescData
 }
 
-var file_tenants_v1_tenants_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_tenants_v1_tenants_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_tenants_v1_tenants_proto_goTypes = []any{
 	(*RegisterMasterUserRequest)(nil),  // 0: tenants.v1.RegisterMasterUserRequest
 	(*RegisterMasterUserResponse)(nil), // 1: tenants.v1.RegisterMasterUserResponse
@@ -1035,36 +1527,53 @@ var file_tenants_v1_tenants_proto_goTypes = []any{
 	(*ListSubUsersResponse)(nil),       // 10: tenants.v1.ListSubUsersResponse
 	(*DeleteUserRequest)(nil),          // 11: tenants.v1.DeleteUserRequest
 	(*DeleteUserResponse)(nil),         // 12: tenants.v1.DeleteUserResponse
-	(*TenantData)(nil),                 // 13: tenants.v1.TenantData
-	(*TokenData)(nil),                  // 14: tenants.v1.TokenData
-	(*UserData)(nil),                   // 15: tenants.v1.UserData
-	(*UserSummary)(nil),                // 16: tenants.v1.UserSummary
+	(*ChangePasswordRequest)(nil),      // 13: tenants.v1.ChangePasswordRequest
+	(*ChangePasswordResponse)(nil),     // 14: tenants.v1.ChangePasswordResponse
+	(*UpdateUserProfileRequest)(nil),   // 15: tenants.v1.UpdateUserProfileRequest
+	(*UpdateUserProfileResponse)(nil),  // 16: tenants.v1.UpdateUserProfileResponse
+	(*TenantData)(nil),                 // 17: tenants.v1.TenantData
+	(*TokenData)(nil),                  // 18: tenants.v1.TokenData
+	(*UserData)(nil),                   // 19: tenants.v1.UserData
+	(*UserSummary)(nil),                // 20: tenants.v1.UserSummary
+	(*ForgotPasswordRequest)(nil),      // 21: tenants.v1.ForgotPasswordRequest
+	(*ForgotPasswordResponse)(nil),     // 22: tenants.v1.ForgotPasswordResponse
+	(*ResetPasswordRequest)(nil),       // 23: tenants.v1.ResetPasswordRequest
+	(*ResetPasswordResponse)(nil),      // 24: tenants.v1.ResetPasswordResponse
 }
 var file_tenants_v1_tenants_proto_depIdxs = []int32{
-	13, // 0: tenants.v1.RegisterMasterUserResponse.data:type_name -> tenants.v1.TenantData
+	17, // 0: tenants.v1.RegisterMasterUserResponse.data:type_name -> tenants.v1.TenantData
 	4,  // 1: tenants.v1.LoginUserResponse.user:type_name -> tenants.v1.UserInfo
-	14, // 2: tenants.v1.GetJWTTokenResponse.data:type_name -> tenants.v1.TokenData
-	15, // 3: tenants.v1.CreateSubUserResponse.data:type_name -> tenants.v1.UserData
-	16, // 4: tenants.v1.ListSubUsersResponse.users:type_name -> tenants.v1.UserSummary
-	0,  // 5: tenants.v1.TenantsService.RegisterMasterUser:input_type -> tenants.v1.RegisterMasterUserRequest
-	2,  // 6: tenants.v1.TenantsService.LoginUser:input_type -> tenants.v1.LoginUserRequest
-	5,  // 7: tenants.v1.TenantsService.GetJWTToken:input_type -> tenants.v1.GetJWTTokenRequest
-	7,  // 8: tenants.v1.TenantsService.CreateSubUser:input_type -> tenants.v1.CreateSubUserRequest
-	9,  // 9: tenants.v1.TenantsService.ListSubUsers:input_type -> tenants.v1.ListSubUsersRequest
-	11, // 10: tenants.v1.TenantsService.DeleteSubUser:input_type -> tenants.v1.DeleteUserRequest
-	11, // 11: tenants.v1.TenantsService.DeleteMasterUser:input_type -> tenants.v1.DeleteUserRequest
-	1,  // 12: tenants.v1.TenantsService.RegisterMasterUser:output_type -> tenants.v1.RegisterMasterUserResponse
-	3,  // 13: tenants.v1.TenantsService.LoginUser:output_type -> tenants.v1.LoginUserResponse
-	6,  // 14: tenants.v1.TenantsService.GetJWTToken:output_type -> tenants.v1.GetJWTTokenResponse
-	8,  // 15: tenants.v1.TenantsService.CreateSubUser:output_type -> tenants.v1.CreateSubUserResponse
-	10, // 16: tenants.v1.TenantsService.ListSubUsers:output_type -> tenants.v1.ListSubUsersResponse
-	12, // 17: tenants.v1.TenantsService.DeleteSubUser:output_type -> tenants.v1.DeleteUserResponse
-	12, // 18: tenants.v1.TenantsService.DeleteMasterUser:output_type -> tenants.v1.DeleteUserResponse
-	12, // [12:19] is the sub-list for method output_type
-	5,  // [5:12] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	18, // 2: tenants.v1.GetJWTTokenResponse.data:type_name -> tenants.v1.TokenData
+	19, // 3: tenants.v1.CreateSubUserResponse.data:type_name -> tenants.v1.UserData
+	20, // 4: tenants.v1.ListSubUsersResponse.users:type_name -> tenants.v1.UserSummary
+	4,  // 5: tenants.v1.UpdateUserProfileResponse.user:type_name -> tenants.v1.UserInfo
+	0,  // 6: tenants.v1.TenantsService.RegisterMasterUser:input_type -> tenants.v1.RegisterMasterUserRequest
+	2,  // 7: tenants.v1.TenantsService.LoginUser:input_type -> tenants.v1.LoginUserRequest
+	5,  // 8: tenants.v1.TenantsService.GetJWTToken:input_type -> tenants.v1.GetJWTTokenRequest
+	7,  // 9: tenants.v1.TenantsService.CreateSubUser:input_type -> tenants.v1.CreateSubUserRequest
+	9,  // 10: tenants.v1.TenantsService.ListSubUsers:input_type -> tenants.v1.ListSubUsersRequest
+	11, // 11: tenants.v1.TenantsService.DeleteSubUser:input_type -> tenants.v1.DeleteUserRequest
+	11, // 12: tenants.v1.TenantsService.DeleteMasterUser:input_type -> tenants.v1.DeleteUserRequest
+	13, // 13: tenants.v1.TenantsService.ChangePassword:input_type -> tenants.v1.ChangePasswordRequest
+	15, // 14: tenants.v1.TenantsService.UpdateUserProfile:input_type -> tenants.v1.UpdateUserProfileRequest
+	21, // 15: tenants.v1.TenantsService.ForgotPassword:input_type -> tenants.v1.ForgotPasswordRequest
+	23, // 16: tenants.v1.TenantsService.ResetPassword:input_type -> tenants.v1.ResetPasswordRequest
+	1,  // 17: tenants.v1.TenantsService.RegisterMasterUser:output_type -> tenants.v1.RegisterMasterUserResponse
+	3,  // 18: tenants.v1.TenantsService.LoginUser:output_type -> tenants.v1.LoginUserResponse
+	6,  // 19: tenants.v1.TenantsService.GetJWTToken:output_type -> tenants.v1.GetJWTTokenResponse
+	8,  // 20: tenants.v1.TenantsService.CreateSubUser:output_type -> tenants.v1.CreateSubUserResponse
+	10, // 21: tenants.v1.TenantsService.ListSubUsers:output_type -> tenants.v1.ListSubUsersResponse
+	12, // 22: tenants.v1.TenantsService.DeleteSubUser:output_type -> tenants.v1.DeleteUserResponse
+	12, // 23: tenants.v1.TenantsService.DeleteMasterUser:output_type -> tenants.v1.DeleteUserResponse
+	14, // 24: tenants.v1.TenantsService.ChangePassword:output_type -> tenants.v1.ChangePasswordResponse
+	16, // 25: tenants.v1.TenantsService.UpdateUserProfile:output_type -> tenants.v1.UpdateUserProfileResponse
+	22, // 26: tenants.v1.TenantsService.ForgotPassword:output_type -> tenants.v1.ForgotPasswordResponse
+	24, // 27: tenants.v1.TenantsService.ResetPassword:output_type -> tenants.v1.ResetPasswordResponse
+	17, // [17:28] is the sub-list for method output_type
+	6,  // [6:17] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_tenants_v1_tenants_proto_init() }
@@ -1078,7 +1587,7 @@ func file_tenants_v1_tenants_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_tenants_v1_tenants_proto_rawDesc), len(file_tenants_v1_tenants_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

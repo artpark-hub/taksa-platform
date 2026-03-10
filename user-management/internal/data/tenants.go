@@ -17,7 +17,6 @@ type tenantsRepo struct {
 	log  *log.Helper
 }
 
-// NewTenantsRepo - Wire uses this to create the repo
 func NewTenantsRepo(data *Data, logger log.Logger) biz.TenantsRepo {
 	return &tenantsRepo{
 		data: data,
@@ -26,7 +25,6 @@ func NewTenantsRepo(data *Data, logger log.Logger) biz.TenantsRepo {
 }
 
 func (r *tenantsRepo) CreateKratosIdentity(ctx context.Context, email, password, firstName, lastName, orgName, role string) (*biz.User, error) {
-	// Accessing the method we just added to data.go
 	url := fmt.Sprintf("%s/admin/identities", r.data.KratosAdminURL())
 
 	payload := map[string]interface{}{
@@ -61,7 +59,6 @@ func (r *tenantsRepo) CreateKratosIdentity(ctx context.Context, email, password,
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	// Accessing HTTPClient from data.go
 	resp, err := r.data.HTTPClient().Do(req)
 	if err != nil {
 		return nil, err
@@ -108,30 +105,26 @@ func (r *tenantsRepo) ListIdentitiesByOrg(ctx context.Context, orgName string) (
 
 	var users []*biz.User
 	for _, id := range identities {
-		// Filter ONLY by Organization (removed role filter)
+
 		if tOrg, ok := id.Traits["organization_name"].(string); ok && tOrg == orgName {
 
-			// Extract Email
 			email, _ := id.Traits["email"].(string)
 
-			// Extract Role
 			role, _ := id.Traits["role"].(string)
 
-			// Extract Nested Name Fields
 			var firstName, lastName string
 			if nameMap, ok := id.Traits["name"].(map[string]interface{}); ok {
 				firstName, _ = nameMap["first"].(string)
 				lastName, _ = nameMap["last"].(string)
 			}
 
-			// Append to Result (all users, not just sub)
 			users = append(users, &biz.User{
 				IdentityID:       id.ID,
 				Email:            email,
 				FirstName:        firstName,
 				LastName:         lastName,
 				OrganizationName: orgName,
-				Role:             role, // Include role
+				Role:             role,
 			})
 		}
 	}
@@ -153,4 +146,85 @@ func (r *tenantsRepo) DeleteIdentity(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to delete identity, status: %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func (r *tenantsRepo) UpdateIdentity(ctx context.Context, id, firstName, lastName, role string) (*biz.User, error) {
+
+	getURL := fmt.Sprintf("%s/admin/identities/%s", r.data.KratosAdminURL(), id)
+	getResp, err := r.data.HTTPClient().Get(getURL)
+	if err != nil {
+		return nil, err
+	}
+	defer getResp.Body.Close()
+
+	var currentIdentity struct {
+		Traits map[string]interface{} `json:"traits"`
+	}
+	if err := json.NewDecoder(getResp.Body).Decode(&currentIdentity); err != nil {
+		return nil, err
+	}
+
+	orgName, _ := currentIdentity.Traits["organization_name"].(string)
+	email, _ := currentIdentity.Traits["email"].(string)
+	currentRole, _ := currentIdentity.Traits["role"].(string)
+	if firstName == "" {
+		if nameMap, ok := currentIdentity.Traits["name"].(map[string]interface{}); ok {
+			firstName, _ = nameMap["first"].(string)
+		}
+	}
+	if lastName == "" {
+		if nameMap, ok := currentIdentity.Traits["name"].(map[string]interface{}); ok {
+			lastName, _ = nameMap["last"].(string)
+		}
+	}
+	if role == "" {
+		role = currentRole
+	}
+
+	updateURL := fmt.Sprintf("%s/admin/identities/%s", r.data.KratosAdminURL(), id)
+
+	payload := map[string]interface{}{
+		"schema_id": "default",
+		"state":     "active",
+		"traits": map[string]interface{}{
+			"email": email,
+			"name": map[string]interface{}{
+				"first": firstName,
+				"last":  lastName,
+			},
+			"role":              role,
+			"organization_name": orgName,
+		},
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", updateURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.data.HTTPClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("kratos update error %d: %s", resp.StatusCode, string(body))
+	}
+
+	return &biz.User{
+		IdentityID:       id,
+		Email:            email,
+		FirstName:        firstName,
+		LastName:         lastName,
+		OrganizationName: orgName,
+		Role:             role,
+	}, nil
 }

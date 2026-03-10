@@ -15,7 +15,6 @@ import (
 	"github.com/google/wire"
 )
 
-// REMOVED: *conf.Nats from arguments
-func wireApp(*conf.Server, *conf.Data, *conf.Kratos, log.Logger) (*kratos.App, func(), error) {
+func wireApp(*conf.Server, *conf.Data, log.Logger) (*kratos.App, func(), error) {
 	panic(wire.Build(server.ProviderSet, data.ProviderSet, biz.ProviderSet, service.ProviderSet, newApp))
 }

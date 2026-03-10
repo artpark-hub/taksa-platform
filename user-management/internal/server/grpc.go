@@ -1,8 +1,7 @@
 package server
 
 import (
-	// Ensure this import matches the generated path
-	tenantsv1 "user-management/api/tenants/v1"
+	v1 "user-management/api/tenants/v1"
 	"user-management/internal/conf"
 	"user-management/internal/service"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 )
 
-// NewGRPCServer new gRPC server.
 func NewGRPCServer(c *conf.Server, tenants *service.TenantsService, logger log.Logger) *grpc.Server {
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
@@ -28,8 +26,6 @@ func NewGRPCServer(c *conf.Server, tenants *service.TenantsService, logger log.L
 		opts = append(opts, grpc.Timeout(c.Grpc.Timeout.AsDuration()))
 	}
 	srv := grpc.NewServer(opts...)
-
-	tenantsv1.RegisterTenantsServiceServer(srv, tenants)
-
+	v1.RegisterTenantsServiceServer(srv, tenants)
 	return srv
 }

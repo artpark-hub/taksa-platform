@@ -9,9 +9,7 @@ server:
 data:
   database:
     driver: postgres
-    source: postgres://taksa:taksa_123@172.25.60.23:5433/taksa?sslmode=disable
+    source: postgres://taksa:taksa_123@postgres:5432/taksa?sslmode=disable
 
-kratos:
-  admin_url: http://172.25.60.23:4434
-  public_url: http://172.25.60.23:4433
-  
+  kratos_admin_url: http://taksa-kratos:4434
+  kratos_public_url: http://taksa-kratos:4433
