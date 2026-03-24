@@ -81,8 +81,6 @@ service TenantsService {
   }
 }
 
-
-
 message RegisterMasterUserRequest {
   string email = 1;
   string password = 2;
