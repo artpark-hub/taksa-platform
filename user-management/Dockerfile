@@ -3,12 +3,14 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
+RUN apk add --no-cache make git protobuf
+
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-RUN go build -o user-service ./cmd/user-management
+RUN make init && make all && go build -o user-service ./cmd/user-management
 
 # -------- Runtime stage --------
 FROM alpine:3.19
