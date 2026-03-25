@@ -1,17 +1,40 @@
 syntax = "proto3";
 
-package tenants.v1;
+package usermanagement.v1;
 
 import "google/api/annotations.proto";
 
-option go_package = "user-management/api/tenants/v1;v1";
-option java_multiple_files = true;
-option java_package = "api.tenants.v1";
+option go_package = "usermanagement/api/tenants/v1;v1";
 
-service TenantsService {
-  rpc RegisterMasterUser (RegisterMasterUserRequest) returns (RegisterMasterUserResponse) {
+service UserManagementService {
+  rpc CreateSubUser (CreateSubUserRequest) returns (CreateSubUserResponse) {
     option (google.api.http) = {
-      post: "/api/v1/um/master_user"
+      post: "/api/v1/um/create_sub_user"
+      body: "*"
+    };
+  }
+
+  rpc ListSubUsers (ListSubUsersRequest) returns (ListSubUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/um/list_all_users"
+    };
+  }
+
+  rpc DeleteSubUser (DeleteUserRequest) returns (DeleteUserResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/um/delete_sub_user/{identity_id}"
+    };
+  }
+
+  rpc DeleteMasterUser (DeleteUserRequest) returns (DeleteUserResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/um/delete_master_user/{identity_id}"
+    };
+  }
+
+  rpc UpdateUserProfile (UpdateUserProfileRequest) returns (UpdateUserProfileResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/update_profile"
       body: "*"
     };
   }
@@ -21,49 +44,13 @@ service TenantsService {
       get: "/api/v1/um/token"
     };
   }
-  
-  rpc CreateSubUser (CreateSubUserRequest) returns (CreateSubUserResponse) {
+
+  rpc RegisterMasterUser (RegisterMasterUserRequest) returns (RegisterMasterUserResponse) {
     option (google.api.http) = {
-      post: "/api/v1/um/user"
+      post: "/api/v1/um/register_master_user"
       body: "*"
     };
   }
-
-  rpc ListSubUsers (ListSubUsersRequest) returns (ListSubUsersResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/um/users"
-    };
-  }
-
-  rpc DeleteSubUser (DeleteUserRequest) returns (DeleteUserResponse) {
-    option (google.api.http) = {
-      delete: "/api/v1/um/user/{identity_id}"
-    };
-  }
-
-  rpc DeleteMasterUser (DeleteUserRequest) returns (DeleteUserResponse) {
-    option (google.api.http) = {
-      delete: "/api/v1/um/master_user/{identity_id}"
-    };
-  }
-}
-
-message RegisterMasterUserRequest {
-  string email = 1;
-  string password = 2;
-  string first_name = 3;
-  string last_name = 4;
-  string organization_name = 5;
-}
-
-message RegisterMasterUserResponse {
-  TenantData data = 1;
-}
-
-message GetJWTTokenRequest {}
-
-message GetJWTTokenResponse {
-  TokenData data = 1;
 }
 
 message CreateSubUserRequest {
@@ -92,14 +79,18 @@ message DeleteUserResponse {
   string message = 2;
 }
 
-message TenantData {
+message UpdateUserProfileRequest {
   string identity_id = 1;
-  string organization_name = 2;
-  string status = 3;
+  string first_name = 2;
+  string last_name = 3;
+  string email = 4;
+  string role = 5;
 }
 
-message TokenData {
-  string jwt_token = 1;
+message UpdateUserProfileResponse {
+  string status = 1;
+  string message = 2;
+  UserInfo user = 3;
 }
 
 message UserData {
@@ -113,5 +104,41 @@ message UserSummary {
   string first_name = 3;
   string last_name = 4;
   string organization_name = 5;
+  string role = 6;
 }
 
+message UserInfo {
+  string email = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string organization_name = 4;
+  string role = 5;
+}
+
+message GetJWTTokenRequest {}
+
+message GetJWTTokenResponse {
+  TokenData data = 1;
+}
+
+message TokenData {
+  string jwt_token = 1;
+}
+
+message RegisterMasterUserRequest {
+  string email = 1;
+  string password = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string organization_name = 5;
+}
+
+message RegisterMasterUserResponse {
+  TenantData data = 1;
+}
+
+message TenantData {
+  string identity_id = 1;
+  string organization_name = 2;
+  string status = 3;
+}
