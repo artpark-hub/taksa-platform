@@ -38,6 +38,4 @@ message Data {
   }
   Database database = 1;
   Redis redis = 2;
-  string kratos_admin_url = 3;
-  string kratos_public_url = 4;
 }

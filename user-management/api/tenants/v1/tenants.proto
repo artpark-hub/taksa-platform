@@ -1,215 +1,30 @@
 syntax = "proto3";
 
-package tenants.v1;
-
-import "google/api/annotations.proto";
+package api.tenants.v1;
 
 option go_package = "user-management/api/tenants/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.tenants.v1";
 
-service TenantsService {
-  rpc RegisterMasterUser (RegisterMasterUserRequest) returns (RegisterMasterUserResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/um/register_master_user"
-      body: "*"
-    };
-  }
-  
-  rpc LoginUser (LoginUserRequest) returns (LoginUserResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/um/login"
-      body: "*"
-    };
-  }
-  
-  rpc GetJWTToken (GetJWTTokenRequest) returns (GetJWTTokenResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/um/token"
-    };
-  }
-  
-  rpc CreateSubUser (CreateSubUserRequest) returns (CreateSubUserResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/um/create_sub_user"
-      body: "*"
-    };
-  }
-
-  rpc ListSubUsers (ListSubUsersRequest) returns (ListSubUsersResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/um/list_all_users"
-    };
-  }
-
-  rpc DeleteSubUser (DeleteUserRequest) returns (DeleteUserResponse) {
-    option (google.api.http) = {
-      delete: "/api/v1/um/delete_sub_user/{identity_id}"
-    };
-  }
-
-  rpc DeleteMasterUser (DeleteUserRequest) returns (DeleteUserResponse) {
-    option (google.api.http) = {
-      delete: "/api/v1/um/delete_master_user/{identity_id}"
-    };
-  }
-
-  rpc ChangePassword (ChangePasswordRequest) returns (ChangePasswordResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/um/change_password"
-      body: "*"
-    };
-  }
-
-  rpc UpdateUserProfile (UpdateUserProfileRequest) returns (UpdateUserProfileResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/um/update_profile"
-      body: "*"
-    };
-  }
-
-  rpc ForgotPassword (ForgotPasswordRequest) returns (ForgotPasswordResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/um/forgot_password"
-      body: "*"
-    };
-  }
-
-  rpc ResetPassword (ResetPasswordRequest) returns (ResetPasswordResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/um/reset_password"
-      body: "*"
-    };
-  }
+service Tenants {
+	rpc CreateTenants (CreateTenantsRequest) returns (CreateTenantsReply);
+	rpc UpdateTenants (UpdateTenantsRequest) returns (UpdateTenantsReply);
+	rpc DeleteTenants (DeleteTenantsRequest) returns (DeleteTenantsReply);
+	rpc GetTenants (GetTenantsRequest) returns (GetTenantsReply);
+	rpc ListTenants (ListTenantsRequest) returns (ListTenantsReply);
 }
 
+message CreateTenantsRequest {}
+message CreateTenantsReply {}
 
+message UpdateTenantsRequest {}
+message UpdateTenantsReply {}
 
-message RegisterMasterUserRequest {
-  string email = 1;
-  string password = 2;
-  string first_name = 3;
-  string last_name = 4;
-  string organization_name = 5;
-}
+message DeleteTenantsRequest {}
+message DeleteTenantsReply {}
 
-message RegisterMasterUserResponse {
-  TenantData data = 1;
-}
+message GetTenantsRequest {}
+message GetTenantsReply {}
 
-message LoginUserRequest {
-  string email = 1;
-  string password = 2;
-}
-
-message LoginUserResponse {
-  string session_token = 1;
-  UserInfo user = 2;
-}
-
-message UserInfo {
-  string email = 1;
-  string first_name = 2;
-  string last_name = 3;
-  string organization_name = 4;
-  string role = 5;
-}
-
-message GetJWTTokenRequest {}
-
-message GetJWTTokenResponse {
-  TokenData data = 1;
-}
-
-message CreateSubUserRequest {
-  string email = 1;
-  string password = 2;
-  string first_name = 3;
-  string last_name = 4;
-}
-
-message CreateSubUserResponse {
-  UserData data = 1;
-}
-
-message ListSubUsersRequest {}
-
-message ListSubUsersResponse {
-  repeated UserSummary users = 1;
-}
-
-message DeleteUserRequest {
-  string identity_id = 1;
-}
-
-message DeleteUserResponse {
-  string status = 1;
-  string message = 2;
-}
-
-message ChangePasswordRequest {
-  string new_password = 1;
-}
-
-message ChangePasswordResponse {
-  string status = 1;
-  string message = 2;
-}
-
-message UpdateUserProfileRequest {
-  string identity_id = 1;      
-  string first_name = 2;       
-  string last_name = 3;        
-  string email = 4;            
-  string role = 5;             
-}
-
-message UpdateUserProfileResponse {
-  string status = 1;
-  string message = 2;
-  UserInfo user = 3;
-}
-
-message TenantData {
-  string identity_id = 1;
-  string organization_name = 2;
-  string status = 3;
-}
-
-message TokenData {
-  string jwt_token = 1;
-}
-
-message UserData {
-  string identity_id = 1;
-  string organization_name = 2;
-}
-
-message UserSummary {
-  string identity_id = 1;
-  string email = 2;
-  string first_name = 3;
-  string last_name = 4;
-  string organization_name = 5;
-  string role = 6;
-}
-
-message ForgotPasswordRequest {
-  string email = 1;
-}
-
-message ForgotPasswordResponse {
-  string status = 1;
-  string message = 2;
-  string flow_id = 3; 
-}
-
-message ResetPasswordRequest {
-  string flow_id = 1;
-  string code = 2;          
-  string new_password = 3;
-  string email = 4;
-}
-
-message ResetPasswordResponse {
-  string status = 1;
-  string message = 2;
-}
+message ListTenantsRequest {}
+message ListTenantsReply {}

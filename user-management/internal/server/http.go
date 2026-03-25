@@ -10,7 +10,8 @@ import (
 	"github.com/go-kratos/kratos/v2/transport/http"
 )
 
-func NewHTTPServer(c *conf.Server, tenants *service.TenantsService, logger log.Logger) *http.Server {
+// NewHTTPServer new an HTTP server.
+func NewHTTPServer(c *conf.Server, greeter *service.GreeterService, logger log.Logger) *http.Server {
 	var opts = []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),
@@ -26,6 +27,6 @@ func NewHTTPServer(c *conf.Server, tenants *service.TenantsService, logger log.L
 		opts = append(opts, http.Timeout(c.Http.Timeout.AsDuration()))
 	}
 	srv := http.NewServer(opts...)
-	v1.RegisterTenantsServiceHTTPServer(srv, tenants)
+	v1.RegisterGreeterHTTPServer(srv, greeter)
 	return srv
 }
