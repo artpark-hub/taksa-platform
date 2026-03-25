@@ -5,6 +5,8 @@ package tenants.v1;
 import "google/api/annotations.proto";
 
 option go_package = "user-management/api/tenants/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.tenants.v1";
 
 service TenantsService {
   rpc RegisterMasterUser (RegisterMasterUserRequest) returns (RegisterMasterUserResponse) {
