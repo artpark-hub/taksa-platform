@@ -4,7 +4,7 @@ package usermanagement.v1;
 
 import "google/api/annotations.proto";
 
-option go_package = "usermanagement/api/tenants/v1;v1";
+option go_package = "user-management/api/tenants/v1;v1";
 
 service UserManagementService {
   rpc CreateSubUser (CreateSubUserRequest) returns (CreateSubUserResponse) {
@@ -44,13 +44,6 @@ service UserManagementService {
       get: "/api/v1/um/token"
     };
   }
-
-  rpc RegisterMasterUser (RegisterMasterUserRequest) returns (RegisterMasterUserResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/um/register_master_user"
-      body: "*"
-    };
-  }
 }
 
 message CreateSubUserRequest {
@@ -58,6 +51,7 @@ message CreateSubUserRequest {
   string password = 2;
   string first_name = 3;
   string last_name = 4;
+  string role = 5;
 }
 
 message CreateSubUserResponse {
@@ -123,22 +117,4 @@ message GetJWTTokenResponse {
 
 message TokenData {
   string jwt_token = 1;
-}
-
-message RegisterMasterUserRequest {
-  string email = 1;
-  string password = 2;
-  string first_name = 3;
-  string last_name = 4;
-  string organization_name = 5;
-}
-
-message RegisterMasterUserResponse {
-  TenantData data = 1;
-}
-
-message TenantData {
-  string identity_id = 1;
-  string organization_name = 2;
-  string status = 3;
 }
