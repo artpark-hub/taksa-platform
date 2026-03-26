@@ -1,6 +1,7 @@
 package data
 
 import (
+	"net/http"
 	"user-management/internal/conf"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -8,17 +9,34 @@ import (
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewGreeterRepo)
+var ProviderSet = wire.NewSet(NewData, NewTenantsRepo)
 
-// Data .
 type Data struct {
-	// TODO wrapped database client
+	kratosAdminURL  string
+	kratosPublicURL string
+	httpClient      *http.Client
 }
 
-// NewData .
-func NewData(c *conf.Data) (*Data, func(), error) {
+func (d *Data) KratosAdminURL() string {
+	return d.kratosAdminURL
+}
+
+func (d *Data) KratosPublicURL() string {
+	return d.kratosPublicURL
+}
+
+func (d *Data) HTTPClient() *http.Client {
+	return d.httpClient
+}
+
+func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	cleanup := func() {
-		log.Info("closing the data resources")
+		log.NewHelper(logger).Info("closing the data resources")
 	}
-	return &Data{}, cleanup, nil
+
+	return &Data{
+		kratosAdminURL:  c.KratosAdminUrl,
+		kratosPublicURL: c.KratosPublicUrl,
+		httpClient:      &http.Client{},
+	}, cleanup, nil
 }
