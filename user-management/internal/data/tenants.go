@@ -102,6 +102,10 @@ func (r *tenantsRepo) ListIdentitiesByOrg(ctx context.Context, orgName string) (
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list identities, status: %d", resp.StatusCode)
+	}
+
 	var identities []struct {
 		ID     string                 `json:"id"`
 		Traits map[string]interface{} `json:"traits"`
@@ -170,6 +174,10 @@ func (r *tenantsRepo) UpdateIdentity(ctx context.Context, id, firstName, lastNam
 		return nil, err
 	}
 	defer getResp.Body.Close()
+
+	if getResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get identity, status: %d", getResp.StatusCode)
+	}
 
 	var currentIdentity struct {
 		Traits map[string]interface{} `json:"traits"`
