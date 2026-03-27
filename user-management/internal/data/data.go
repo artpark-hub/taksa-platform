@@ -2,6 +2,7 @@ package data
 
 import (
 	"net/http"
+	"time"
 	"user-management/internal/conf"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -37,6 +38,8 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	return &Data{
 		kratosAdminURL:  c.KratosAdminUrl,
 		kratosPublicURL: c.KratosPublicUrl,
-		httpClient:      &http.Client{},
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}, cleanup, nil
 }

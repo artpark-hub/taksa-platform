@@ -44,7 +44,8 @@ func (s *UserManagementService) CreateSubUser(ctx context.Context, req *v1.Creat
 		return nil, err
 	}
 
-	if details.Role != "master" {
+	currentRole := strings.ToLower(strings.TrimSpace(details.Role))
+	if currentRole != "master" {
 		s.log.Warnf("Unauthorized create user attempt by role: %s", details.Role)
 		return nil, errors.New("forbidden: only master users can create users")
 	}
@@ -58,6 +59,15 @@ func (s *UserManagementService) CreateSubUser(ctx context.Context, req *v1.Creat
 		return nil, errors.New("forbidden: create_sub_user cannot create master users")
 	}
 
+	s.log.Infof(
+		"CreateSubUser called by subject=%s role=%s org=%s targetEmail=%s targetRole=%s",
+		details.Subject,
+		details.Role,
+		details.OrganizationName,
+		req.Email,
+		role,
+	)
+
 	data, err := s.uc.CreateSubUser(
 		ctx,
 		req.Email,
@@ -68,6 +78,7 @@ func (s *UserManagementService) CreateSubUser(ctx context.Context, req *v1.Creat
 		role,
 	)
 	if err != nil {
+		s.log.Errorf("Failed to create user: %v", err)
 		return nil, err
 	}
 
@@ -223,16 +234,49 @@ func (s *UserManagementService) UpdateUserProfile(ctx context.Context, req *v1.U
 	}
 
 	isSelf := details.Subject == req.IdentityId
-	normalizedCurrentRole := strings.ToLower(strings.TrimSpace(details.Role))
+	currentActorRole := strings.ToLower(strings.TrimSpace(details.Role))
 	normalizedReqRole := strings.ToLower(strings.TrimSpace(req.Role))
 	isChangingRole := normalizedReqRole != ""
 
-	if normalizedCurrentRole != "master" {
+	users, err := s.uc.ListSubUsers(ctx, details.OrganizationName)
+	if err != nil {
+		s.log.Errorf("Failed to list organization users: %v", err)
+		return nil, errors.New("failed to validate profile update")
+	}
+
+	targetFound := false
+	targetCurrentRole := ""
+	masterCount := 0
+
+	for _, user := range users {
+		userRole := strings.ToLower(strings.TrimSpace(user.Role))
+
+		if userRole == "master" {
+			masterCount++
+		}
+
+		if user.IdentityID == req.IdentityId {
+			targetFound = true
+			targetCurrentRole = userRole
+		}
+	}
+
+	if !targetFound {
+		return nil, errors.New("user not found in your organization")
+	}
+
+	if currentActorRole != "master" {
 		if !isSelf {
 			return nil, errors.New("forbidden: only master users can update other users' profiles")
 		}
 		if isChangingRole {
 			return nil, errors.New("forbidden: you cannot change your role")
+		}
+	}
+
+	if isChangingRole {
+		if targetCurrentRole == "master" && normalizedReqRole != "master" && masterCount <= 1 {
+			return nil, errors.New("forbidden: an organization must have at least one master user")
 		}
 	}
 
@@ -254,7 +298,6 @@ func (s *UserManagementService) UpdateUserProfile(ctx context.Context, req *v1.U
 		},
 	}, nil
 }
-
 func (s *UserManagementService) GetJWTToken(ctx context.Context, req *v1.GetJWTTokenRequest) (*v1.GetJWTTokenResponse, error) {
 	if tr, ok := transport.FromServerContext(ctx); ok {
 		authHeader := tr.RequestHeader().Get("Authorization")

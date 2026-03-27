@@ -6,7 +6,7 @@ server:
 data:
   database:
     driver: postgres
-    source: postgres://taksa:taksa_123@postgres:5432/taksa?sslmode=disable
+    source: ${TAKSA_DATABASE_DSN}
 
   kratos_admin_url: http://taksa-kratos:4434
   kratos_public_url: http://taksa-kratos:4433

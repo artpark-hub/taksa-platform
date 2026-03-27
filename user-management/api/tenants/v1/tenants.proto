@@ -77,8 +77,7 @@ message UpdateUserProfileRequest {
   string identity_id = 1;
   string first_name = 2;
   string last_name = 3;
-  string email = 4;
-  string role = 5;
+  string role = 4;
 }
 
 message UpdateUserProfileResponse {
