@@ -1,0 +1,847 @@
+syntax = "proto3";
+
+package api.umh_core.v2;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "common/models.proto";
+
+option go_package = "taksa-platform-dm/api/umh-core/v2;v2";
+option java_multiple_files = true;
+option java_package = "api.umh-core.v2";
+
+// Certificate represents X.509 certificate
+// NOTE: GetCertificate endpoint only returns userEmail and certificate fields
+// This matches umh-core's UserCertificateResponse exactly
+// (pkg/communicator/api/v2/pull/pull.go:147-151)
+message Certificate {
+  string userEmail = 1; // Email of certificate owner
+  string certificate = 2; // PEM format X.509 certificate
+}
+
+// UMHMessage is the standard message format for device-console communication
+// MUST match umh-core's models.UMHMessage exactly (pkg/models/action_models.go:79-84)
+// Wire protocol - clean, simple, compatible with umh-core
+// Internal correlation tracking is handled separately in taksa-platform-dm
+message UMHMessage {
+  api.common.MessageMetadata metadata = 1; // Distributed tracing ID only
+  string email = 2; // Sender email
+  string content = 3; // JSON-serialized action payload
+  string umhInstance = 4; // Device UUID
+}
+
+// ActionMessagePayload is the wrapper for actions sent to umh-core
+// MUST match umh-core's models.ActionMessagePayload exactly (pkg/models/action_models.go:103-108)
+// Serialized as JSON and placed in UMHMessage.content field
+message ActionMessagePayload {
+  string actionUUID = 1; // Unique action identifier (UUID)
+  string actionType = 2; // Type of action to execute
+  string actionPayload = 3; // JSON-serialized specific payload (GetConfigFilePayload, SetConfigFilePayload, etc.)
+}
+
+// ============================================================================
+// Enums - Match umh-core constant values
+// ============================================================================
+
+// DatasourceConnectionType: Type of data source connection
+enum DatasourceConnectionType {
+  DATASOURCE_CONNECTION_TYPE_UNSPECIFIED = 0;
+  DATASOURCE_CONNECTION_TYPE_OPCUA_SERVER = 1; // "opcua-server"
+  DATASOURCE_CONNECTION_TYPE_GENERIC_ASSET = 2; // "generic-asset"
+  DATASOURCE_CONNECTION_TYPE_EXTERNAL_MQTT = 3; // "external-mqtt"
+}
+
+// MetricResourceType: Type of resource for metrics retrieval
+enum MetricResourceType {
+  METRIC_RESOURCE_TYPE_UNSPECIFIED = 0;
+  METRIC_RESOURCE_TYPE_DFC = 1; // "dfc"
+  METRIC_RESOURCE_TYPE_REDPANDA = 2; // "redpanda"
+  METRIC_RESOURCE_TYPE_TOPIC_BROWSER = 3; // "topic-browser"
+  METRIC_RESOURCE_TYPE_STREAM_PROCESSOR = 4; // "stream-processor"
+  METRIC_RESOURCE_TYPE_PROTOCOL_CONVERTER = 5; // "protocol-converter"
+}
+
+// LogType: Type of logs to retrieve
+enum LogType {
+  LOG_TYPE_UNSPECIFIED = 0;
+  LOG_TYPE_AGENT = 1; // "agent"
+  LOG_TYPE_DFC = 2; // "dfc"
+  LOG_TYPE_PROTOCOL_CONVERTER_READ = 3; // "protocol-converter-read"
+  LOG_TYPE_PROTOCOL_CONVERTER_WRITE = 4; // "protocol-converter-write"
+  LOG_TYPE_REDPANDA = 5; // "redpanda"
+  LOG_TYPE_TOPIC_BROWSER = 6; // "topic-browser"
+  LOG_TYPE_STREAM_PROCESSOR = 7; // "stream-processor"
+}
+
+// MetricValueType: Type of metric value
+enum MetricValueType {
+  METRIC_VALUE_TYPE_UNSPECIFIED = 0;
+  METRIC_VALUE_TYPE_NUMBER = 1; // "number"
+  METRIC_VALUE_TYPE_STRING = 2; // "string"
+  METRIC_VALUE_TYPE_BOOLEAN = 3; // "boolean"
+}
+
+// ActionReplyState: State of action reply
+enum ActionReplyState {
+  ACTION_REPLY_STATE_UNSPECIFIED = 0;
+  ACTION_REPLY_STATE_CONFIRMED = 1; // "action-confirmed"
+  ACTION_REPLY_STATE_EXECUTING = 2; // "action-executing"
+  ACTION_REPLY_STATE_SUCCESS = 3; // "action-success"
+  ACTION_REPLY_STATE_FAILURE = 4; // "action-failure"
+}
+
+// HealthCategory: Health state category
+enum HealthCategory {
+  HEALTH_CATEGORY_UNSPECIFIED = 0;
+  HEALTH_CATEGORY_NEUTRAL = 1; // "neutral"
+  HEALTH_CATEGORY_ACTIVE = 2; // "active"
+  HEALTH_CATEGORY_DEGRADED = 3; // "degraded"
+}
+
+// DfcType: Type of Data Flow Component
+enum DfcType {
+  DFC_TYPE_UNSPECIFIED = 0;
+  DFC_TYPE_CUSTOM = 1; // "custom"
+  DFC_TYPE_DATA_BRIDGE = 2; // "data-bridge"
+  DFC_TYPE_PROTOCOL_CONVERTER = 3; // "protocol-converter"
+  DFC_TYPE_STREAM_PROCESSOR = 4; // "stream-processor"
+}
+
+// ContainerArchitecture: Processor architecture
+enum ContainerArchitecture {
+  ARCHITECTURE_UNSPECIFIED = 0;
+  ARCHITECTURE_ARM64 = 1; // "arm64"
+  ARCHITECTURE_AMD64 = 2; // "amd64"
+}
+
+// ============================================================================
+// Action Payloads - must match umh-core's payload structures exactly
+// ============================================================================
+
+// GetConfigFileResponse: Response from GetConfigFile action
+// Matches umh-core's models.GetConfigFileResponse exactly (pkg/models/action_models.go:608-611)
+message GetConfigFileResponse {
+  string content = 1; // File content as string (YAML format)
+  string lastModifiedTime = 2; // ISO 8601 timestamp of last modification
+}
+
+// SetConfigFilePayload: Request payload for SetConfigFile action
+// Matches umh-core's models.SetConfigFilePayload exactly (pkg/models/action_models.go:613-616)
+message SetConfigFilePayload {
+  string content = 1; // File content as string (YAML format)
+  string lastModifiedTime = 2; // ISO 8601 timestamp for optimistic concurrency control (e.g., 2025-12-19T14:00:00Z)
+}
+
+// SetConfigFileResponse: Response from SetConfigFile action
+// Matches umh-core's models.SetConfigFileResponse exactly (pkg/models/action_models.go:618-622)
+// Note: content field echoes back the entire file that was written (for confirmation/audit purposes)
+message SetConfigFileResponse {
+  string content = 1; // Echoed file content (entire YAML that was written)
+  string lastModifiedTime = 2; // Updated modification timestamp
+  bool success = 3; // Whether the operation succeeded
+}
+
+// ============================================================================
+// DFC Common Configuration Messages - Shared by Protocol Converters and Data Flows
+// ============================================================================
+
+// CommonDataFlowComponentInputConfig: Input source configuration
+message CommonDataFlowComponentInputConfig {
+  string data = 1; // Input YAML configuration
+  string type = 2; // Input type (e.g., "mqtt", "kafka", "http_server")
+}
+
+// CommonDataFlowComponentOutputConfig: Output destination configuration
+message CommonDataFlowComponentOutputConfig {
+  string data = 1; // Output YAML configuration
+  string type = 2; // Output type (e.g., "kafka", "http_client")
+}
+
+// CommonDataFlowComponentBenthosImageTagConfig: Benthos image tag configuration
+message CommonDataFlowComponentBenthosImageTagConfig {
+  string tag = 1; // Benthos image tag (e.g., "v4.2.0")
+}
+
+// CommonDataFlowComponentPipelineConfigProcessor: Individual processor configuration
+message CommonDataFlowComponentPipelineConfigProcessor {
+  string data = 1; // Processor YAML configuration
+  string type = 2; // Processor type (e.g., "bloblang", "jmespath")
+}
+
+// CommonDataFlowComponentPipelineConfig: Pipeline processing configuration
+message CommonDataFlowComponentPipelineConfig {
+  map<string, CommonDataFlowComponentPipelineConfigProcessor> processors = 1; // Named processors
+  int32 threads = 2; // Number of pipeline threads (-1 = default)
+}
+
+// CommonDataFlowComponentRawYamlConfig: Raw YAML configuration fallback
+message CommonDataFlowComponentRawYamlConfig {
+  string data = 1; // Complete raw YAML configuration
+}
+
+// ============================================================================
+// GetLogsPayload: Retrieve logs from various services
+// ============================================================================
+
+message GetLogsPayload {
+  // Log source type - REQUIRED
+  // Valid values:
+  //   - "agent": General agent logs (no uuid required)
+  //   - "dfc": Data Flow Component logs (requires uuid)
+  //   - "protocol-converter-read": Protocol converter read logs (requires uuid)
+  //   - "protocol-converter-write": Protocol converter write logs (requires uuid)
+  //   - "redpanda": Redpanda broker logs (no uuid required)
+  //   - "topic-browser": Topic browser logs (no uuid required)
+  //   - "stream-processor": Stream processor logs (requires uuid)
+  // See LogType enum for available types.
+  string type = 1;
+  
+  // Unix timestamp in milliseconds (must be > 0 and in the past)
+  // Limits log retrieval to entries after this timestamp
+  int64 startTime = 2;
+  
+  // Component UUID - REQUIRED if type is: dfc, protocol-converter-read, protocol-converter-write, stream-processor
+  // For other types, this field is ignored
+  string uuid = 3;
+}
+
+// GetMetricsPayload: Retrieve metrics from various services
+message GetMetricsPayload {
+  // Metric source type - REQUIRED
+  // Valid values:
+  //   - "dfc": Data Flow Component metrics (requires uuid)
+  //   - "protocol-converter": Protocol converter metrics (requires uuid)
+  //   - "redpanda": Redpanda broker metrics (no uuid required)
+  //   - "stream-processor": Stream processor metrics (requires uuid)
+  //   - "topic-browser": Topic browser metrics (no uuid required)
+  // See MetricResourceType enum for available types.
+  string type = 1;
+  
+  // Component UUID - REQUIRED if type is: dfc, protocol-converter, stream-processor
+  // For other types, this field is ignored
+  string uuid = 2;
+}
+
+// ============================================================================
+// Connections - Datasources and Protocol Converters (Bridges)
+// ============================================================================
+
+// TestNetworkConnectionPayload: Test network connectivity to a data source
+message TestNetworkConnectionPayload {
+  string ip = 1; // IP address of the target
+  string datasource = 2; // Data source type: opcua-server, generic-asset, external-mqtt
+  uint32 port = 3; // Port to connect on
+}
+
+// DeployConnectionPayload: Create/deploy a connection to a data source
+message DeployConnectionPayload {
+  string uuid = 1; // Unique identifier (UUID)
+  string name = 2; // Connection name
+  string ip = 3; // IP address
+  uint32 port = 4; // Port number
+  string datasource = 5; // Data source type: opcua-server, generic-asset, external-mqtt
+  string notes = 6; // Optional notes
+  ConnectionLocation location = 7; // Optional location hierarchy
+}
+
+// ConnectionLocation: Hierarchical location for a connection (no enterprise)
+message ConnectionLocation {
+  string site = 1; // Site/facility (optional)
+  string area = 2; // Area/department (optional)
+  string line = 3; // Line/production line (optional)
+  string workCell = 4; // Work cell/machine (optional)
+}
+
+// EditConnectionPayload: Partially edit connection properties
+message EditConnectionPayload {
+  string uuid = 1; // Connection UUID (required)
+  string name = 2; // Connection name (optional)
+  string ip = 3; // IP address (optional)
+  uint32 port = 4; // Port number (optional)
+  string datasource = 5; // Data source type (optional)
+  string notes = 6; // Notes (optional)
+  ConnectionLocation location = 7; // Location (optional)
+}
+
+// DeleteConnectionPayload: Delete a connection
+message DeleteConnectionPayload {
+  string uuid = 1; // Connection UUID to delete
+}
+
+// GetConnectionNotesPayload: Retrieve notes for a connection
+message GetConnectionNotesPayload {
+  string uuid = 1; // Connection UUID
+}
+
+// GetConnectionNotesResponse: Notes response for a connection
+message GetConnectionNotesResponse {
+  string notes = 1; // Connection notes
+}
+
+// GetDatasourcePayload: Retrieve datasource information
+message GetDatasourcePayload {
+  string uuid = 1; // Datasource UUID
+}
+
+// DeleteDatasourcePayload: Delete a datasource
+message DeleteDatasourcePayload {
+  string uuid = 1; // Datasource UUID to delete
+}
+
+// ============================================================================
+// Protocol Converters (Bridges) - Advanced Operations
+// ============================================================================
+
+// ProtocolConverterConnection: Connection details for a protocol converter
+// Matches umh-core's models.ProtocolConverterConnection exactly
+// (pkg/models/action_models.go:759-762)
+message ProtocolConverterConnection {
+  string ip = 1; // IP address
+  uint32 port = 2; // Port number
+}
+
+// ProtocolConverterMeta: Metadata for a protocol converter
+// Matches umh-core's models.ProtocolConverterMeta exactly
+// (pkg/models/action_models.go:793-796)
+message ProtocolConverterMeta {
+  string processingMode = 1; // Processing mode (e.g., "streaming", "buffered")
+  string protocol = 2; // Protocol type (e.g., "modbus_tcp", "opcua")
+}
+
+// ProtocolConverterVariable: Template variable for a protocol converter
+message ProtocolConverterVariable {
+  string label = 1; // Variable label/name
+  string value = 2; // Variable value
+}
+
+// ProtocolConverterTemplateInfo: Template configuration for a protocol converter
+// Matches umh-core's models.ProtocolConverterTemplateInfo exactly
+// (pkg/models/action_models.go:776-780)
+message ProtocolConverterTemplateInfo {
+  repeated ProtocolConverterVariable variables = 1; // Template variables
+  string rootUUID = 2; // Root UUID for template
+  bool isTemplated = 3; // Whether this uses templating
+}
+
+// ProtocolConverterDFC: Data Flow Component configuration for a protocol converter
+// MUST match umh-core's models.ProtocolConverterDFC exactly
+// (pkg/models/action_models.go:764-769)
+// NOTE: For DeployProtocolConverter, readDfc and writeDfc should be null/empty.
+// DFC configurations are added later via EditProtocolConverter action.
+message ProtocolConverterDFC {
+  // Pipeline processor configuration
+  CommonDataFlowComponentPipelineConfig pipeline = 1;
+  
+  // Input source configuration (required for functional DFC)
+  CommonDataFlowComponentInputConfig inputs = 2;
+  
+  // Optional raw YAML fallback configuration
+  CommonDataFlowComponentRawYamlConfig rawYAML = 3;
+  
+  // Whether to ignore errors during processing
+  bool ignoreErrors = 4;
+}
+
+// ProtocolConverter: Full protocol converter model (action payload for Deploy/Edit)
+// MUST match umh-core's models.ProtocolConverter exactly
+// (pkg/models/action_models.go:782-791)
+message ProtocolConverter {
+  string uuid = 1; // Generated UUID (optional - umh-core generates if empty)
+  string name = 2; // Bridge name (required)
+  ProtocolConverterConnection connection = 3; // Connection details (required: IP + Port)
+  map<int32, string> location = 4; // Hierarchical location (level → name)
+  ProtocolConverterDFC readDfc = 5; // Read data flow component (optional)
+  ProtocolConverterDFC writeDfc = 6; // Write data flow component (optional)
+  ProtocolConverterTemplateInfo templateInfo = 7; // Template variables (optional)
+  ProtocolConverterMeta meta = 8; // Metadata (optional)
+}
+
+// ============================================================================
+// Data Flow Components (DFC) - Stream Processing
+// ============================================================================
+
+// CdcfMeta: Component metadata
+message CdcfMeta {
+  string type = 1; // Component type (e.g., "benthos", "custom", etc.)
+}
+
+// DeployDataFlowComponentPayload: Deploy a data flow component
+message DeployDataFlowComponentPayload {
+  string name = 1; // Component name
+  string benthosImageTag = 2; // Optional: Benthos container image tag
+  DataFlowComponentDFC customDataFlowComponent = 3; // Component configuration
+  CdcfMeta meta = 4; // Component metadata (type)
+  bool ignoreHealthCheck = 5; // Whether to ignore health checks
+}
+
+// DataFlowComponentDFC: Data Flow Component configuration
+message DataFlowComponentDFC {
+  DataFlowComponentPipeline pipeline = 1; // Pipeline processors
+  DataFlowComponentIOConfig inputs = 2; // Input configuration
+  DataFlowComponentIOConfig outputs = 3; // Output configuration
+  string rawYAML = 4; // Optional: Raw YAML injection
+  bool ignoreErrors = 5; // Whether to ignore processing errors
+}
+
+// DataFlowComponentPipeline: Pipeline configuration for DFC
+message DataFlowComponentPipeline {
+  map<string, DataFlowComponentProcessor> processors = 1; // Processors by name
+  int32 threads = 2; // Optional: Number of pipeline threads (default: -1)
+}
+
+// DataFlowComponentProcessor: Individual processor configuration
+message DataFlowComponentProcessor {
+  string type = 1; // Processor type: bloblang, json, etc.
+  string data = 2; // Processor YAML/configuration data
+}
+
+// DataFlowComponentIOConfig: Input/Output configuration
+message DataFlowComponentIOConfig {
+  string type = 1; // I/O type: mqtt, kafka, http, file, etc.
+  string data = 2; // I/O YAML/configuration data
+}
+
+// EditDataFlowComponentPayload: Edit an existing data flow component
+// NOTE: umh-core expects a wrapper with uuid, name, meta, and nested DeployDataFlowComponentPayload
+message EditDataFlowComponentPayload {
+  string uuid = 1; // Component UUID (required)
+  string name = 2; // Component name
+  CdcfMeta meta = 3; // Component metadata (type)
+  DeployDataFlowComponentPayload payload = 4; // Nested deployment payload (contains CDFC config)
+  bool ignoreHealthCheck = 5; // Whether to ignore health checks
+}
+
+// DeleteDataFlowComponentPayload: Delete a data flow component
+message DeleteDataFlowComponentPayload {
+  string uuid = 1; // Component UUID to delete
+}
+
+// GetDataFlowComponentPayload: Retrieve data flow component information
+message GetDataFlowComponentPayload {
+  repeated string versionUUIDs = 1; // Optional: Specific version UUIDs to retrieve
+}
+
+// RollbackDataFlowComponentPayload: Rollback a component to a previous version
+message RollbackDataFlowComponentPayload {
+  string uuid = 1; // Component UUID to rollback
+  string versionUUID = 2; // Version to rollback to
+}
+
+// ============================================================================
+// Data Models
+// ============================================================================
+
+// AddDataModelPayload: Add a new data model
+message AddDataModelPayload {
+  string name = 1; // Data model name
+  string description = 2; // Optional: Data model description
+  string encodedStructure = 3; // Base64-encoded YAML structure
+}
+
+// EditDataModelPayload: Edit an existing data model
+message EditDataModelPayload {
+  string name = 1; // Data model name
+  string description = 2; // Optional: Data model description
+  string encodedStructure = 3; // Base64-encoded YAML structure
+}
+
+// DeleteDataModelPayload: Delete a data model
+message DeleteDataModelPayload {
+  string name = 1; // Data model name to delete
+}
+
+// GetDataModelPayload: Retrieve data model information
+message GetDataModelPayload {
+  string name = 1; // Data model name
+  string version = 2; // Optional: specific version (e.g., "1", "2", "3"). If empty, returns all versions
+  bool getEnrichedTree = 3; // Whether to include referenced model data
+}
+
+// ============================================================================
+// Stream Processors - Data Aggregation
+// ============================================================================
+
+// StreamProcessor: Complete stream processor configuration (used for both Deploy and Edit)
+// NOTE: When deploying, uuid is generated server-side. When editing, uuid identifies the processor to update.
+message StreamProcessor {
+  string uuid = 1; // Generated UUID (server-side for deploy, client-provided for edit)
+  string name = 2; // Processor name
+  StreamProcessorModelRef model = 3; // Referenced data model (required)
+  string encodedConfig = 4; // Base64-encoded YAML configuration (sources and mappings)
+  map<int32, string> location = 5; // Hierarchical location (level number → name). 0=enterprise, 1=site, etc.
+  bool ignoreHealthCheck = 6; // Whether to ignore health checks
+  StreamProcessorTemplateInfo templateInfo = 7; // Template information (optional)
+}
+
+// StreamProcessorModelRef: Reference to a data model
+message StreamProcessorModelRef {
+  string name = 1; // Data model name
+  string version = 2; // Data model version
+}
+
+// StreamProcessorTemplateInfo: Template information for stream processor
+message StreamProcessorTemplateInfo {
+  repeated StreamProcessorVariable variables = 1; // Template variables
+}
+
+// StreamProcessorVariable: Template variable definition
+message StreamProcessorVariable {
+  string name = 1;
+  string value = 2;
+}
+
+// DeleteStreamProcessorPayload: Delete a stream processor
+message DeleteStreamProcessorPayload {
+  string uuid = 1; // Stream processor UUID to delete
+}
+
+// GetStreamProcessorPayload: Retrieve stream processor information
+message GetStreamProcessorPayload {
+  string uuid = 1; // Stream processor UUID
+}
+
+// ============================================================================
+// Instance Configuration & Management
+// ============================================================================
+
+// EditInstanceLocationPayload: Set/update instance location hierarchy
+message EditInstanceLocationPayload {
+  string enterprise = 1; // Enterprise/company (required)
+  string site = 2; // Site/facility (optional)
+  string area = 3; // Area/department (optional)
+  string line = 4; // Line/production line (optional)
+  string workCell = 5; // Work cell/machine (optional)
+}
+
+// EditInstancePayload: Edit instance metadata and settings
+message EditInstancePayload {
+  string name = 1; // Instance name (optional)
+  map<string, string> metadata = 2; // Metadata key-value pairs (optional)
+}
+
+// EditMqttBrokerPayload: Configure MQTT broker connection
+message EditMqttBrokerPayload {
+  string uuid = 1; // MQTT broker UUID
+  string ip = 2; // Broker IP address
+  uint32 port = 3; // Broker port
+  string username = 4; // Username
+  string password = 5; // Password
+  int64 lastUpdated = 6; // Last update timestamp
+}
+
+// ============================================================================
+// Diagnostics & Monitoring
+// ============================================================================
+
+// GetAuditLogPayload: Retrieve audit logs
+message GetAuditLogPayload {
+  int64 startTime = 1; // Optional: Start time in milliseconds
+  int64 endTime = 2; // Optional: End time in milliseconds
+  string filter = 3; // Optional: Filter expression
+}
+
+// GetKubernetesEventsPayload: Retrieve Kubernetes events
+message GetKubernetesEventsPayload {
+  string namespace = 1; // Optional: Kubernetes namespace
+  string pod = 2; // Optional: Pod name filter
+}
+
+// GetOpcuaTagsPayload: Retrieve available OPC-UA tags
+message GetOpcuaTagsPayload {
+  string connectionUUID = 1; // Connection UUID to query
+  string browsePath = 2; // Optional: Specific browse path
+}
+
+// DummyActionPayload: Dummy action for testing (no-op)
+message DummyActionPayload {
+  // Empty - this action does nothing
+}
+
+// TestBenthosInputPayload: Test a Benthos input configuration
+message TestBenthosInputPayload {
+  string inputYaml = 1; // Input YAML configuration to test
+}
+
+// ============================================================================
+// Instance Configuration & Management
+// ============================================================================
+
+
+// ============================================================================
+// Service Control & Upgrades
+// ============================================================================
+
+// UpgradeCompanionPayload: Upgrade to a specific version
+message UpgradeCompanionPayload {
+  string version = 1; // Target version (semantic version string)
+}
+
+// ============================================================================
+// Response/Reply Messages
+// ============================================================================
+
+// GetLogsResponse: Response containing logs
+message GetLogsResponse {
+  repeated string logs = 1; // Log lines
+}
+
+// GetMetricsResponse: Response containing metrics
+message GetMetricsResponse {
+  repeated Metric metrics = 1; // Metric values
+}
+
+// Metric: A single metric value
+message Metric {
+  string                name           = 1; // Metric name
+  string                path           = 2; // Metric path/location
+  MetricResourceType    componentType  = 3; // Component type that produced metric
+  MetricValueType       valueType      = 4; // Value type: number, string, boolean
+  bytes                 value          = 5; // Metric value as JSON bytes
+}
+
+// ActionReplyMessagePayload: Response/reply to an action
+message ActionReplyMessagePayload {
+  string                actionUUID       = 1; // UUID of the action being replied to
+  ActionReplyState      actionReplyState = 2; // State of the action reply
+  bytes                 actionReplyPayload = 3; // Reply payload as JSON bytes (interface{})
+  map<string, bytes>    actionContext    = 4; // Optional: Additional context as JSON
+}
+
+// ============================================================================
+// Action Result Response Messages (returned in result_payload)
+// ============================================================================
+
+// DataFlowComponent: Response from data flow component operations
+message DataFlowComponent {
+  string uuid = 1; // Generated UUID
+  string name = 2; // Component name
+  string benthosImageTag = 3; // Benthos image tag
+  DataFlowComponentDFC customDataFlowComponent = 4; // DFC config
+  CdcfMeta meta = 5; // Component metadata
+  bool ignoreHealthCheck = 6; // Health check flag
+}
+
+// DataContractInfo: Data contract created by data model operations
+message DataContractInfo {
+  string name = 1; // Data contract name (e.g., "_ModelName_v1")
+  string model = 2; // Model reference (e.g., "ModelName:v1")
+  string status = 3; // Status ("created" or "failed")
+}
+
+// DataModelOperationResult: Response from DataModel operations (Add/Edit/Delete/Get)
+// NOTE: Matches umh-core's Execute() response from add-datamodel.go and edit-datamodel.go
+message DataModelOperationResult {
+  string name = 1; // Model name
+  string version = 2; // Model version (integer as string, e.g., "1", "2", "3")
+  string description = 3; // Model description
+  // NOTE: umh-core returns "structure" (parsed map), not "encodedStructure"
+  // For compatibility, we include encoded structure when available, or JSON-serialized structure
+  string encodedStructure = 4; // Base64-encoded YAML structure (if available)
+  // Full parsed structure as JSON object (from umh-core response)
+  google.protobuf.Struct structure = 5; // Structure as JSON object (umh-core returns parsed structure)
+  // Auto-created data contract information
+  DataContractInfo dataContract = 6; // Data contract created by AddDataModel/EditDataModel actions
+}
+
+// ============================================================================
+// Status Messages (Device → Console via Push API)
+// ============================================================================
+
+// StatusMessage: Complete system state sent by device (via Push API)
+message StatusMessage {
+  Core core = 1; // Required: System state
+  map<string, bytes> plugins = 2; // Extension point for future plugins
+}
+
+// Core: Root system state container
+message Core {
+  Health health = 1; // Overall system health
+  Agent agent = 2; // Device agent information
+  Container container = 3; // Hardware/container information
+  Release release = 4; // Version and feature information
+  repeated Dfc dfcs = 5; // Data flow components
+  Redpanda redpanda = 6; // Message broker state
+  TopicBrowser topicBrowser = 7; // Topic/data catalog
+  repeated DataModel dataModels = 8; // Available data models
+  repeated DataContract dataContracts = 9; // Data contracts
+}
+
+// Health: Health state with category
+message Health {
+  string message = 1; // Human-readable state description
+  string state = 2; // Observed state (FSM current state)
+  string desiredState = 3; // Desired state (FSM target state)
+  string category = 4; // Category: active, degraded, neutral
+}
+
+// Agent: Device agent state and configuration
+message Agent {
+  Health health = 1; // Agent health status
+  Latency latency = 2; // Communication latency metrics
+  map<int32, string> location = 3; // Hierarchical location (level → name)
+}
+
+// Latency: Latency metrics with percentiles
+message Latency {
+  double avgMs = 1; // Average latency in milliseconds
+  double maxMs = 2; // Maximum latency
+  double minMs = 3; // Minimum latency
+  double p95Ms = 4; // 95th percentile
+  double p99Ms = 5; // 99th percentile
+}
+
+// Container: Hardware and resource information
+message Container {
+  Health health = 1; // Container health
+  CPU cpu = 2; // CPU metrics
+  Disk disk = 3; // Storage metrics
+  Memory memory = 4; // Memory metrics
+  string hwid = 5; // Hardware identifier
+  string architecture = 6; // Processor architecture: arm64, amd64
+}
+
+// CPU: CPU metrics with cgroup limits
+message CPU {
+  Health health = 1; // CPU health
+  double totalUsageMCpu = 2; // Total usage in millicores (1000m = 1 core)
+  int32 coreCount = 3; // Number of CPU cores
+  double cgroupCores = 4; // CPU quota from cgroup (e.g., 2.0 = 2 cores)
+  double throttleRatio = 5; // Ratio of time throttled (0.0-1.0)
+  bool isThrottled = 6; // True if recently throttled
+}
+
+// Disk: Storage metrics
+message Disk {
+  Health health = 1; // Disk health
+  int64 dataPartitionUsedBytes = 2; // Used bytes on data partition
+  int64 dataPartitionTotalBytes = 3; // Total bytes on data partition
+}
+
+// Memory: Memory metrics
+message Memory {
+  Health health = 1; // Memory health
+  int64 cGroupUsedBytes = 2; // Used bytes in cgroup
+  int64 cGroupTotalBytes = 3; // Total bytes in cgroup
+}
+
+// Dfc: Data Flow Component state
+message Dfc {
+  string uuid = 1; // Component UUID
+  string name = 2; // Component name
+  string dfcType = 3; // Type: custom, data-bridge, protocol-converter, stream-processor
+  Health health = 4; // Component health
+  DfcMetrics metrics = 5; // Performance metrics
+  repeated Connection connections = 6; // Associated connections
+  DfcBridgeInfo bridge = 7; // Bridge-specific info (for bridge type)
+  bool isInitialized = 8; // Whether initialized
+  string currentVersionUUID = 9; // Deprecated: current version UUID
+}
+
+// DfcMetrics: Data Flow Component performance metrics
+message DfcMetrics {
+  double avgInputThroughputPerMinuteInMsgSec = 1; // Messages per second
+}
+
+// Connection: External system connection state
+message Connection {
+  string uuid = 1; // Connection UUID
+  string name = 2; // Connection name
+  Health health = 3; // Connection health
+  string uri = 4; // Full connection URI
+  double lastLatencyMs = 5; // Last measured latency
+}
+
+// DfcBridgeInfo: Bridge-specific metadata
+message DfcBridgeInfo {
+  string dataContract = 1; // Associated data contract
+  string inputType = 2; // Input data type
+  string outputType = 3; // Output data type
+}
+
+// Redpanda: Message broker state
+message Redpanda {
+  Health health = 1; // Broker health
+  double avgIncomingThroughputPerMinuteInBytesSec = 2; // Incoming bytes per second
+  double avgOutgoingThroughputPerMinuteInBytesSec = 3; // Outgoing bytes per second
+}
+
+// TopicBrowser: Topic catalog state
+message TopicBrowser {
+  Health health = 1; // Browser health
+  map<int32, bytes> unsBundles = 2; // Compressed UNS bundles (protobuf format)
+  int32 topicCount = 3; // Total topics
+}
+
+// Release: Version and feature information
+message Release {
+  Health health = 1; // Release health
+  string version = 2; // Version string
+  string channel = 3; // Release channel (stable, beta, etc.)
+  repeated string supportedFeatures = 4; // Feature keywords
+  repeated Version versions = 5; // Component versions
+}
+
+// Version: Component version information
+message Version {
+  string name = 1; // Component name
+  string version = 2; // Version string
+}
+
+// DataModel: Data model metadata
+message DataModel {
+  string name = 1; // Model name
+  string description = 2; // Model description
+  string latestVersion = 3; // Latest version
+  string hash = 4; // Structure hash
+}
+
+// DataContract: Data contract definition
+message DataContract {
+  string name = 1; // Contract name
+  DataContractRef dataModel = 2; // Referenced data model
+  int32 flows = 3; // Number of data flows using this contract
+}
+
+// DataContractRef: Reference to a data model
+message DataContractRef {
+  string name = 1; // Model name
+  string version = 2; // Model version
+}
+
+// EventsTable: Event data from Kafka topic
+message EventsTable {
+  bytes value = 1; // Event value as JSON bytes
+  string origin = 2; // Data origin
+  string error = 3; // Error message if any
+  string unsTreeId = 4; // UNS tree identifier
+  repeated string bridges = 5; // Associated bridges
+  EventKafka rawKafkaMessage = 6; // Kafka message details
+  double timestamp_ms = 7; // Timestamp in milliseconds
+}
+
+// EventKafka: Kafka message metadata
+message EventKafka {
+  map<string, string> headers = 1; // Message headers
+  string key = 2; // Message key
+  string lastPayload = 3; // Last payload content
+  string topic = 4; // Kafka topic
+  repeated string destination = 5; // Destination path
+  repeated string origin = 6; // Origin path
+  double kafkaInsertedTimestamp = 7; // Kafka insertion time
+  double messagesPerMinute = 8; // Throughput
+}
+
+// UnsTable: Universal Namespace data
+message UnsTable {
+  string area = 1; // Area level
+  string eventGroup = 2; // Event group
+  string eventTag = 3; // Event tag
+  bool isError = 4; // Error flag
+  string line = 5; // Line level
+  string originId = 6; // Origin identifier
+  string schema = 7; // Data schema
+  string site = 8; // Site level
+  string workCell = 9; // Work cell level
+  string enterprise = 10; // Enterprise level (required)
+  repeated string instances = 11; // Instance references
+}

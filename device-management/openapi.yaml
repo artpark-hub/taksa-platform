@@ -1,0 +1,2433 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: ""
+    version: 0.0.1
+paths:
+    /api/v1/devicemgmt/devices:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: List all registered devices
+            operationId: DeviceMgmtService_ListDevices
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  description: Filters
+                  schema:
+                    type: array
+                    items:
+                        type: integer
+                        format: enum
+                - name: locationLevel0
+                  in: query
+                  schema:
+                    type: string
+                - name: search
+                  in: query
+                  schema:
+                    type: string
+                - name: sortBy
+                  in: query
+                  description: Sorting
+                  schema:
+                    type: integer
+                    format: enum
+                - name: sortDesc
+                  in: query
+                  schema:
+                    type: boolean
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ListDevicesResponse'
+        post:
+            tags:
+                - DeviceMgmtService
+            description: Create a new device with the management system
+            operationId: DeviceMgmtService_RegisterDevice
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.RegisterDeviceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.RegisterDeviceResponse'
+    /api/v1/devicemgmt/devices/{deviceId}:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get device information
+            operationId: DeviceMgmtService_GetDevice
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.Device'
+        delete:
+            tags:
+                - DeviceMgmtService
+            description: Delete/decommission a device
+            operationId: DeviceMgmtService_DeleteDevice
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: force
+                  in: query
+                  schema:
+                    type: boolean
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+        patch:
+            tags:
+                - DeviceMgmtService
+            description: Update device information
+            operationId: DeviceMgmtService_UpdateDevice
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.UpdateDeviceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.Device'
+    /api/v1/devicemgmt/devices/{deviceId}/config:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to get device configuration (config.yaml)
+                 Supported by: umh-core GetConfigFile action (no payload - umh-core reads default config path)
+            operationId: DeviceMgmtService_GetDeviceConfig
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        put:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to set device configuration (config.yaml)
+                 Supported by: umh-core SetConfigFile action
+                 Note: This completely overwrites the configuration file, not a partial update
+            operationId: DeviceMgmtService_SetDeviceConfig
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.SetDeviceConfigRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/config/{actionId}/result:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get result of DeviceConfig action (handles both GET and SET results)
+            operationId: DeviceMgmtService_GetDeviceConfigActionResponse
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: actionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.DeviceConfigActionResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/data-flow-components:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: List all data flow components for a device
+            operationId: DeviceMgmtService_ListDataFlowComponents
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ListDataFlowComponentsResponse'
+        post:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to deploy a new data flow component
+                 Supported by: umh-core DeployDataFlowComponent action
+            operationId: DeviceMgmtService_DeployDataFlowComponent
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.DeployDataFlowComponentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/data-flow-components/{actionId}/result:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get result of any data flow component action
+            operationId: DeviceMgmtService_GetDataFlowComponentActionResponse
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: actionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.DataFlowComponentActionResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/data-flow-components/{uuid}:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to get an existing data flow component
+                 Supported by: umh-core GetDataFlowComponent action
+            operationId: DeviceMgmtService_GetDataFlowComponent
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        delete:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to delete a data flow component
+                 Supported by: umh-core DeleteDataFlowComponent action
+            operationId: DeviceMgmtService_DeleteDataFlowComponent
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        patch:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to edit an existing data flow component
+                 Supported by: umh-core EditDataFlowComponent action
+            operationId: DeviceMgmtService_EditDataFlowComponent
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.umh_core.v2.EditDataFlowComponentPayload'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/data-models:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: List all data models for a device
+            operationId: DeviceMgmtService_ListDataModels
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: nameFilter
+                  in: query
+                  description: Optional filters
+                  schema:
+                    type: string
+                - name: versionFilter
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ListDataModelsResponse'
+        post:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to add a new data model
+                 Supported by: umh-core AddDataModel action
+            operationId: DeviceMgmtService_AddDataModel
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.AddDataModelRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/data-models/{actionId}/result:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get result of any data model action
+            operationId: DeviceMgmtService_GetDataModelActionResponse
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: actionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.DataModelActionResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/data-models/{name}:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to get a data model
+                 Supported by: umh-core GetDataModel action
+            operationId: DeviceMgmtService_GetDataModel
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: name
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: version
+                  in: query
+                  schema:
+                    type: string
+                - name: getEnrichedTree
+                  in: query
+                  schema:
+                    type: boolean
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        delete:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to delete a data model
+                 Supported by: umh-core DeleteDataModel action
+            operationId: DeviceMgmtService_DeleteDataModel
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: name
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        patch:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to edit an existing data model
+                 Supported by: umh-core EditDataModel action
+            operationId: DeviceMgmtService_EditDataModel
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: name
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.EditDataModelRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/health:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get device health metrics (stored from Push API)
+            operationId: DeviceMgmtService_GetDeviceHealth
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.DeviceHealthResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/logs:
+        post:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to get device logs
+                 Supported by: umh-core GetLogs action
+                 Request payload specifies the log source type (agent, dfc, redpanda, etc.)
+                 Some types require a uuid field to identify the specific component
+                 Response: ActionQueuedResponse with action_id to poll for results
+            operationId: DeviceMgmtService_GetLogs
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.GetLogsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/logs/{actionId}/result:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get result of GetLogs action
+            operationId: DeviceMgmtService_GetLogsActionResponse
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: actionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.LogsActionResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/metrics:
+        post:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to get device metrics
+                 Supported by: umh-core GetMetrics action
+                 Request payload specifies the metric source type (dfc, redpanda, protocol-converter, etc.)
+                 Some types require a uuid field to identify the specific component
+                 Response: ActionQueuedResponse with action_id to poll for results
+            operationId: DeviceMgmtService_GetMetrics
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.GetMetricsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/metrics/{actionId}/result:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get result of GetMetrics action
+            operationId: DeviceMgmtService_GetMetricsActionResponse
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: actionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.MetricsActionResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/protocol-converters:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: List all protocol converters for a device
+            operationId: DeviceMgmtService_ListProtocolConverters
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: uuidFilter
+                  in: query
+                  description: Optional filters
+                  schema:
+                    type: string
+                - name: nameFilter
+                  in: query
+                  schema:
+                    type: string
+                - name: typeFilter
+                  in: query
+                  schema:
+                    type: string
+                - name: deploymentStatusFilter
+                  in: query
+                  schema:
+                    type: string
+                - name: connectionUuidFilter
+                  in: query
+                  schema:
+                    type: string
+                - name: healthStatusFilter
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ListProtocolConvertersResponse'
+        post:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to deploy a new protocol converter (bridge)
+                 Supported by: umh-core DeployProtocolConverter action
+            operationId: DeviceMgmtService_DeployProtocolConverter
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.DeployProtocolConverterRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/protocol-converters/{actionId}/result:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get result of any protocol converter action
+            operationId: DeviceMgmtService_GetProtocolConverterActionResponse
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: actionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterActionResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/protocol-converters/{uuid}:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to get an existing protocol converter
+                 Supported by: umh-core GetProtocolConverter action
+            operationId: DeviceMgmtService_GetProtocolConverter
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        delete:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to delete a protocol converter
+                 Supported by: umh-core DeleteProtocolConverter action
+            operationId: DeviceMgmtService_DeleteProtocolConverter
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        patch:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to edit an existing protocol converter
+                 Supported by: umh-core EditProtocolConverter action
+            operationId: DeviceMgmtService_EditProtocolConverter
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  description: |-
+                    Protocol converter UUID (path parameter - authoritative)
+                     If payload.uuid is provided, it must match this value (validation at API)
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.EditProtocolConverterRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/stream-processors:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: List all stream processors for a device
+            operationId: DeviceMgmtService_ListStreamProcessors
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ListStreamProcessorsResponse'
+        post:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to deploy a new stream processor
+                 Supported by: umh-core DeployStreamProcessor action
+            operationId: DeviceMgmtService_DeployStreamProcessor
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.DeployStreamProcessorRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/stream-processors/{actionId}/result:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get result of any stream processor action
+            operationId: DeviceMgmtService_GetStreamProcessorActionResponse
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: actionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.StreamProcessorActionResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/stream-processors/{uuid}:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to get a stream processor
+                 Supported by: umh-core GetStreamProcessor action
+            operationId: DeviceMgmtService_GetStreamProcessor
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        delete:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to delete a stream processor
+                 Supported by: umh-core DeleteStreamProcessor action
+            operationId: DeviceMgmtService_DeleteStreamProcessor
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        patch:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue action to edit an existing stream processor
+                 Supported by: umh-core EditStreamProcessor action
+            operationId: DeviceMgmtService_EditStreamProcessor
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.EditStreamProcessorRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v2/instance/login:
+        post:
+            tags:
+                - InstanceService
+            description: |-
+                Login/authenticate a device
+                 RPC: POST /api/v2/instance/login
+                 Compatible with: umh-core v0.43.17+
+                 Client sends: POST with Authorization: Bearer <SHA3(SHA3(token))> header, no body
+                 Server returns: JWT token in "token" HttpOnly cookie + LoginResponse JSON body
+                 Authentication: token hash validated against stored raw auth tokens
+            operationId: InstanceService_Login
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.umh_core.v2.LoginResponse'
+    /api/v2/instance/pull:
+        get:
+            tags:
+                - InstanceService
+            description: |-
+                Pull (retrieve) queued actions from console
+                 Compatible with: GET /api/v2/instance/pull
+            operationId: InstanceService_Pull
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.umh_core.v2.PullResponse'
+    /api/v2/instance/push:
+        post:
+            tags:
+                - InstanceService
+            description: |-
+                Push device status and telemetry to console
+                 Compatible with: POST /api/v2/instance/push
+            operationId: InstanceService_Push
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.umh_core.v2.PushRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+    /api/v2/instance/user/certificate:
+        get:
+            tags:
+                - InstanceService
+            description: |-
+                Get device certificate for TLS communication
+                 Compatible with: GET /api/v2/instance/user/certificate
+            operationId: InstanceService_GetCertificate
+            parameters:
+                - name: email
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.umh_core.v2.Certificate'
+    /health:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Health check endpoint - returns service status
+                 Used by Docker healthchecks, Kubernetes probes, load balancers
+            operationId: DeviceMgmtService_Health
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.HealthResponse'
+components:
+    schemas:
+        api.common.CompanyDetails:
+            type: object
+            properties:
+                owner:
+                    type: string
+                certificate:
+                    type: string
+                encryptedPrivateKey:
+                    type: string
+                name:
+                    type: string
+                licenseStatus:
+                    $ref: '#/components/schemas/api.common.LicenseStatus'
+                userCount:
+                    type: string
+            description: |-
+                CompanyDetails contains company/organization information
+                 Wire protocol version - matches umh-core exactly
+                 This is what umh-core sends in LoginResponse
+                 CRITICAL: Must use these field names and types for wire protocol compatibility
+        api.common.LicenseStatus:
+            type: object
+            properties:
+                validTo:
+                    type: string
+                description:
+                    type: string
+                isActive:
+                    type: boolean
+            description: |-
+                LicenseStatus tracks device licensing information
+                 Wire protocol version - matches umh-core exactly
+                 CRITICAL: validTo is a STRING in wire format (date format: "2006-01-02")
+        api.common.MessageMetadata:
+            type: object
+            properties:
+                traceId:
+                    type: string
+            description: |-
+                MessageMetadata for distributed tracing
+                 Shared between instance-facing (umh-core) and management console APIs
+                 MUST match umh-core's MessageMetadata exactly (pkg/models/action_models.go:60-62)
+        api.devicemgmt.v1.ActionQueuedResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
+                expiresAt:
+                    type: string
+                    format: date-time
+            description: ActionQueuedResponse is returned by all action-sending RPCs
+        api.devicemgmt.v1.AddDataModelRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                structure:
+                    type: object
+        api.devicemgmt.v1.CompanyDetailsExtended:
+            type: object
+            properties:
+                base:
+                    $ref: '#/components/schemas/api.common.CompanyDetails'
+                contactEmail:
+                    type: string
+                supportContact:
+                    type: string
+                tags:
+                    type: array
+                    items:
+                        type: string
+            description: |-
+                ============================================================================
+                 Extended Company Details for Management Console
+                 ============================================================================
+                 CompanyDetailsExtended adds management console-specific fields to the
+                 canonical wire protocol CompanyDetails. These fields are NOT sent to umh-core,
+                 but are used internally by the management console.
+        api.devicemgmt.v1.DataFlowComponentActionResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                completedAt:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+                result:
+                    $ref: '#/components/schemas/api.umh_core.v2.DataFlowComponent'
+        api.devicemgmt.v1.DataFlowComponentSummary:
+            type: object
+            properties:
+                uuid:
+                    type: string
+                name:
+                    type: string
+                benthosImageTag:
+                    type: string
+        api.devicemgmt.v1.DataModelActionResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                completedAt:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+                result:
+                    $ref: '#/components/schemas/api.umh_core.v2.DataModelOperationResult'
+                results:
+                    type: object
+                    additionalProperties:
+                        $ref: '#/components/schemas/api.umh_core.v2.DataModelOperationResult'
+        api.devicemgmt.v1.DataModelSummary:
+            type: object
+            properties:
+                name:
+                    type: string
+                version:
+                    type: string
+                description:
+                    type: string
+        api.devicemgmt.v1.DeployDataFlowComponentRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                payload:
+                    $ref: '#/components/schemas/api.umh_core.v2.DeployDataFlowComponentPayload'
+        api.devicemgmt.v1.DeployProtocolConverterRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                payload:
+                    $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverter'
+        api.devicemgmt.v1.DeployStreamProcessorRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                name:
+                    type: string
+                uuid:
+                    type: string
+                config:
+                    type: object
+                modelName:
+                    type: string
+                modelVersion:
+                    type: string
+                location:
+                    type: object
+                    additionalProperties:
+                        type: string
+                ignoreHealthCheck:
+                    type: boolean
+        api.devicemgmt.v1.Device:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                serialNumber:
+                    type: string
+                metadata:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceMetadata'
+                location:
+                    allOf:
+                        - $ref: '#/components/schemas/api.devicemgmt.v1.DeviceLocation'
+                    description: |-
+                        Location using ISA-95 5-level hierarchy (enterprise, site, area, line, workCell)
+                         CRITICAL: Must be compatible with umh-core's Location struct
+                         Used for Kafka topic path and location-based filtering
+                company:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.CompanyDetailsExtended'
+                status:
+                    type: integer
+                    format: enum
+                createdAt:
+                    type: string
+                    format: date-time
+                lastSeen:
+                    type: string
+                    format: date-time
+                lastLogin:
+                    type: string
+                    format: date-time
+                authTokenExpiresAt:
+                    type: string
+                    format: date-time
+                certificate:
+                    type: string
+                    description: Certificate management
+                encryptedPrivateKey:
+                    type: string
+                companyCertificate:
+                    type: string
+            description: |-
+                Device represents a managed edge device (runs UMH Core instance)
+                 NOTE: Uses CompanyDetailsExtended which wraps the canonical wire protocol version
+                 Contains full details including certificates. Use DeviceSummary for list/summary responses.
+        api.devicemgmt.v1.DeviceConfigActionResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                completedAt:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+                getConfigResponse:
+                    $ref: '#/components/schemas/api.umh_core.v2.GetConfigFileResponse'
+                setConfigResponse:
+                    $ref: '#/components/schemas/api.umh_core.v2.SetConfigFileResponse'
+        api.devicemgmt.v1.DeviceHealthResponse:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                lastUpdated:
+                    type: string
+                    format: date-time
+                status:
+                    $ref: '#/components/schemas/api.umh_core.v2.StatusMessage'
+                statusB64:
+                    type: string
+                deviceTimestamp:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+            description: DeviceHealthResponse contains health metrics from latest Push API data
+        api.devicemgmt.v1.DeviceLocation:
+            type: object
+            properties:
+                levels:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: |-
+                        Map of location levels: key is level number as string ("0", "1", "2", ..., "6", etc.)
+                         Level 0 (company) is required; other levels are optional
+            description: |-
+                DeviceLocation represents hierarchical location as map of levels
+                 CRITICAL: Must match umh-core's location structure: map[string]string with int keys as strings
+
+                 umh-core config.yaml location format (7-level ISA-95 hierarchy):
+                   location:
+                     "0": company       # Level 0: Enterprise/Company (required)
+                     "1": plant         # Level 1: Manufacturing plant or site
+                     "2": area          # Level 2: Production area
+                     "3": zone          # Level 3: Work zone or line group
+                     "4": line          # Level 4: Production line
+                     "5": workCell      # Level 5: Work cell
+                     "6": workUnit      # Level 6: Work unit or station
+
+                 Note: Levels can be extended beyond 7 if needed; levels are numeric strings as keys
+                 Reference: umh-core/pkg/communicator/actions/edit_instance_test.go
+        api.devicemgmt.v1.DeviceMetadata:
+            type: object
+            properties:
+                hardwareVersion:
+                    type: string
+                operatingSystem:
+                    type: string
+                manufacturer:
+                    type: string
+                firmwareVersion:
+                    type: string
+                ipAddress:
+                    type: string
+                macAddress:
+                    type: string
+            description: DeviceMetadata contains hardware and software information
+        api.devicemgmt.v1.DeviceSummary:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                serialNumber:
+                    type: string
+                metadata:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceMetadata'
+                location:
+                    allOf:
+                        - $ref: '#/components/schemas/api.devicemgmt.v1.DeviceLocation'
+                    description: Location using ISA-95 5-level hierarchy
+                company:
+                    allOf:
+                        - $ref: '#/components/schemas/api.common.CompanyDetails'
+                    description: Basic company info (name and license only, no contact/support/tags)
+                status:
+                    type: integer
+                    format: enum
+                createdAt:
+                    type: string
+                    format: date-time
+                lastSeen:
+                    type: string
+                    format: date-time
+                authTokenExpiresAt:
+                    type: string
+                    format: date-time
+            description: |-
+                DeviceSummary represents a lightweight device summary for list/overview responses
+                 Contains only essential device information without certificate data or extended company details
+        api.devicemgmt.v1.EditDataModelRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                structure:
+                    type: object
+        api.devicemgmt.v1.EditProtocolConverterRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                uuid:
+                    type: string
+                    description: |-
+                        Protocol converter UUID (path parameter - authoritative)
+                         If payload.uuid is provided, it must match this value (validation at API)
+                payload:
+                    $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverter'
+        api.devicemgmt.v1.EditStreamProcessorRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                uuid:
+                    type: string
+                name:
+                    type: string
+                config:
+                    type: object
+                modelName:
+                    type: string
+                modelVersion:
+                    type: string
+                location:
+                    type: object
+                    additionalProperties:
+                        type: string
+                ignoreHealthCheck:
+                    type: boolean
+        api.devicemgmt.v1.GetLogsRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                payload:
+                    $ref: '#/components/schemas/api.umh_core.v2.GetLogsPayload'
+        api.devicemgmt.v1.GetMetricsRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                payload:
+                    $ref: '#/components/schemas/api.umh_core.v2.GetMetricsPayload'
+        api.devicemgmt.v1.HealthResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                    description: 'Status code: "healthy" | "degraded" | "unhealthy"'
+                message:
+                    type: string
+                    description: Human-readable message
+                version:
+                    type: string
+                    description: Service version
+                timestamp:
+                    type: string
+                    description: Timestamp of health check
+                    format: date-time
+                databaseConnected:
+                    type: boolean
+                    description: Database connectivity status
+                diagnostics:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: 'Optional: Additional diagnostic info'
+        api.devicemgmt.v1.ListDataFlowComponentsResponse:
+            type: object
+            properties:
+                components:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.DataFlowComponentSummary'
+                nextPageToken:
+                    type: string
+        api.devicemgmt.v1.ListDataModelsResponse:
+            type: object
+            properties:
+                models:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.DataModelSummary'
+                nextPageToken:
+                    type: string
+        api.devicemgmt.v1.ListDevicesResponse:
+            type: object
+            properties:
+                devices:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.DeviceSummary'
+                nextPageToken:
+                    type: string
+            description: ListDevicesResponse contains paginated device list
+        api.devicemgmt.v1.ListProtocolConvertersResponse:
+            type: object
+            properties:
+                converters:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterSummary'
+                nextPageToken:
+                    type: string
+        api.devicemgmt.v1.ListStreamProcessorsResponse:
+            type: object
+            properties:
+                processors:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.StreamProcessorSummary'
+                nextPageToken:
+                    type: string
+        api.devicemgmt.v1.LogsActionResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                completedAt:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+                resultPayload:
+                    type: string
+                    description: |-
+                        Result payload (only populated when status=COMPLETED)
+                         Format: JSON string containing array of log lines: ["line 1", "line 2", ...]
+                         Server automatically decompresses gzip/zstd payloads before returning
+                         Client can directly parse as JSON without decoding base64
+        api.devicemgmt.v1.MetricsActionResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                completedAt:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+                resultPayload:
+                    type: string
+                    description: |-
+                        Result payload (only populated when status=COMPLETED)
+                         Format: JSON string containing array of metric objects
+                         Each metric: {"name": "...", "value": "...", "componentType": "...", ...}
+                         Server automatically decompresses gzip/zstd payloads before returning
+                         Client can directly parse as JSON without decoding base64
+        api.devicemgmt.v1.ProtocolConverterActionResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                completedAt:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+                result:
+                    allOf:
+                        - $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverter'
+                    description: |-
+                        result field contents:
+                         - Deploy/Edit/Get: populated with the ProtocolConverter object
+                         - Delete: empty (when status=COMPLETED, no object is returned)
+        api.devicemgmt.v1.ProtocolConverterSummary:
+            type: object
+            properties:
+                uuid:
+                    type: string
+                name:
+                    type: string
+                type:
+                    type: string
+                connectionUUID:
+                    type: string
+                deploymentStatus:
+                    type: string
+                healthStatus:
+                    type: string
+                lastSyncTime:
+                    type: string
+                errorMessage:
+                    type: string
+        api.devicemgmt.v1.RegisterDeviceRequest:
+            type: object
+            properties:
+                name:
+                    type: string
+                serialNumber:
+                    type: string
+                metadata:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceMetadata'
+                location:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceLocation'
+                company:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.CompanyDetailsExtended'
+                certificate:
+                    type: string
+                    description: |-
+                        Certificate management (optional)
+                         NOTE: Certificate is for device identification only. Private keys are device-side and should NOT be transmitted to server.
+            description: RegisterDeviceRequest contains device registration information
+        api.devicemgmt.v1.RegisterDeviceResponse:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                authToken:
+                    type: string
+                authTokenHash:
+                    type: string
+                device:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceSummary'
+                instructions:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: Setup instructions
+            description: |-
+                RegisterDeviceResponse returns registration details including auth token
+                 NOTE: Timestamps duplicated from device summary for convenience (device.created_at, device.auth_token_expires_at)
+        api.devicemgmt.v1.SetDeviceConfigRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                payload:
+                    $ref: '#/components/schemas/api.umh_core.v2.SetConfigFilePayload'
+                changeReason:
+                    type: string
+        api.devicemgmt.v1.StreamProcessorActionResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                completedAt:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
+                uuid:
+                    type: string
+                name:
+                    type: string
+                config:
+                    type: object
+        api.devicemgmt.v1.StreamProcessorSummary:
+            type: object
+            properties:
+                uuid:
+                    type: string
+                name:
+                    type: string
+                model:
+                    $ref: '#/components/schemas/api.umh_core.v2.StreamProcessorModelRef'
+        api.devicemgmt.v1.UpdateDeviceRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                name:
+                    type: string
+                location:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceLocation'
+                company:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.CompanyDetailsExtended'
+            description: UpdateDeviceRequest updates device information
+        api.umh_core.v2.Agent:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                latency:
+                    $ref: '#/components/schemas/api.umh_core.v2.Latency'
+                location:
+                    type: object
+                    additionalProperties:
+                        type: string
+            description: 'Agent: Device agent state and configuration'
+        api.umh_core.v2.CPU:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                totalUsageMCpu:
+                    type: number
+                    format: double
+                coreCount:
+                    type: integer
+                    format: int32
+                cgroupCores:
+                    type: number
+                    format: double
+                throttleRatio:
+                    type: number
+                    format: double
+                isThrottled:
+                    type: boolean
+            description: 'CPU: CPU metrics with cgroup limits'
+        api.umh_core.v2.CdcfMeta:
+            type: object
+            properties:
+                type:
+                    type: string
+            description: 'CdcfMeta: Component metadata'
+        api.umh_core.v2.Certificate:
+            type: object
+            properties:
+                userEmail:
+                    type: string
+                certificate:
+                    type: string
+            description: |-
+                Certificate represents X.509 certificate
+                 NOTE: GetCertificate endpoint only returns userEmail and certificate fields
+                 This matches umh-core's UserCertificateResponse exactly
+                 (pkg/communicator/api/v2/pull/pull.go:147-151)
+        api.umh_core.v2.CommonDataFlowComponentInputConfig:
+            type: object
+            properties:
+                data:
+                    type: string
+                type:
+                    type: string
+            description: 'CommonDataFlowComponentInputConfig: Input source configuration'
+        api.umh_core.v2.CommonDataFlowComponentPipelineConfig:
+            type: object
+            properties:
+                processors:
+                    type: object
+                    additionalProperties:
+                        $ref: '#/components/schemas/api.umh_core.v2.CommonDataFlowComponentPipelineConfigProcessor'
+                threads:
+                    type: integer
+                    format: int32
+            description: 'CommonDataFlowComponentPipelineConfig: Pipeline processing configuration'
+        api.umh_core.v2.CommonDataFlowComponentPipelineConfigProcessor:
+            type: object
+            properties:
+                data:
+                    type: string
+                type:
+                    type: string
+            description: 'CommonDataFlowComponentPipelineConfigProcessor: Individual processor configuration'
+        api.umh_core.v2.CommonDataFlowComponentRawYamlConfig:
+            type: object
+            properties:
+                data:
+                    type: string
+            description: 'CommonDataFlowComponentRawYamlConfig: Raw YAML configuration fallback'
+        api.umh_core.v2.Connection:
+            type: object
+            properties:
+                uuid:
+                    type: string
+                name:
+                    type: string
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                uri:
+                    type: string
+                lastLatencyMs:
+                    type: number
+                    format: double
+            description: 'Connection: External system connection state'
+        api.umh_core.v2.Container:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                cpu:
+                    $ref: '#/components/schemas/api.umh_core.v2.CPU'
+                disk:
+                    $ref: '#/components/schemas/api.umh_core.v2.Disk'
+                memory:
+                    $ref: '#/components/schemas/api.umh_core.v2.Memory'
+                hwid:
+                    type: string
+                architecture:
+                    type: string
+            description: 'Container: Hardware and resource information'
+        api.umh_core.v2.Core:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                agent:
+                    $ref: '#/components/schemas/api.umh_core.v2.Agent'
+                container:
+                    $ref: '#/components/schemas/api.umh_core.v2.Container'
+                release:
+                    $ref: '#/components/schemas/api.umh_core.v2.Release'
+                dfcs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.umh_core.v2.Dfc'
+                redpanda:
+                    $ref: '#/components/schemas/api.umh_core.v2.Redpanda'
+                topicBrowser:
+                    $ref: '#/components/schemas/api.umh_core.v2.TopicBrowser'
+                dataModels:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.umh_core.v2.DataModel'
+                dataContracts:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.umh_core.v2.DataContract'
+            description: 'Core: Root system state container'
+        api.umh_core.v2.DataContract:
+            type: object
+            properties:
+                name:
+                    type: string
+                dataModel:
+                    $ref: '#/components/schemas/api.umh_core.v2.DataContractRef'
+                flows:
+                    type: integer
+                    format: int32
+            description: 'DataContract: Data contract definition'
+        api.umh_core.v2.DataContractInfo:
+            type: object
+            properties:
+                name:
+                    type: string
+                model:
+                    type: string
+                status:
+                    type: string
+            description: 'DataContractInfo: Data contract created by data model operations'
+        api.umh_core.v2.DataContractRef:
+            type: object
+            properties:
+                name:
+                    type: string
+                version:
+                    type: string
+            description: 'DataContractRef: Reference to a data model'
+        api.umh_core.v2.DataFlowComponent:
+            type: object
+            properties:
+                uuid:
+                    type: string
+                name:
+                    type: string
+                benthosImageTag:
+                    type: string
+                customDataFlowComponent:
+                    $ref: '#/components/schemas/api.umh_core.v2.DataFlowComponentDFC'
+                meta:
+                    $ref: '#/components/schemas/api.umh_core.v2.CdcfMeta'
+                ignoreHealthCheck:
+                    type: boolean
+            description: 'DataFlowComponent: Response from data flow component operations'
+        api.umh_core.v2.DataFlowComponentDFC:
+            type: object
+            properties:
+                pipeline:
+                    $ref: '#/components/schemas/api.umh_core.v2.DataFlowComponentPipeline'
+                inputs:
+                    $ref: '#/components/schemas/api.umh_core.v2.DataFlowComponentIOConfig'
+                outputs:
+                    $ref: '#/components/schemas/api.umh_core.v2.DataFlowComponentIOConfig'
+                rawYAML:
+                    type: string
+                ignoreErrors:
+                    type: boolean
+            description: 'DataFlowComponentDFC: Data Flow Component configuration'
+        api.umh_core.v2.DataFlowComponentIOConfig:
+            type: object
+            properties:
+                type:
+                    type: string
+                data:
+                    type: string
+            description: 'DataFlowComponentIOConfig: Input/Output configuration'
+        api.umh_core.v2.DataFlowComponentPipeline:
+            type: object
+            properties:
+                processors:
+                    type: object
+                    additionalProperties:
+                        $ref: '#/components/schemas/api.umh_core.v2.DataFlowComponentProcessor'
+                threads:
+                    type: integer
+                    format: int32
+            description: 'DataFlowComponentPipeline: Pipeline configuration for DFC'
+        api.umh_core.v2.DataFlowComponentProcessor:
+            type: object
+            properties:
+                type:
+                    type: string
+                data:
+                    type: string
+            description: 'DataFlowComponentProcessor: Individual processor configuration'
+        api.umh_core.v2.DataModel:
+            type: object
+            properties:
+                name:
+                    type: string
+                description:
+                    type: string
+                latestVersion:
+                    type: string
+                hash:
+                    type: string
+            description: 'DataModel: Data model metadata'
+        api.umh_core.v2.DataModelOperationResult:
+            type: object
+            properties:
+                name:
+                    type: string
+                version:
+                    type: string
+                description:
+                    type: string
+                encodedStructure:
+                    type: string
+                    description: |-
+                        NOTE: umh-core returns "structure" (parsed map), not "encodedStructure"
+                         For compatibility, we include encoded structure when available, or JSON-serialized structure
+                structure:
+                    type: object
+                    description: Full parsed structure as JSON object (from umh-core response)
+                dataContract:
+                    allOf:
+                        - $ref: '#/components/schemas/api.umh_core.v2.DataContractInfo'
+                    description: Auto-created data contract information
+            description: |-
+                DataModelOperationResult: Response from DataModel operations (Add/Edit/Delete/Get)
+                 NOTE: Matches umh-core's Execute() response from add-datamodel.go and edit-datamodel.go
+        api.umh_core.v2.DeployDataFlowComponentPayload:
+            type: object
+            properties:
+                name:
+                    type: string
+                benthosImageTag:
+                    type: string
+                customDataFlowComponent:
+                    $ref: '#/components/schemas/api.umh_core.v2.DataFlowComponentDFC'
+                meta:
+                    $ref: '#/components/schemas/api.umh_core.v2.CdcfMeta'
+                ignoreHealthCheck:
+                    type: boolean
+            description: 'DeployDataFlowComponentPayload: Deploy a data flow component'
+        api.umh_core.v2.Dfc:
+            type: object
+            properties:
+                uuid:
+                    type: string
+                name:
+                    type: string
+                dfcType:
+                    type: string
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                metrics:
+                    $ref: '#/components/schemas/api.umh_core.v2.DfcMetrics'
+                connections:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.umh_core.v2.Connection'
+                bridge:
+                    $ref: '#/components/schemas/api.umh_core.v2.DfcBridgeInfo'
+                isInitialized:
+                    type: boolean
+                currentVersionUUID:
+                    type: string
+            description: 'Dfc: Data Flow Component state'
+        api.umh_core.v2.DfcBridgeInfo:
+            type: object
+            properties:
+                dataContract:
+                    type: string
+                inputType:
+                    type: string
+                outputType:
+                    type: string
+            description: 'DfcBridgeInfo: Bridge-specific metadata'
+        api.umh_core.v2.DfcMetrics:
+            type: object
+            properties:
+                avgInputThroughputPerMinuteInMsgSec:
+                    type: number
+                    format: double
+            description: 'DfcMetrics: Data Flow Component performance metrics'
+        api.umh_core.v2.Disk:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                dataPartitionUsedBytes:
+                    type: string
+                dataPartitionTotalBytes:
+                    type: string
+            description: 'Disk: Storage metrics'
+        api.umh_core.v2.EditDataFlowComponentPayload:
+            type: object
+            properties:
+                uuid:
+                    type: string
+                name:
+                    type: string
+                meta:
+                    $ref: '#/components/schemas/api.umh_core.v2.CdcfMeta'
+                payload:
+                    $ref: '#/components/schemas/api.umh_core.v2.DeployDataFlowComponentPayload'
+                ignoreHealthCheck:
+                    type: boolean
+            description: |-
+                EditDataFlowComponentPayload: Edit an existing data flow component
+                 NOTE: umh-core expects a wrapper with uuid, name, meta, and nested DeployDataFlowComponentPayload
+        api.umh_core.v2.GetConfigFileResponse:
+            type: object
+            properties:
+                content:
+                    type: string
+                lastModifiedTime:
+                    type: string
+            description: |-
+                GetConfigFileResponse: Response from GetConfigFile action
+                 Matches umh-core's models.GetConfigFileResponse exactly (pkg/models/action_models.go:608-611)
+        api.umh_core.v2.GetLogsPayload:
+            type: object
+            properties:
+                type:
+                    type: string
+                    description: |-
+                        Log source type - REQUIRED
+                         Valid values:
+                           - "agent": General agent logs (no uuid required)
+                           - "dfc": Data Flow Component logs (requires uuid)
+                           - "protocol-converter-read": Protocol converter read logs (requires uuid)
+                           - "protocol-converter-write": Protocol converter write logs (requires uuid)
+                           - "redpanda": Redpanda broker logs (no uuid required)
+                           - "topic-browser": Topic browser logs (no uuid required)
+                           - "stream-processor": Stream processor logs (requires uuid)
+                         See LogType enum for available types.
+                startTime:
+                    type: string
+                    description: |-
+                        Unix timestamp in milliseconds (must be > 0 and in the past)
+                         Limits log retrieval to entries after this timestamp
+                uuid:
+                    type: string
+                    description: |-
+                        Component UUID - REQUIRED if type is: dfc, protocol-converter-read, protocol-converter-write, stream-processor
+                         For other types, this field is ignored
+        api.umh_core.v2.GetMetricsPayload:
+            type: object
+            properties:
+                type:
+                    type: string
+                    description: |-
+                        Metric source type - REQUIRED
+                         Valid values:
+                           - "dfc": Data Flow Component metrics (requires uuid)
+                           - "protocol-converter": Protocol converter metrics (requires uuid)
+                           - "redpanda": Redpanda broker metrics (no uuid required)
+                           - "stream-processor": Stream processor metrics (requires uuid)
+                           - "topic-browser": Topic browser metrics (no uuid required)
+                         See MetricResourceType enum for available types.
+                uuid:
+                    type: string
+                    description: |-
+                        Component UUID - REQUIRED if type is: dfc, protocol-converter, stream-processor
+                         For other types, this field is ignored
+            description: 'GetMetricsPayload: Retrieve metrics from various services'
+        api.umh_core.v2.Health:
+            type: object
+            properties:
+                message:
+                    type: string
+                state:
+                    type: string
+                desiredState:
+                    type: string
+                category:
+                    type: string
+            description: 'Health: Health state with category'
+        api.umh_core.v2.Latency:
+            type: object
+            properties:
+                avgMs:
+                    type: number
+                    format: double
+                maxMs:
+                    type: number
+                    format: double
+                minMs:
+                    type: number
+                    format: double
+                p95Ms:
+                    type: number
+                    format: double
+                p99Ms:
+                    type: number
+                    format: double
+            description: 'Latency: Latency metrics with percentiles'
+        api.umh_core.v2.LoginResponse:
+            type: object
+            properties:
+                certificate:
+                    type: string
+                encryptedPrivateKey:
+                    type: string
+                uuid:
+                    type: string
+                name:
+                    type: string
+                companyDetails:
+                    $ref: '#/components/schemas/api.common.CompanyDetails'
+                jwtToken:
+                    type: string
+            description: "LoginResponse returns device information and authentication token\n Matches umh-core's InstanceLoginResponse (backend_api_structs/backend_api_struct.go:119-125)\n but includes jwtToken for taksa-platform-dm client convenience\n \n CRITICAL: Uses common.CompanyDetails and common.LicenseStatus for wire protocol compatibility\n These are the exact types that umh-core sends, ensuring 100% compatibility"
+        api.umh_core.v2.Memory:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                cGroupUsedBytes:
+                    type: string
+                cGroupTotalBytes:
+                    type: string
+            description: 'Memory: Memory metrics'
+        api.umh_core.v2.ProtocolConverter:
+            type: object
+            properties:
+                uuid:
+                    type: string
+                name:
+                    type: string
+                connection:
+                    $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterConnection'
+                location:
+                    type: object
+                    additionalProperties:
+                        type: string
+                readDfc:
+                    $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterDFC'
+                writeDfc:
+                    $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterDFC'
+                templateInfo:
+                    $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterTemplateInfo'
+                meta:
+                    $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterMeta'
+            description: |-
+                ProtocolConverter: Full protocol converter model (action payload for Deploy/Edit)
+                 MUST match umh-core's models.ProtocolConverter exactly
+                 (pkg/models/action_models.go:782-791)
+        api.umh_core.v2.ProtocolConverterConnection:
+            type: object
+            properties:
+                ip:
+                    type: string
+                port:
+                    type: integer
+                    format: uint32
+            description: |-
+                ProtocolConverterConnection: Connection details for a protocol converter
+                 Matches umh-core's models.ProtocolConverterConnection exactly
+                 (pkg/models/action_models.go:759-762)
+        api.umh_core.v2.ProtocolConverterDFC:
+            type: object
+            properties:
+                pipeline:
+                    allOf:
+                        - $ref: '#/components/schemas/api.umh_core.v2.CommonDataFlowComponentPipelineConfig'
+                    description: Pipeline processor configuration
+                inputs:
+                    allOf:
+                        - $ref: '#/components/schemas/api.umh_core.v2.CommonDataFlowComponentInputConfig'
+                    description: Input source configuration (required for functional DFC)
+                rawYAML:
+                    allOf:
+                        - $ref: '#/components/schemas/api.umh_core.v2.CommonDataFlowComponentRawYamlConfig'
+                    description: Optional raw YAML fallback configuration
+                ignoreErrors:
+                    type: boolean
+                    description: Whether to ignore errors during processing
+            description: |-
+                ProtocolConverterDFC: Data Flow Component configuration for a protocol converter
+                 MUST match umh-core's models.ProtocolConverterDFC exactly
+                 (pkg/models/action_models.go:764-769)
+                 NOTE: For DeployProtocolConverter, readDfc and writeDfc should be null/empty.
+                 DFC configurations are added later via EditProtocolConverter action.
+        api.umh_core.v2.ProtocolConverterMeta:
+            type: object
+            properties:
+                processingMode:
+                    type: string
+                protocol:
+                    type: string
+            description: |-
+                ProtocolConverterMeta: Metadata for a protocol converter
+                 Matches umh-core's models.ProtocolConverterMeta exactly
+                 (pkg/models/action_models.go:793-796)
+        api.umh_core.v2.ProtocolConverterTemplateInfo:
+            type: object
+            properties:
+                variables:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterVariable'
+                rootUUID:
+                    type: string
+                isTemplated:
+                    type: boolean
+            description: |-
+                ProtocolConverterTemplateInfo: Template configuration for a protocol converter
+                 Matches umh-core's models.ProtocolConverterTemplateInfo exactly
+                 (pkg/models/action_models.go:776-780)
+        api.umh_core.v2.ProtocolConverterVariable:
+            type: object
+            properties:
+                label:
+                    type: string
+                value:
+                    type: string
+            description: 'ProtocolConverterVariable: Template variable for a protocol converter'
+        api.umh_core.v2.PullResponse:
+            type: object
+            properties:
+                UMHMessages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.umh_core.v2.UMHMessage'
+            description: PullResponse retrieves queued actions
+        api.umh_core.v2.PushRequest:
+            type: object
+            properties:
+                UMHMessages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.umh_core.v2.UMHMessage'
+            description: PushRequest sends device status/telemetry to console
+        api.umh_core.v2.Redpanda:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                avgIncomingThroughputPerMinuteInBytesSec:
+                    type: number
+                    format: double
+                avgOutgoingThroughputPerMinuteInBytesSec:
+                    type: number
+                    format: double
+            description: 'Redpanda: Message broker state'
+        api.umh_core.v2.Release:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                version:
+                    type: string
+                channel:
+                    type: string
+                supportedFeatures:
+                    type: array
+                    items:
+                        type: string
+                versions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.umh_core.v2.Version'
+            description: 'Release: Version and feature information'
+        api.umh_core.v2.SetConfigFilePayload:
+            type: object
+            properties:
+                content:
+                    type: string
+                lastModifiedTime:
+                    type: string
+            description: |-
+                SetConfigFilePayload: Request payload for SetConfigFile action
+                 Matches umh-core's models.SetConfigFilePayload exactly (pkg/models/action_models.go:613-616)
+        api.umh_core.v2.SetConfigFileResponse:
+            type: object
+            properties:
+                content:
+                    type: string
+                lastModifiedTime:
+                    type: string
+                success:
+                    type: boolean
+            description: |-
+                SetConfigFileResponse: Response from SetConfigFile action
+                 Matches umh-core's models.SetConfigFileResponse exactly (pkg/models/action_models.go:618-622)
+                 Note: content field echoes back the entire file that was written (for confirmation/audit purposes)
+        api.umh_core.v2.StatusMessage:
+            type: object
+            properties:
+                core:
+                    $ref: '#/components/schemas/api.umh_core.v2.Core'
+                plugins:
+                    type: object
+                    additionalProperties:
+                        type: string
+                        format: bytes
+            description: 'StatusMessage: Complete system state sent by device (via Push API)'
+        api.umh_core.v2.StreamProcessorModelRef:
+            type: object
+            properties:
+                name:
+                    type: string
+                version:
+                    type: string
+            description: 'StreamProcessorModelRef: Reference to a data model'
+        api.umh_core.v2.TopicBrowser:
+            type: object
+            properties:
+                health:
+                    $ref: '#/components/schemas/api.umh_core.v2.Health'
+                unsBundles:
+                    type: object
+                    additionalProperties:
+                        type: string
+                        format: bytes
+                topicCount:
+                    type: integer
+                    format: int32
+            description: 'TopicBrowser: Topic catalog state'
+        api.umh_core.v2.UMHMessage:
+            type: object
+            properties:
+                metadata:
+                    $ref: '#/components/schemas/api.common.MessageMetadata'
+                email:
+                    type: string
+                content:
+                    type: string
+                umhInstance:
+                    type: string
+            description: |-
+                UMHMessage is the standard message format for device-console communication
+                 MUST match umh-core's models.UMHMessage exactly (pkg/models/action_models.go:79-84)
+                 Wire protocol - clean, simple, compatible with umh-core
+                 Internal correlation tracking is handled separately in taksa-platform-dm
+        api.umh_core.v2.Version:
+            type: object
+            properties:
+                name:
+                    type: string
+                version:
+                    type: string
+            description: 'Version: Component version information'
+tags:
+    - name: DeviceMgmtService
+      description: |-
+        DeviceMgmtService handles device management operations
+         These are called by the management console and administrative tools
+
+         API Patterns:
+         - SYNCHRONOUS (immediate response): Device CRUD, List operations, Health status
+         - ASYNCHRONOUS (queue-and-poll): All component actions (Deploy, Edit, Delete, Get)
+           Returns action_id immediately, client polls for result via GetXActionResponse
+
+         umh-core Compatibility:
+         All component action RPCs correspond directly to umh-core action handlers
+         (pkg/communicator/actions/actions.go). List and Health endpoints provide
+         database/cache layer above the action queue.
+    - name: InstanceService
+      description: |-
+        InstanceService handles device-facing operations
+         These are called by edge devices (umh-core)
+         All endpoints are compatible with umh-core expectations

@@ -1,0 +1,38 @@
+meta {
+  name: Get Stream Processor Details
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors/{{stream_processor_uuid}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Retrieve details of a specific stream processor.
+  
+  This queues an asynchronous action to fetch the full configuration
+  from the device. Use GetStreamProcessorActionResult to poll for the result.
+  
+  Returns action_id for polling.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_stream_processor', resp.actionId);
+    console.log("✓ Get stream processor action queued");
+    console.log("  Action ID: " + resp.actionId);
+  }
+}
+
+tests {
+  test("Get action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

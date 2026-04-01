@@ -1,0 +1,139 @@
+meta {
+  name: Get Action Result
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/config/{{action_id_config}}/result
+}
+
+docs {
+  Poll for action result (works for all action types).
+  
+  This generic endpoint uses config action_id. For specific action types, see:
+  - GetLogs result: Use 05a-GetLogsResult.bru with logs/{action_id_logs}/result
+  - GetMetrics result: Use 05b-GetMetricsResult.bru with metrics/{action_id_metrics}/result
+  
+  Action types supported:
+  - GetConfigFile result: DeviceConfigActionResponse
+  - SetConfigFile result: DeviceConfigActionResponse
+  - GetLogs result: LogsActionResponse (result_payload: automatically decompressed JSON array of strings)
+  - GetMetrics result: MetricsActionResponse (result_payload: automatically decompressed JSON array of metrics)
+  - Protocol Converter actions: ProtocolConverterActionResponse
+  - Data Flow Component actions: DataFlowComponentActionResponse
+  - Data Model actions: DataModelActionResponse
+  - Stream Processor actions: StreamProcessorActionResponse
+  
+  Response includes:
+  - status: Action state (QUEUED, DELIVERED, PROCESSING, COMPLETED, FAILED, EXPIRED, CANCELLED)
+  - completed_at: Timestamp when action completed
+  - error_message: Error details if failed
+  - result_payload/result: Action-specific result data (logs/metrics payloads are automatically decompressed)
+  
+  Poll repeatedly with exponential backoff until status is terminal (COMPLETED, FAILED, EXPIRED, CANCELLED).
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp) {
+    console.log("✓ Action result retrieved");
+    console.log("  Status: " + resp.status);
+    console.log("  Completed: " + (resp.completed_at || "Not yet"));
+    
+    // Status values: 1=QUEUED, 2=DELIVERED, 3=PROCESSING, 4=COMPLETED, 5=FAILED, 6=EXPIRED, 7=CANCELLED
+    if (resp.status === 4) {
+      console.log("  ✓ Action completed successfully");
+      
+      // Handle structured response types in Result field (Config responses)
+      if (resp.Result && resp.Result.GetConfigResponse) {
+        console.log("  ✓ GET config response received");
+        console.log("    Content length: " + (resp.Result.GetConfigResponse.content ? resp.Result.GetConfigResponse.content.length : 0) + " bytes");
+        console.log("    Last modified: " + resp.Result.GetConfigResponse.lastModifiedTime);
+      } else if (resp.Result && resp.Result.SetConfigResponse) {
+        console.log("  ✓ SET config response received");
+        console.log("    Success: " + resp.Result.SetConfigResponse.success);
+        console.log("    Last modified: " + resp.Result.SetConfigResponse.lastModifiedTime);
+      }
+      
+      // Handle bytes payload (Logs and Metrics responses)
+      if (resp.result_payload && typeof resp.result_payload === 'string') {
+        try {
+          const payloadJson = JSON.parse(atob(resp.result_payload));
+          console.log("  ✓ Decompressed payload received");
+          
+          // Check if it's a logs response (array of strings)
+          if (Array.isArray(payloadJson) && payloadJson.length > 0 && typeof payloadJson[0] === 'string') {
+            console.log("  ✓ Logs payload: " + payloadJson.length + " log lines");
+          }
+          // Check if it's a metrics response (array of objects with metric fields)
+          else if (Array.isArray(payloadJson) && payloadJson.length > 0 && payloadJson[0].name) {
+            console.log("  ✓ Metrics payload: " + payloadJson.length + " metrics");
+          }
+        } catch (e) {
+          console.log("  ⚠ Payload is present but not valid JSON: " + e.message);
+        }
+      }
+    } else if (resp.status === 5) {
+      console.log("  ✗ Action failed: " + resp.error_message);
+    } else {
+      const statusNames = {1: 'QUEUED', 2: 'DELIVERED', 3: 'PROCESSING', 6: 'EXPIRED', 7: 'CANCELLED'};
+      console.log("  ⏳ Action still " + (statusNames[resp.status] || 'UNKNOWN') + " - poll again");
+    }
+  }
+}
+
+tests {
+  test("Result retrieval successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has status", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+  });
+  
+  test("Response has action_id", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+  });
+  
+  test("Status is valid state", function() {
+    const resp = res.getBody();
+    const validStatuses = ['QUEUED', 'DELIVERED', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED', 'CANCELLED'];
+    expect(validStatuses).to.include(resp.status);
+  });
+  
+  test("Response may have completedAt when terminal", function() {
+    const resp = res.getBody();
+    // completedAt is optional and may be null/missing for non-terminal states
+    if (resp.completedAt) {
+      expect(resp.completedAt).to.be.a('string');
+    }
+  });
+  
+  test("COMPLETED GET config has GetConfigResponse", function() {
+    const resp = res.getBody();
+    if (resp.status === 'COMPLETED' && resp.result && resp.result.GetConfigResponse) {
+      expect(resp.result.GetConfigResponse).to.have.property('content');
+      expect(resp.result.GetConfigResponse).to.have.property('lastModifiedTime');
+    }
+  });
+  
+  test("COMPLETED SET config has SetConfigResponse", function() {
+    const resp = res.getBody();
+    if (resp.status === 'COMPLETED' && resp.result && resp.result.SetConfigResponse) {
+      expect(resp.result.SetConfigResponse).to.have.property('success');
+      expect(resp.result.SetConfigResponse).to.have.property('lastModifiedTime');
+    }
+  });
+  
+  test("FAILED status has errorMessage", function() {
+    const resp = res.getBody();
+    if (resp.status === 'FAILED') {
+      expect(resp).to.have.property('errorMessage');
+      expect(resp.errorMessage).to.not.be.empty;
+    }
+  });
+}

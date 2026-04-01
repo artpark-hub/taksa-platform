@@ -1,0 +1,130 @@
+meta {
+  name: Instance Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v2/instance/login
+  body: none
+}
+
+headers {
+  Authorization: Bearer {{token_hash}}
+}
+
+docs {
+  Authenticates device and retrieves JWT token in cookie
+  Compatible with umh-core v0.43.17+
+  
+  Flow:
+  1. Device sends double SHA3 hash in Authorization header
+  2. Server validates token and returns:
+     - JWT token in Set-Cookie header (HttpOnly, SameSite=Strict)
+     - LoginResponse JSON with device info
+  3. Cookie automatically saved by Bruno
+}
+
+script:pre-request {
+  // This script would hash the token, but you need to set token_raw first
+  // For now, manually set token_hash in environment
+  console.log("Token hash: " + bru.getEnvVar('token_hash'));
+}
+
+script:post-response {
+   // Extract JWT from response (also set as HttpOnly cookie by server)
+   const resp = res.getBody();
+   
+   // Note: device_uuid should already be set in environment
+   // Verify it matches the login response
+   if (resp.uuid !== bru.getEnvVar('device_uuid')) {
+     console.warn("Device UUID mismatch: expected " + bru.getEnvVar('device_uuid') + ", got " + resp.uuid);
+   }
+   
+   // Extract JWT token from response body or Set-Cookie header
+   let jwtToken = null;
+   
+   // First try to get from response body
+   if (resp.jwtToken) {
+     jwtToken = resp.jwtToken;
+     console.log("✓ JWT token extracted from response body");
+   }
+   
+   // Otherwise try Set-Cookie header
+   if (!jwtToken) {
+     const setCookie = res.getHeader('Set-Cookie');
+     if (setCookie && setCookie.includes('token=')) {
+       const tokenMatch = setCookie.match(/token=([^;]+)/);
+       if (tokenMatch) {
+         jwtToken = tokenMatch[1];
+         console.log("✓ JWT token extracted from Set-Cookie header");
+       }
+     }
+   }
+   
+   if (jwtToken) {
+     bru.setEnvVar('jwt_token', jwtToken);
+   }
+   
+   console.log("✓ Login successful!");
+   console.log("  Device UUID: " + resp.uuid);
+   console.log("  JWT Cookie: Set by server (HttpOnly)");
+   console.log("  Response fields: " + Object.keys(resp).join(", "));
+   console.log("  CompanyDetails fields: " + (resp.companyDetails ? Object.keys(resp.companyDetails).join(", ") : "N/A"));
+}
+
+tests {
+  test("Login successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has certificate", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('certificate');
+  });
+  
+  test("Response has uuid", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('uuid');
+    expect(resp.uuid).to.be.a('string');
+  });
+  
+  test("Response has name", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('name');
+  });
+  
+  test("Response has certificate field", function() {
+    const resp = res.getBody();
+    // certificate field should exist (may be null/undefined if not provided)
+    expect(resp).to.have.property('certificate');
+  });
+  
+  test("Response has companyDetails", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('companyDetails');
+    expect(resp.companyDetails).to.have.property('name');
+    expect(resp.companyDetails).to.have.property('licenseStatus');
+  });
+  
+  test("licenseStatus has validTo in YYYY-MM-DD format", function() {
+    const resp = res.getBody();
+    const validTo = resp.companyDetails.licenseStatus.validTo;
+    expect(validTo).to.match(/^\d{4}-\d{2}-\d{2}$/);
+  });
+  
+  test("licenseStatus has required fields", function() {
+    const resp = res.getBody();
+    const licenseStatus = resp.companyDetails.licenseStatus;
+    // validTo is required
+    expect(licenseStatus).to.have.property('validTo');
+    // isActive and description may be omitted if zero/empty (protobuf behavior)
+  });
+  
+  test("Field names use camelCase not snake_case", function() {
+    const resp = res.getBody();
+    // Check for camelCase in response
+    expect(resp).to.have.property('companyDetails'); // not company_details
+    expect(resp.companyDetails).to.have.property('licenseStatus'); // not license_status
+  });
+}

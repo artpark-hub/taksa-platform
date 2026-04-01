@@ -1,0 +1,103 @@
+meta {
+  name: Update Device
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Updated Device {{timestamp}}",
+    "metadata": {
+      "ip_address": "192.168.1.100",
+      "mac_address": "00:11:22:33:44:55"
+    },
+    "location": {
+      "levels": {
+        "0": "UpdatedEnterprise",
+        "1": "UpdatedSite",
+        "2": "UpdatedArea"
+      }
+    },
+    "company": {
+      "base": {
+        "name": "Updated Company",
+        "user_count": 20
+      },
+      "contact_email": "newemail@test.com",
+      "support_contact": "newsupport@test.com",
+      "tags": ["updated", "production"]
+    }
+  }
+}
+
+docs {
+  Update device information.
+  
+  Partial updates supported - only provided fields are updated.
+  
+  Updatable fields:
+  - name: Device name
+  - metadata: Hardware/OS/network info
+  - location: ISA-95 hierarchy
+  - company: Company details and tags
+  
+  Returns updated Device object.
+}
+
+script:pre-request {
+  bru.setEnvVar('timestamp', Date.now().toString());
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.id) {
+    console.log("✓ Device updated: " + resp.name);
+    console.log("  Location: " + (resp.location.levels['0'] || "N/A"));
+    console.log("  Company: " + (resp.company.name || "N/A"));
+  }
+}
+
+tests {
+  test("Update successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response is Device object", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('id');
+    expect(resp).to.have.property('name');
+  });
+  
+  test("Device name updated", function() {
+    const resp = res.getBody();
+    expect(resp.name).to.include('Updated Device');
+  });
+  
+  test("Device name in response", function() {
+    const resp = res.getBody();
+    // Device name should be returned
+    expect(resp).to.have.property('name');
+  });
+  
+  test("Device location in response", function() {
+    const resp = res.getBody();
+    // Location field should exist
+    expect(resp).to.have.property('location');
+  });
+  
+  test("Device company in response", function() {
+    const resp = res.getBody();
+    // Company field should exist
+    expect(resp).to.have.property('company');
+  });
+}

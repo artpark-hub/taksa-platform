@@ -1,0 +1,150 @@
+meta {
+  name: Instance Push
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/api/v2/instance/push
+  body: json
+}
+
+headers {
+   Content-Type: application/json
+   Connection: keep-alive
+   Keep-Alive: timeout=30, max=1000
+   X-Features: longpoll;
+   Cookie: token={{jwt_token}}
+}
+
+docs {
+  Sends device status and telemetry messages to console
+  Compatible with umh-core implementation
+  
+  Flow:
+  1. Device sends POST request with JWT cookie
+  2. Body contains PushPayload with UMHMessages array
+  3. Includes keep-alive headers for consistency
+  4. Server returns empty response (200 OK) on success
+  
+  UMHMessage structure:
+  {
+    "email": "device@example.com",
+    "content": "{\"MessageType\": \"status\", \"Payload\": {...}}",
+    "umhInstance": "device-uuid",
+    "metadata": null
+  }
+}
+
+body:json {
+  {
+    "UMHMessages": [
+      {
+        "email": "device@example.com",
+        "content": "eyJNZXNzYWdlVHlwZSI6InN0YXR1cyIsIlBheWxvYWQiOnsibWVzc2FnZVR5cGUiOiJzdGF0dXMiLCJpbmZvcyI6eyJob3N0bmFtZSI6ImRldmljZS1wYWFzIiwiaXBfYWRkcmVzcyI6IjE5Mi4xNjguMS4xMDAifX19",
+        "umhInstance": "{{device_uuid}}",
+        "metadata": {
+          "traceId": "550e8400-e29b-41d4-a716-446655440000"
+        }
+      }
+    ]
+  }
+}
+
+script:pre-request {
+  // Verify device_uuid is available from login
+  const uuid = bru.getEnvVar('device_uuid');
+  if (!uuid) {
+    throw new Error("device_uuid not set. Please run Instance-Login first!");
+  }
+  console.log("Pushing messages for device: " + uuid);
+}
+
+script:post-response {
+  console.log("Push successful!");
+  console.log("Status: " + res.getStatus());
+  const resp = res.getBody();
+  console.log("Response: " + JSON.stringify(resp, null, 2));
+}
+
+tests {
+  test("Push successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("device_uuid available from login", function() {
+    const uuid = bru.getEnvVar('device_uuid');
+    expect(uuid).to.exist;
+    expect(uuid).to.be.a('string');
+  });
+  
+  test("Body is valid PushPayload", function() {
+    const body = req.getBody();
+    expect(body).to.have.property('UMHMessages');
+    expect(body.UMHMessages).to.be.an('array');
+    expect(body.UMHMessages.length).to.be.greaterThan(0);
+  });
+  
+  test("All UMHMessages have required fields", function() {
+    const body = req.getBody();
+    body.UMHMessages.forEach((msg, idx) => {
+      expect(msg, "Message " + idx).to.have.property('email');
+      expect(msg, "Message " + idx).to.have.property('content');
+      expect(msg, "Message " + idx).to.have.property('umhInstance');
+      expect(msg, "Message " + idx).to.have.property('metadata');
+    });
+  });
+  
+  test("Message content is valid JSON or base64", function() {
+    const body = req.getBody();
+    body.UMHMessages.forEach((msg, idx) => {
+      // Content can be JSON string or base64-encoded JSON
+      let content;
+      try {
+        content = JSON.parse(msg.content);
+      } catch(e) {
+        // Try decoding as base64
+        try {
+          const decoded = atob(msg.content);
+          content = JSON.parse(decoded);
+        } catch(e2) {
+          // If both fail, that's still ok for telemetry
+          console.log("Message " + idx + " content could not be parsed as JSON or base64");
+        }
+      }
+      
+      // If we could parse it, it should have the expected structure
+      if (content) {
+        expect(content, "Message " + idx).to.have.property('MessageType');
+      }
+    });
+  });
+  
+  test("umhInstance matches device_uuid", function() {
+    const body = req.getBody();
+    const uuid = bru.getEnvVar('device_uuid');
+    body.UMHMessages.forEach((msg, idx) => {
+      expect(msg.umhInstance, "Message " + idx).to.equal(uuid);
+    });
+  });
+  
+  test("Keep-Alive headers sent", function() {
+    expect(req.getHeader('Connection')).to.equal('keep-alive');
+    expect(req.getHeader('Keep-Alive')).to.include('timeout=30');
+    expect(req.getHeader('X-Features')).to.equal('longpoll;');
+  });
+  
+  test("JWT cookie included", function() {
+    const cookie = req.getHeader('Cookie');
+    expect(cookie).to.exist;
+    expect(cookie).to.include('token=');
+  });
+  
+  test("Field names use camelCase not snake_case", function() {
+    const body = req.getBody();
+    body.UMHMessages.forEach((msg, idx) => {
+      expect(msg, "Message " + idx).to.have.property('umhInstance'); // camelCase
+      expect(msg, "Message " + idx).not.to.have.property('umh_instance'); // not snake_case
+    });
+  });
+}

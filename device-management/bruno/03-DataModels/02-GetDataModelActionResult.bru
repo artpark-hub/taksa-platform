@@ -1,0 +1,138 @@
+meta {
+  name: Get Data Model Action Result
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/data-models/{{action_id_data_model}}/result
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Poll for the result of a data model action.
+  
+  This endpoint retrieves the result of a previously queued data model
+  action (add, edit, delete, or get). Use this after receiving an action_id
+  from one of the data model action endpoints.
+  
+  Status transitions:
+  - QUEUED: Action waiting to be sent to device
+  - DELIVERED: Action sent to device, awaiting response
+  - PROCESSING: Device is processing the action
+  - COMPLETED: Action completed successfully, result available
+  - FAILED: Action failed, error_message populated
+  - EXPIRED: Action TTL exceeded
+  - CANCELLED: Action was cancelled
+  - FAILED_PARSING_RESPONSE: Device response could not be parsed
+  
+  For COMPLETED status with successful add/edit/get:
+  - result field contains DataModelOperationResult with:
+    - name: Model name
+    - version: Version number as string (e.g., "1", "2", "3")
+    - description: Model description
+    - encodedStructure: Base64-encoded YAML structure
+  
+  For COMPLETED status with failed operation:
+  - error_message contains the failure reason
+  
+  For DELETE operations:
+  - result field may be empty on success
+  
+  Polling recommendation:
+  - Poll every 1-2 seconds initially
+  - Increase interval to 5-10 seconds if action takes time
+  - Max action TTL: 3600 seconds (1 hour)
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.status) {
+    console.log("✓ Action status: " + resp.status);
+    
+    if (resp.errorMessage) {
+      console.log("  Error: " + resp.errorMessage);
+    }
+    
+    if (resp.result) {
+      console.log("  Result Name: " + resp.result.name);
+      console.log("  Result Version: " + resp.result.version);
+      if (resp.result.description) {
+        console.log("  Result Description: " + resp.result.description);
+      }
+      
+      // Save version for subsequent tests
+      if (resp.result.version) {
+        bru.setEnvVar('data_model_version', resp.result.version);
+        console.log("  ✓ Version saved for next operations");
+      }
+    } else if (resp.status === 'QUEUED' || resp.status === 'DELIVERED' || resp.status === 'PROCESSING') {
+      console.log("  ⏳ Action still processing, poll again for results");
+    }
+  }
+}
+
+tests {
+  test("Action result retrieved", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has status field", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+    // Status can be string (QUEUED, DELIVERED, PROCESSING, COMPLETED, FAILED, EXPIRED, CANCELLED, FAILED_PARSING_RESPONSE)
+    const validStatuses = ['QUEUED', 'DELIVERED', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED', 'CANCELLED', 'FAILED_PARSING_RESPONSE'];
+    expect(validStatuses).to.include(resp.status);
+  });
+  
+  test("Response structure is valid", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+    // result and errorMessage may be optional depending on status
+    if (resp.status === 'COMPLETED' && !resp.errorMessage) {
+      expect(resp).to.have.property('result');
+    }
+  });
+  
+  test("COMPLETED action has result with name and version", function() {
+    const resp = res.getBody();
+    if (resp.status === 'COMPLETED' && resp.result) {
+      expect(resp.result).to.have.property('name');
+      expect(resp.result.name).to.be.a('string');
+      expect(resp.result.name).to.not.be.empty;
+      
+      expect(resp.result).to.have.property('version');
+      expect(resp.result.version).to.be.a('string');
+      expect(resp.result.version).to.not.be.empty;
+    }
+  });
+  
+  test("FAILED action has errorMessage", function() {
+    const resp = res.getBody();
+    if (resp.status === 'FAILED') {
+      expect(resp).to.have.property('errorMessage');
+      expect(resp.errorMessage).to.be.a('string');
+      expect(resp.errorMessage).to.not.be.empty;
+    }
+  });
+  
+  test("Result has expected fields for successful operation", function() {
+    const resp = res.getBody();
+    
+    // Must be COMPLETED
+    expect(resp.status).to.equal('COMPLETED');
+    
+    // Result must exist (not null/undefined)
+    expect(resp).to.have.property('result');
+    expect(resp.result).to.not.be.null;
+    expect(resp.result).to.not.be.undefined;
+    
+    // DataModelOperationResult object should have required fields
+    expect(resp.result).to.have.property('name');
+    expect(resp.result).to.have.property('version');
+  });
+}

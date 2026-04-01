@@ -1,0 +1,79 @@
+meta {
+  name: Delete Protocol Converter
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/{{converter_uuid}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Queue a DELETE action to remove a protocol converter from a device.
+  
+  This endpoint queues an asynchronous action on the device to delete/remove
+  a protocol converter. The device will stop the converter and clean up resources.
+  
+  Path Parameter:
+  - uuid: UUID of the protocol converter to delete
+  
+  Returns:
+  - action_id: UUID of the queued action
+  - created_at: Timestamp when action was created
+  - expires_at: Timestamp when action will expire
+  
+  Note: For DELETE operations, the action result may not contain a result field,
+  but the status will be COMPLETED if successful.
+  
+  Status codes:
+  - 200: DELETE action queued successfully
+  - 400: Invalid request
+  - 404: Device or converter not found
+  - 500: Server error
+  
+  After successful deletion:
+  - The converter will be removed from the device
+  - Next ListProtocolConverters call will not include it (unless still in StatusMessage)
+  - health_status will be marked as OFFLINE if still present in DB
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_protocol_converter', resp.actionId);
+    console.log("✓ DELETE protocol converter action queued");
+    console.log("  Action ID: " + resp.actionId);
+    console.log("  Converter will be removed when device confirms");
+    console.log("  Next: Poll GetProtocolConverterActionResult using {{action_id_protocol_converter}}");
+  }
+}
+
+tests {
+  test("DELETE action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+    expect(resp.actionId).to.not.be.empty;
+  });
+  
+  test("Response has timestamps", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('createdAt');
+    expect(resp).to.have.property('expiresAt');
+  });
+  
+  test("Action ID is UUID format", function() {
+    const resp = res.getBody();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(resp.actionId).to.match(uuidRegex);
+  });
+}

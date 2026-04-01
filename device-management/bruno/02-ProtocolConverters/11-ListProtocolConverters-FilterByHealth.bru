@@ -1,0 +1,65 @@
+meta {
+  name: List Protocol Converters Filter by Health Status
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters?health_status_filter=ONLINE
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Filter protocol converters by health status.
+  
+  This is useful to find converters in specific health states.
+  
+  Query Parameter:
+  - health_status_filter: Health status - ONLINE, OFFLINE, or UNKNOWN
+  
+  Returns:
+  - All converters matching the health status
+  - Empty result if no matches
+  
+  Health Status Values:
+  - ONLINE: Converter is actively communicating
+  - OFFLINE: Converter is not responding
+  - UNKNOWN: Health status not yet determined
+  
+  Common Use Cases:
+  - Find unhealthy converters: health_status_filter=OFFLINE
+  - Find healthy converters: health_status_filter=ONLINE
+  - Find uninitialized converters: health_status_filter=UNKNOWN
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.converters) {
+    console.log("✓ Found " + resp.converters.length + " converter(s) with ONLINE health status");
+    
+    resp.converters.forEach((converter) => {
+      console.log(`  - ${converter.name} (${converter.healthStatus})`);
+    });
+  } else {
+    console.log("✓ No converters found with specified health status");
+  }
+}
+
+tests {
+  test("Health status filter request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("All results match health status filter (ONLINE)", function() {
+    const resp = res.getBody();
+    if (resp.converters) {
+      resp.converters.forEach((converter) => {
+        expect(converter.healthStatus).to.equal('ONLINE');
+      });
+    }
+  });
+}

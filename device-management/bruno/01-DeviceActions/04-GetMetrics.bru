@@ -1,0 +1,82 @@
+meta {
+  name: Get Metrics
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/metrics
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "payload": {
+      "type": "redpanda"
+    }
+  }
+}
+
+docs {
+  Queue action to retrieve device metrics.
+  
+  Asynchronous pattern:
+  1. Returns action_id immediately (ActionQueuedResponse)
+  2. Client polls GetMetricsActionResponse to get result
+  
+  Supported by umh-core GetMetrics action.
+  
+  Metric types:
+  - dfc: Data flow component metrics
+  - redpanda: Message broker metrics
+  - topic-browser: Topic catalog metrics
+  - stream-processor: Stream processor metrics
+  - protocol-converter: Protocol converter metrics
+  
+  Request Parameters (in payload):
+  - type: Metric type (required) - one of: dfc, redpanda, topic-browser, stream-processor, protocol-converter
+  - uuid: Optional UUID for component-specific metrics
+  
+  Response:
+  - action_id: Unique action identifier for polling results
+  - created_at: When action was queued
+  - expires_at: When action result will expire
+  
+  Next step: Poll GetMetricsActionResponse with action_id to retrieve result
+  - Endpoint: GET /api/v1/devicemgmt/devices/{device_id}/metrics/{action_id}/result
+  - Result payload: Automatically decompressed JSON array of Metric objects
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_metrics', resp.actionId);
+    console.log("✓ Metrics retrieval action queued: " + resp.actionId);
+  }
+}
+
+tests {
+  test("Action queued successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+  });
+  
+  test("Response has createdAt", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('createdAt');
+  });
+  
+  test("Response has expiresAt", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('expiresAt');
+  });
+}

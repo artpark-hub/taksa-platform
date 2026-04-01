@@ -1,0 +1,132 @@
+meta {
+  name: List Devices
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices
+}
+
+params:query {
+  page_size: 10
+  page_token: 
+}
+
+docs {
+  Retrieve paginated list of registered devices.
+  
+  Uses cursor-based pagination:
+  - page_size: Maximum results per page (default: 50)
+  - page_token: Cursor token from previous response (empty for first page)
+  
+  Response includes:
+  - devices: Array of DeviceSummary objects (lightweight summary)
+  - next_page_token: Token for next page (empty if no more pages)
+  
+  Note on Certificates:
+  - ListDevices returns DeviceSummary (lightweight summary)
+  - Certificates are OMITTED to reduce payload size (~60% reduction)
+  - Use GetDevice endpoint to retrieve full device with certificate
+  
+  Supports filtering and sorting:
+  - status: Device status (PENDING, ACTIVE, INACTIVE, SUSPENDED, DECOMMISSIONED)
+  - location_level_0: Filter by enterprise/company
+  - search: Full-text search in name, serial number
+  - sort_by: CREATED_AT (default), NAME, LAST_SEEN
+  - sort_desc: true/false for sort direction
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.devices) {
+    console.log("✓ Retrieved " + resp.devices.length + " devices");
+    
+    if (resp.next_page_token) {
+      bru.setEnvVar('next_page_token', resp.next_page_token);
+      console.log("✓ More pages available - next_page_token saved");
+    } else {
+      console.log("✓ No more pages available (end of results)");
+    }
+    
+    // Log first device if available
+    if (resp.devices.length > 0) {
+      const device = resp.devices[0];
+      console.log("  First device: " + device.name + " (" + device.id + ")");
+    }
+  }
+}
+
+tests {
+  test("List successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has devices array", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('devices');
+    expect(resp.devices).to.be.an('array');
+  });
+  
+  test("Device objects have required fields", function() {
+    const resp = res.getBody();
+    if (resp.devices && resp.devices.length > 0) {
+      const device = resp.devices[0];
+      expect(device).to.have.property('id');
+      expect(device).to.have.property('name');
+      expect(device).to.have.property('serialNumber');
+      expect(device).to.have.property('status');
+    }
+  });
+  
+  test("Device has company info", function() {
+    const resp = res.getBody();
+    if (resp.devices && resp.devices.length > 0) {
+      const device = resp.devices[0];
+      expect(device).to.have.property('company');
+      // API returns camelCase field names
+      expect(device.company).to.have.property('name');
+    }
+  });
+  
+  test("Certificates NOT included in list (performance)", function() {
+    const resp = res.getBody();
+    if (resp.devices && resp.devices.length > 0) {
+      const device = resp.devices[0];
+      // ListDevices returns DeviceSummary without certificate to reduce payload
+      expect(device).to.not.have.property('certificate');
+    }
+  });
+  
+  test("Device status is valid enum string", function() {
+    const resp = res.getBody();
+    // Proto enums are marshaled as strings: PENDING, ACTIVE, INACTIVE, SUSPENDED, DECOMMISSIONED
+    const validStatuses = ["PENDING", "ACTIVE", "INACTIVE", "SUSPENDED", "DECOMMISSIONED"];
+    if (resp.devices && resp.devices.length > 0) {
+      resp.devices.forEach(device => {
+        if (device.status) {
+          expect(validStatuses).to.include(device.status);
+        }
+      });
+    }
+  });
+  
+  test("Devices have metadata", function() {
+    const resp = res.getBody();
+    if (resp.devices && resp.devices.length > 0) {
+      const device = resp.devices[0];
+      expect(device).to.have.property('metadata');
+      expect(device.metadata).to.have.property('hardwareVersion');
+    }
+  });
+  
+  test("Devices have location", function() {
+    const resp = res.getBody();
+    if (resp.devices && resp.devices.length > 0) {
+      const device = resp.devices[0];
+      expect(device).to.have.property('location');
+    }
+  });
+  
+}

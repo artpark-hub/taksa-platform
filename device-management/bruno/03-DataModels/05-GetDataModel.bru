@@ -1,0 +1,82 @@
+meta {
+  name: Get Data Model
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/data-models/{{data_model_name}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Queue action to get data model details from a device.
+  
+  This endpoint queues an asynchronous action to retrieve detailed information
+  about a data model. The get happens on the device, and results are returned 
+  via the GetDataModelActionResult endpoint.
+  
+  Path Parameter:
+  - name: Name of the data model to retrieve
+  
+  Query Parameters (optional):
+  - getEnrichedTree: boolean - If true, includes referenced model data filled in
+  
+  Returns:
+  - action_id: UUID of the queued action
+  - created_at: Timestamp when action was created
+  - expires_at: Timestamp when action will expire
+  
+  Status codes:
+  - 200: Get action queued successfully
+  - 400: Invalid request
+  - 404: Device or data model not found
+  - 500: Server error
+}
+
+script:pre-request {
+  // Ensure we have a data_model_name from previous test
+  if (!bru.getEnvVar('data_model_name')) {
+    console.warn("⚠ No data_model_name set. Run AddDataModel first to populate data_model_name.");
+  }
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_data_model', resp.actionId);
+    console.log("✓ Data model get action queued");
+    console.log("  Action ID: " + resp.actionId);
+    console.log("  Created: " + resp.createdAt);
+    console.log("  Next: Poll GetDataModelActionResult using {{action_id_data_model}}");
+  }
+}
+
+tests {
+  test("Get action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+    expect(resp.actionId).to.not.be.empty;
+  });
+  
+  test("Response has timestamps", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('createdAt');
+    expect(resp).to.have.property('expiresAt');
+  });
+  
+  test("Action ID is UUID format", function() {
+    const resp = res.getBody();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(resp.actionId).to.match(uuidRegex);
+  });
+}

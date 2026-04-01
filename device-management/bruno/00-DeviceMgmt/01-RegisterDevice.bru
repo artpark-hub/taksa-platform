@@ -1,0 +1,155 @@
+meta {
+  name: Register Device
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "Test Device {{timestamp}}",
+    "serial_number": "SN-{{timestamp}}",
+    "metadata": {
+      "hardware_version": "1.0",
+      "operating_system": "Linux",
+      "manufacturer": "Test",
+      "firmware_version": "1.0.0"
+    },
+    "location": {
+      "levels": {
+        "0": "TestEnterprise",
+        "1": "TestSite"
+      }
+    },
+    "company": {
+      "base": {
+        "name": "Test Company",
+        "user_count": 10,
+        "license_status": {
+          "is_active": true,
+          "valid_to": "2025-12-31"
+        }
+      },
+      "contact_email": "contact@test.com",
+      "support_contact": "support@test.com",
+      "tags": ["test", "demo"]
+    }
+  }
+}
+
+docs {
+  Register a new device with the management system.
+  
+  Certificate Handling:
+  - If 'certificate' field provided: Validates and uses provided certificate
+  - If 'certificate' field omitted: Auto-generates self-signed X.509 certificate
+  - Private keys: NOT stored server-side (device-side only)
+  
+  Creates:
+  - Device record in database
+  - Auto-generated UUID and device ID
+  - Device certificate (provided or auto-generated)
+  - Auth token (shown once only)
+  
+  Returns device info and pre-calculated token hash for Login.
+}
+
+script:pre-request {
+  // Generate timestamp for unique device naming
+  bru.setEnvVar('timestamp', Date.now().toString());
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.deviceId) {
+    // Save device_id for subsequent tests
+    bru.setEnvVar('device_id', resp.deviceId);
+    console.log("✓ Device registered: " + resp.deviceId);
+    
+    // Save auth token and hash for later use
+    if (resp.authToken) {
+      bru.setEnvVar('token_raw', resp.authToken);
+      console.log("✓ Auth token saved (will expire in 7 days)");
+    }
+    
+    if (resp.authTokenHash) {
+      bru.setEnvVar('token_hash', resp.authTokenHash);
+      console.log("✓ Token hash saved for Login API");
+    }
+    
+    console.log("  Instructions: " + JSON.stringify(resp.instructions || {}));
+  }
+}
+
+tests {
+  test("Device registered successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has deviceId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('deviceId');
+    expect(resp.deviceId).to.be.a('string');
+    expect(resp.deviceId).to.not.be.empty;
+  });
+  
+  test("Response has authToken", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('authToken');
+    expect(resp.authToken).to.be.a('string');
+  });
+  
+  test("Response has authTokenHash", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('authTokenHash');
+    expect(resp.authTokenHash).to.be.a('string');
+  });
+  
+  test("Response has device object", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('device');
+    expect(resp.device).to.have.property('id');
+    expect(resp.device).to.have.property('name');
+    expect(resp.device).to.have.property('serialNumber');
+  });
+  
+  test("Device has PENDING status", function() {
+    const resp = res.getBody();
+    // Proto enums are marshaled as strings in JSON (PENDING = "PENDING" in DeviceStatus enum)
+    expect(resp.device.status).to.equal("PENDING");
+  });
+  
+  test("Device has metadata", function() {
+    const resp = res.getBody();
+    expect(resp.device).to.have.property('metadata');
+    expect(resp.device.metadata).to.have.property('hardwareVersion');
+  });
+  
+  test("Device has location", function() {
+    const resp = res.getBody();
+    expect(resp.device).to.have.property('location');
+    expect(resp.device.location).to.have.property('levels');
+  });
+  
+  test("Device has company details", function() {
+    const resp = res.getBody();
+    expect(resp.device).to.have.property('company');
+    // RegisterDevice returns DeviceSummary with api.common.CompanyDetails (no .base wrapper)
+    expect(resp.device.company).to.have.property('name');
+  });
+  
+  test("Instructions provided", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('instructions');
+    expect(Object.keys(resp.instructions).length).to.be.greaterThan(0);
+  });
+}

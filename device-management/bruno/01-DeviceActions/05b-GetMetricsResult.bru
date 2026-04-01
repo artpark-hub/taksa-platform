@@ -1,0 +1,124 @@
+meta {
+  name: Get Metrics Result
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/metrics/{{action_id_metrics}}/result
+}
+
+docs {
+  Poll for GetMetrics action result (GetMetricsActionResponse).
+  
+  Asynchronous polling pattern:
+  1. First, queue action with GetMetrics endpoint
+  2. Then poll this endpoint with the action_id
+  3. Repeat until status is terminal (COMPLETED, FAILED, EXPIRED, CANCELLED)
+  
+  Response Status Codes:
+  - 1 = QUEUED: Action waiting for device
+  - 2 = DELIVERED: Sent to device, waiting for processing
+  - 3 = PROCESSING: Device is processing the request
+  - 4 = COMPLETED: Success - result_payload contains metrics (decompressed JSON)
+  - 5 = FAILED: Error - check error_message field
+  - 6 = EXPIRED: Action timeout
+  - 7 = CANCELLED: User cancelled
+  
+  Result Payload:
+  - When status=COMPLETED: Contains decompressed JSON string of Metric objects array
+  - Format: JSON string that can be directly parsed: JSON.parse(result_payload)
+  - Server automatically decompresses gzip/zstd compressed payloads before returning
+  - No base64 decoding needed - client receives clean JSON string ready to parse
+  
+  Metric Object Fields:
+  - name: Metric name
+  - path: Metric path/location
+  - componentType: Component that produced metric (DFC, PROTOCOL_CONVERTER, REDPANDA, etc.)
+  - valueType: Value type (NUMBER, STRING, BOOLEAN)
+  - value: Metric value as JSON bytes
+  
+  Error Handling:
+  - When status=FAILED: Check error_message field for details
+  - Payload will be empty/null
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp) {
+    console.log("✓ Metrics action result retrieved");
+    console.log("  Status: " + resp.status);
+    console.log("  Completed: " + (resp.completedAt || "Not yet"));
+    
+    if (resp.status === 'COMPLETED') {
+      console.log("  ✓ Action completed successfully");
+      
+      if (resp.resultPayload) {
+        try {
+          const metricsJson = JSON.parse(resp.resultPayload);
+          console.log("  ✓ Metrics retrieved: " + metricsJson.length + " metrics");
+          if (metricsJson.length > 0) {
+            const firstMetric = metricsJson[0];
+            console.log("    First metric: " + firstMetric.name + " (" + firstMetric.componentType + ")");
+          }
+        } catch (e) {
+          console.log("  ⚠ Failed to parse payload: " + e.message);
+          console.log("    Raw payload: " + resp.resultPayload.substring(0, 100));
+        }
+      }
+    } else if (resp.status === 'FAILED') {
+      console.log("  ✗ Action failed: " + resp.errorMessage);
+    } else {
+      const statusNames = {QUEUED: 'QUEUED', DELIVERED: 'DELIVERED', PROCESSING: 'PROCESSING', EXPIRED: 'EXPIRED', CANCELLED: 'CANCELLED'};
+      console.log("  ⏳ Action still " + (statusNames[resp.status] || 'UNKNOWN') + " - poll again");
+    }
+  }
+}
+
+tests {
+  test("Result retrieval successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has action_id", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+  });
+  
+  test("Response has status", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+  });
+  
+  test("Status is valid state", function() {
+    const resp = res.getBody();
+    const validStatuses = ['QUEUED', 'DELIVERED', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED', 'CANCELLED'];
+    expect(validStatuses).to.include(resp.status);
+  });
+  
+  test("Response may have completedAt when terminal", function() {
+    const resp = res.getBody();
+    // completedAt is optional and may be null/missing for non-terminal states
+    // This test just verifies the structure is valid if present
+    if (resp.completedAt) {
+      expect(resp.completedAt).to.be.a('string');
+    }
+  });
+  
+  test("COMPLETED status has resultPayload", function() {
+    const resp = res.getBody();
+    if (resp.status === 'COMPLETED') {
+      expect(resp).to.have.property('resultPayload');
+    }
+  });
+  
+  test("FAILED status has errorMessage", function() {
+    const resp = res.getBody();
+    if (resp.status === 'FAILED') {
+      expect(resp).to.have.property('errorMessage');
+      expect(resp.errorMessage).to.not.be.empty;
+    }
+  });
+}

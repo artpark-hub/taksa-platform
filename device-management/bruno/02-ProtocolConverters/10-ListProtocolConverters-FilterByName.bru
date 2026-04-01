@@ -1,0 +1,60 @@
+meta {
+  name: List Protocol Converters Filter by Name
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters?name_filter=bridge
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Filter protocol converters by name (substring search).
+  
+  This is useful to find converters whose names contain specific text.
+  
+  Query Parameter:
+  - name_filter: Substring to search for in converter names (case-sensitive)
+  
+  Returns:
+  - All converters whose names contain the substring
+  - Empty result if no matches
+  
+  Examples:
+  - name_filter=bridge (find all bridges)
+  - name_filter=opcua (find OPCUA-related converters)
+  - name_filter=mqtt (find MQTT-related converters)
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.converters) {
+    console.log("✓ Found " + resp.converters.length + " converter(s) matching name filter");
+    
+    resp.converters.forEach((converter) => {
+      console.log(`  - ${converter.name}`);
+    });
+  } else {
+    console.log("✓ No converters match the name filter");
+  }
+}
+
+tests {
+  test("Name filter request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("All results match name filter (contain 'bridge')", function() {
+    const resp = res.getBody();
+    if (resp.converters) {
+      resp.converters.forEach((converter) => {
+        expect(converter.name.toLowerCase()).to.include('bridge');
+      });
+    }
+  });
+}

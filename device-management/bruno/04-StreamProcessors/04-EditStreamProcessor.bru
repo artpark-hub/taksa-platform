@@ -1,0 +1,76 @@
+meta {
+  name: Edit Stream Processor
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors/{{stream_processor_uuid}}
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "stream-processor-updated-{{timestamp}}",
+    "config": {
+      "sources": {
+        "vibration": "umh.v1.{{ .enterprise }}.{{ .site }}.vibration",
+        "temperature": "umh.v1.{{ .enterprise }}.{{ .site }}.temperature",
+        "pressure": "umh.v1.{{ .enterprise }}.{{ .site }}.pressure"
+      },
+      "mapping": {
+        "vibration_level": "vibration.value",
+        "temp_celsius": "temperature.celsius",
+        "pressure_bar": "pressure.bar"
+      }
+    },
+    "location": {
+      "0": "TestEnterprise",
+      "1": "UpdatedSite"
+    },
+    "ignoreHealthCheck": false
+  }
+}
+
+docs {
+  Edit an existing stream processor.
+  
+  Updates the stream processor configuration on the device.
+  The UUID in the path parameter ({{stream_processor_uuid}}) is authoritative.
+  
+  All request body fields are optional for partial updates:
+  - name: Update processor name (optional)
+  - config: Update configuration as JSON object (optional)
+    Service layer converts JSON → YAML → Base64 automatically
+  - modelName: Update data model reference (optional)
+  - modelVersion: Update data model version (optional)
+  - location: Update location hierarchy (optional)
+  - metadata: Update metadata (optional)
+  - ignoreHealthCheck: Update health check setting (optional)
+  
+  Returns action_id for polling the result.
+}
+
+script:pre-request {
+  bru.setEnvVar('timestamp', Date.now().toString());
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_stream_processor', resp.actionId);
+    console.log("✓ Stream processor edit queued");
+    console.log("  Action ID: " + resp.actionId);
+  }
+}
+
+tests {
+  test("Edit action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

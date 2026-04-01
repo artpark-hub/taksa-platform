@@ -1,0 +1,109 @@
+meta {
+  name: Edit Data Model
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/data-models/{{data_model_name}}
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "{{data_model_name}}",
+    "description": "Updated test data model",
+    "structure": {
+      "temperature": {
+        "_payloadshape": "timeseries-number"
+      },
+      "humidity": {
+        "_payloadshape": "timeseries-number"
+      },
+      "timestamp": {
+        "_payloadshape": "timeseries-string"
+      },
+      "pressure": {
+        "_payloadshape": "timeseries-number"
+      }
+    }
+  }
+}
+
+docs {
+   Queue action to edit an existing data model on a device.
+   
+   This endpoint queues an asynchronous action to edit a data model.
+   The edit happens on the device, and results are returned via the 
+   GetDataModelActionResult endpoint.
+   
+   Path Parameter:
+   - name: Name of the data model to edit (from URL path)
+   
+   Request Body:
+   - name: Name of the data model (required)
+   - description: Updated description (optional)
+   - structure: JSON object with field definitions (will be converted to YAML and base64 encoded server-side)
+     Each field should have _payloadshape property indicating the data type
+   
+   Note: The name path parameter is authoritative.
+   
+   Returns:
+   - action_id: UUID of the queued action
+   - created_at: Timestamp when action was created
+   - expires_at: Timestamp when action will expire
+   
+   Status codes:
+   - 200: Edit action queued successfully
+   - 400: Invalid request
+   - 404: Device or data model not found
+   - 500: Server error
+}
+
+script:pre-request {
+  // Ensure we have a data_model_name from previous test
+  if (!bru.getEnvVar('data_model_name')) {
+    console.warn("⚠ No data_model_name set. Run AddDataModel first to populate data_model_name.");
+  }
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_data_model', resp.actionId);
+    console.log("✓ Data model edit action queued");
+    console.log("  Action ID: " + resp.actionId);
+    console.log("  Created: " + resp.createdAt);
+    console.log("  Next: Poll GetDataModelActionResult using {{action_id_data_model}}");
+  }
+}
+
+tests {
+  test("Edit action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+    expect(resp.actionId).to.not.be.empty;
+  });
+  
+  test("Response has timestamps", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('createdAt');
+    expect(resp).to.have.property('expiresAt');
+  });
+  
+  test("Action ID is UUID format", function() {
+    const resp = res.getBody();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(resp.actionId).to.match(uuidRegex);
+  });
+}

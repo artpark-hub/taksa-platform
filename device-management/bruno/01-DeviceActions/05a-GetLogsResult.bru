@@ -1,0 +1,116 @@
+meta {
+  name: Get Logs Result
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/logs/{{action_id_logs}}/result
+}
+
+docs {
+  Poll for GetLogs action result (GetLogsActionResponse).
+  
+  Asynchronous polling pattern:
+  1. First, queue action with GetLogs endpoint
+  2. Then poll this endpoint with the action_id
+  3. Repeat until status is terminal (COMPLETED, FAILED, EXPIRED, CANCELLED)
+  
+  Response Status Codes:
+  - 1 = QUEUED: Action waiting for device
+  - 2 = DELIVERED: Sent to device, waiting for processing
+  - 3 = PROCESSING: Device is processing the request
+  - 4 = COMPLETED: Success - result_payload contains logs (decompressed JSON)
+  - 5 = FAILED: Error - check error_message field
+  - 6 = EXPIRED: Action timeout
+  - 7 = CANCELLED: User cancelled
+  
+  Result Payload:
+  - When status=COMPLETED: Contains decompressed JSON string of log array
+  - Format: JSON string that can be directly parsed: JSON.parse(result_payload)
+  - Server automatically decompresses gzip/zstd compressed payloads before returning
+  - No base64 decoding needed - client receives clean JSON string ready to parse
+  
+  Error Handling:
+  - When status=FAILED: Check error_message field for details
+  - Payload will be empty/null
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp) {
+    console.log("✓ Logs action result retrieved");
+    console.log("  Status: " + resp.status);
+    console.log("  Completed: " + (resp.completed_at || "Not yet"));
+    
+    // Status values: 1=QUEUED, 2=DELIVERED, 3=PROCESSING, 4=COMPLETED, 5=FAILED, 6=EXPIRED, 7=CANCELLED
+    if (resp.status === 4) {
+      console.log("  ✓ Action completed successfully");
+      
+      if (resp.result_payload) {
+        try {
+          const logsJson = JSON.parse(resp.result_payload);
+          console.log("  ✓ Logs retrieved: " + logsJson.length + " lines");
+          if (logsJson.length > 0) {
+            console.log("    First line: " + logsJson[0].substring(0, 80) + "...");
+          }
+        } catch (e) {
+          console.log("  ⚠ Failed to parse payload: " + e.message);
+          console.log("    Raw payload: " + resp.result_payload.substring(0, 100));
+        }
+      }
+    } else if (resp.status === 5) {
+      console.log("  ✗ Action failed: " + resp.error_message);
+    } else {
+      const statusNames = {1: 'QUEUED', 2: 'DELIVERED', 3: 'PROCESSING', 6: 'EXPIRED', 7: 'CANCELLED'};
+      console.log("  ⏳ Action still " + (statusNames[resp.status] || 'UNKNOWN') + " - poll again");
+    }
+  }
+}
+
+tests {
+  test("Result retrieval successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has action_id", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+  });
+  
+  test("Response has status", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+  });
+  
+  test("Status is valid state", function() {
+    const resp = res.getBody();
+    const validStatuses = ['QUEUED', 'DELIVERED', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED', 'CANCELLED'];
+    expect(validStatuses).to.include(resp.status);
+  });
+  
+  test("Response may have completedAt when terminal", function() {
+    const resp = res.getBody();
+    // completedAt is optional and may be null/missing for non-terminal states
+    if (resp.completedAt) {
+      expect(resp.completedAt).to.be.a('string');
+    }
+  });
+  
+  test("COMPLETED status has resultPayload", function() {
+    const resp = res.getBody();
+    if (resp.status === 'COMPLETED') {
+      expect(resp).to.have.property('resultPayload');
+    }
+  });
+  
+  test("FAILED status has errorMessage", function() {
+    const resp = res.getBody();
+    if (resp.status === 'FAILED') {
+      expect(resp).to.have.property('errorMessage');
+      expect(resp.errorMessage).to.not.be.empty;
+    }
+  });
+}

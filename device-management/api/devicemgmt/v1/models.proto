@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+package api.devicemgmt.v1;
+
+import "google/protobuf/timestamp.proto";
+import "common/models.proto";
+
+// NOTE: CompanyDetails and LicenseStatus are imported from common/models.proto
+// They are the canonical wire protocol versions used by umh-core
+// Management Console may need extended versions - use CompanyDetailsExtended
+
+option go_package = "taksa-platform-dm/api/devicemgmt/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.devicemgmt.v1";
+
+// Device represents a managed edge device (runs UMH Core instance)
+// NOTE: Uses CompanyDetailsExtended which wraps the canonical wire protocol version
+// Contains full details including certificates. Use DeviceSummary for list/summary responses.
+message Device {
+  string id = 1;
+  string name = 2;
+  string serial_number = 3;
+
+  DeviceMetadata metadata = 4;
+
+  // Location using ISA-95 5-level hierarchy (enterprise, site, area, line, workCell)
+  // CRITICAL: Must be compatible with umh-core's Location struct
+  // Used for Kafka topic path and location-based filtering
+  DeviceLocation location = 5;
+
+  CompanyDetailsExtended company = 6; // Extended model with console-specific fields
+
+  DeviceStatus status = 7;
+
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp last_seen = 9;
+  google.protobuf.Timestamp last_login = 10;
+  google.protobuf.Timestamp auth_token_expires_at = 11;
+
+  // Certificate management
+  string certificate = 12;
+  string encrypted_private_key = 13;
+  string company_certificate = 14;
+}
+
+// DeviceSummary represents a lightweight device summary for list/overview responses
+// Contains only essential device information without certificate data or extended company details
+message DeviceSummary {
+  string id = 1;
+  string name = 2;
+  string serial_number = 3;
+
+  DeviceMetadata metadata = 4;
+
+  // Location using ISA-95 5-level hierarchy
+  DeviceLocation location = 5;
+
+  // Basic company info (name and license only, no contact/support/tags)
+  api.common.CompanyDetails company = 6;
+
+  DeviceStatus status = 7;
+
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp last_seen = 9;
+  google.protobuf.Timestamp auth_token_expires_at = 11;
+}
+
+// DeviceMetadata contains hardware and software information
+message DeviceMetadata {
+  string hardware_version = 1;
+  string operating_system = 2;
+  string manufacturer = 3;
+  string firmware_version = 4;
+  string ip_address = 5;
+  string mac_address = 6;
+}
+
+// DeviceLocation represents hierarchical location as map of levels
+// CRITICAL: Must match umh-core's location structure: map[string]string with int keys as strings
+//
+// umh-core config.yaml location format (7-level ISA-95 hierarchy):
+//   location:
+//     "0": company       # Level 0: Enterprise/Company (required)
+//     "1": plant         # Level 1: Manufacturing plant or site
+//     "2": area          # Level 2: Production area
+//     "3": zone          # Level 3: Work zone or line group
+//     "4": line          # Level 4: Production line
+//     "5": workCell      # Level 5: Work cell
+//     "6": workUnit      # Level 6: Work unit or station
+//
+// Note: Levels can be extended beyond 7 if needed; levels are numeric strings as keys
+// Reference: umh-core/pkg/communicator/actions/edit_instance_test.go
+message DeviceLocation {
+  // Map of location levels: key is level number as string ("0", "1", "2", ..., "6", etc.)
+  // Level 0 (company) is required; other levels are optional
+  map<string, string> levels = 1;
+}
+
+// NOTE: CompanyDetails and LicenseStatus are now imported from api.common
+// They are the canonical wire protocol versions matching umh-core exactly
+// See api/common/models.proto for definitions
+
+// ============================================================================
+// Extended Company Details for Management Console
+// ============================================================================
+// CompanyDetailsExtended adds management console-specific fields to the
+// canonical wire protocol CompanyDetails. These fields are NOT sent to umh-core,
+// but are used internally by the management console.
+message CompanyDetailsExtended {
+  api.common.CompanyDetails base = 1; // Canonical wire protocol fields
+  string contact_email = 2; // Management console contact email
+  string support_contact = 3; // Support contact information
+  repeated string tags = 4; // Organization tags
+}
+
+// DeviceStatus represents the operational state of a device
+enum DeviceStatus {
+  DEVICE_STATUS_UNSPECIFIED = 0;
+  PENDING = 1; // Newly registered, awaiting first login
+  ACTIVE = 2; // Authenticated and communicating
+  INACTIVE = 3; // Not communicating
+  SUSPENDED = 4; // Administratively suspended
+  DECOMMISSIONED = 5; // No longer in use
+}
+
+// ActionStatus tracks action state
+// Used in RPC responses to indicate action progress and completion
+enum ActionStatus {
+  ACTION_STATUS_UNSPECIFIED = 0;
+  QUEUED = 1; // Waiting to be delivered
+  DELIVERED = 2; // Sent to device
+  PROCESSING = 3; // Device is processing
+  COMPLETED = 4; // Successfully completed
+  FAILED = 5; // Failed execution
+  EXPIRED = 6; // Expiry time exceeded
+  CANCELLED = 7; // Manually cancelled
+  FAILED_PARSING_RESPONSE = 8; // Failed to parse device response
+}
+
+

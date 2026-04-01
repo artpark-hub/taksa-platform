@@ -1,0 +1,37 @@
+# Dockerfile - For Production Deployment of Taksa Platform DM
+# TODO: Address Optimization and Security Enhancements (e.g., multi-stage builds, non-root user, minimal base image)
+# Build locally with: make build
+# Then build image with: docker build -t taksa-platform-dm:latest .
+
+FROM ubuntu:24.04
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y ca-certificates wget && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN groupadd -g 2000 taksa && useradd -u 2000 -g taksa -s /sbin/nologin taksa
+
+# Create directories
+RUN mkdir -p /data /home/taksa && chown -R taksa:taksa /data /home/taksa
+
+WORKDIR /home/taksa
+
+# Copy pre-built binary (built with: make build)
+COPY --chown=taksa:taksa bin/taksa-platform-dm /home/taksa/taksa-platform-dm
+
+# Copy config and db schema
+COPY --chown=taksa:taksa configs/ /home/taksa/configs/
+COPY --chown=taksa:taksa db/ /home/taksa/db/
+
+# Switch to non-root user
+USER taksa
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8000/ || exit 1
+
+# Expose ports
+EXPOSE 8000 9000
+
+# Run
+CMD ["/home/taksa/taksa-platform-dm", "-conf", "/home/taksa/configs"]
