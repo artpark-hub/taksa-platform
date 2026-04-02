@@ -15,8 +15,8 @@ type DeviceStore interface {
 	// GetByID retrieves a device by its ID
 	GetByID(ctx context.Context, id string) (*v1.Device, error)
 
-	// GetByName retrieves a device by name (globally unique)
-	GetByName(ctx context.Context, name string) (*v1.Device, error)
+	// GetByCreatedByAndName retrieves a device by created_by (tenant) and name (per-tenant unique)
+	GetByCreatedByAndName(ctx context.Context, createdBy, name string) (*v1.Device, error)
 
 	// GetByUUID retrieves a device by UUID
 	GetByUUID(ctx context.Context, uuid string) (*v1.Device, error)

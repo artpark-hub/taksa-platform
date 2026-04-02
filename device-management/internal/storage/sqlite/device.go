@@ -137,14 +137,14 @@ func (s *DeviceStore) GetByID(ctx context.Context, id string) (*v1.Device, error
 	return device, nil
 }
 
-// GetByName retrieves a device by name (globally unique)
-func (s *DeviceStore) GetByName(ctx context.Context, name string) (*v1.Device, error) {
-	if name == "" {
+// GetByCreatedByAndName retrieves a device by created_by (tenant) and name
+func (s *DeviceStore) GetByCreatedByAndName(ctx context.Context, createdBy, name string) (*v1.Device, error) {
+	if createdBy == "" || name == "" {
 		return nil, ErrInvalidInput
 	}
 
 	device := &v1.Device{}
-	err := s.getDevice(ctx, "WHERE name = ?", name, device)
+	err := s.getDevice(ctx, "WHERE created_by = ? AND name = ?", []interface{}{createdBy, name}, device)
 	if err != nil {
 		return nil, err
 	}
@@ -577,7 +577,7 @@ func (s *DeviceStore) UpdateLastLogin(ctx context.Context, id string, timestamp 
 
 // Helper methods
 
-func (s *DeviceStore) getDevice(ctx context.Context, where string, arg interface{}, device *v1.Device) error {
+func (s *DeviceStore) getDevice(ctx context.Context, where string, args interface{}, device *v1.Device) error {
 	query := fmt.Sprintf(`
 		SELECT id, uuid, created_by, name, hardware_version, operating_system, manufacturer,
 		       firmware_version, ip_address, mac_address, location_company, location_plant,
@@ -589,7 +589,16 @@ func (s *DeviceStore) getDevice(ctx context.Context, where string, arg interface
 		FROM devices %s
 	`, where)
 
-	return s.scanDeviceRow(s.db.QueryRowContext(ctx, query, arg), device)
+	// Handle both single arg and multiple args
+	var queryArgs []interface{}
+	switch v := args.(type) {
+	case []interface{}:
+		queryArgs = v
+	default:
+		queryArgs = []interface{}{args}
+	}
+
+	return s.scanDeviceRow(s.db.QueryRowContext(ctx, query, queryArgs...), device)
 }
 
 func (s *DeviceStore) scanDeviceRow(row *sql.Row, device *v1.Device) error {

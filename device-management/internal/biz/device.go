@@ -35,10 +35,10 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 		return nil, fmt.Errorf("created_by, name, and location are required")
 	}
 
-	// Check if already exists by name (globally unique)
-	existing, _ := uc.store.Devices().GetByName(ctx, req.Name)
+	// Check if already exists by created_by + name (per-tenant unique)
+	existing, _ := uc.store.Devices().GetByCreatedByAndName(ctx, req.CreatedBy, req.Name)
 	if existing != nil {
-		return nil, fmt.Errorf("device with name '%s' already exists", req.Name)
+		return nil, fmt.Errorf("device with name '%s' already exists for this tenant", req.Name)
 	}
 
 	// Create device with license information

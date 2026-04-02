@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
   uuid TEXT UNIQUE NOT NULL,
   created_by TEXT,  -- Owner UUID (tenant identifier)
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
   
   -- Hardware metadata
   hardware_version TEXT,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS devices (
   last_login_at TIMESTAMP WITH TIME ZONE,
   auth_token_expires_at TIMESTAMP WITH TIME ZONE,
   
-  UNIQUE(name),
+  UNIQUE(created_by, name),  -- Device names unique per tenant
   UNIQUE(uuid)
 );
 

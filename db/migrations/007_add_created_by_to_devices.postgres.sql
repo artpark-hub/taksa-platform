@@ -1,5 +1,5 @@
--- Migration: Add created_by field, remove serial_number, and ensure name is globally unique
--- Purpose: Track device ownership (tenant), remove deprecated serial_number field, ensure name uniqueness globally
+-- Migration: Add created_by field, remove serial_number, and ensure name is unique per tenant
+-- Purpose: Track device ownership (tenant), enable multi-tenant device management
 
 BEGIN TRANSACTION;
 
@@ -15,10 +15,13 @@ DROP INDEX IF EXISTS idx_devices_serial_number;
 -- Drop serial_number column
 ALTER TABLE devices DROP COLUMN IF EXISTS serial_number;
 
--- Drop existing UNIQUE(serial_number) constraint if it exists by dropping and re-adding the constraint
+-- Drop existing UNIQUE(serial_number) constraint if it exists
 ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_serial_number_key;
 
--- Add unique constraint on name (globally unique)
-ALTER TABLE devices ADD CONSTRAINT unique_device_name UNIQUE (name);
+-- Drop old global unique constraint on name
+ALTER TABLE devices DROP CONSTRAINT IF EXISTS unique_device_name;
+
+-- Add unique constraint on (created_by, name) for per-tenant uniqueness
+ALTER TABLE devices ADD CONSTRAINT unique_device_per_tenant UNIQUE (created_by, name);
 
 COMMIT;
