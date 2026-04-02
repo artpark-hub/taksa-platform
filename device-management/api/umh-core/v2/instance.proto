@@ -7,7 +7,7 @@ import "google/protobuf/empty.proto";
 import "common/models.proto";
 import "umh-core/v2/models.proto";
 
-option go_package = "taksa-platform-dm/api/umh-core/v2;v2";
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2;v2";
 option java_multiple_files = true;
 option java_package = "api.umh-core.v2";
 

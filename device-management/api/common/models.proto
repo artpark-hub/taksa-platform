@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package api.common;
 
-option go_package = "taksa-platform-dm/api/common;common";
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/common;common";
 option java_multiple_files = true;
 option java_package = "api.common";
 option java_outer_classname = "ModelsProto";

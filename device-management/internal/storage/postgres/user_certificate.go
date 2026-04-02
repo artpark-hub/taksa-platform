@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	v2 "taksa-platform-dm/api/umh-core/v2"
+	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 )
 
 // UserCertificateStore implements storage.UserCertificateStore for PostgreSQL

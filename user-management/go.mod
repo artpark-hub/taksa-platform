@@ -1,13 +1,11 @@
 module user-management
 
-go 1.22
-
-toolchain go1.24.6
+go 1.26.1
 
 require (
 	github.com/go-kratos/kratos/v2 v2.9.2
 	github.com/golang-jwt/jwt/v5 v5.2.2
-	github.com/google/wire v0.6.0
+	github.com/google/wire v0.7.0
 	go.uber.org/automaxprocs v1.5.1
 	google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157
 	google.golang.org/grpc v1.65.0

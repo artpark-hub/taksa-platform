@@ -7,8 +7,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"taksa-platform-dm/internal/models"
-	"taksa-platform-dm/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // ActionUsecase handles action business logic (queuing, status tracking)

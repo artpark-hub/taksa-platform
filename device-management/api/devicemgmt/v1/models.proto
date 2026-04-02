@@ -9,7 +9,7 @@ import "common/models.proto";
 // They are the canonical wire protocol versions used by umh-core
 // Management Console may need extended versions - use CompanyDetailsExtended
 
-option go_package = "taksa-platform-dm/api/devicemgmt/v1;v1";
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1;v1";
 option java_multiple_files = true;
 option java_package = "api.devicemgmt.v1";
 

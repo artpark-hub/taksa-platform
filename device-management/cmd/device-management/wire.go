@@ -6,11 +6,11 @@
 package main
 
 import (
-	"taksa-platform-dm/internal/biz"
-	"taksa-platform-dm/internal/conf"
-	"taksa-platform-dm/internal/data"
-	"taksa-platform-dm/internal/server"
-	"taksa-platform-dm/internal/service"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/biz"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/server"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/service"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"

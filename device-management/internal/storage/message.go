@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"taksa-platform-dm/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 )
 
 // MessageStore defines the interface for message storage operations

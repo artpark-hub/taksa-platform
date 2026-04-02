@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	v1 "taksa-platform-dm/api/devicemgmt/v1"
+	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 )
 
 // DeviceStore defines the interface for device storage operations

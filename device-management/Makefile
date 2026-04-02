@@ -52,7 +52,7 @@ build:
 .PHONY: wire
 # generate wire
 wire:
-	cd ./cmd/taksa-platform-dm && wire
+	cd ./cmd/device-management && wire
 
 .PHONY: generate
 # generate
@@ -69,7 +69,7 @@ all: api config generate wire build
 clean:
 	rm -rf bin/
 	rm -f openapi.yaml
-	rm -f cmd/taksa-platform-dm/wire_gen.go
+	rm -f cmd/device-management/wire_gen.go
 	go clean
 
 .PHONY: help

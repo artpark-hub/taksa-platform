@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"taksa-platform-dm/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 )
 
 type ActionResponseStore struct {

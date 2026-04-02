@@ -10,9 +10,9 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	common "taksa-platform-dm/api/common"
-	v1 "taksa-platform-dm/api/devicemgmt/v1"
-	"taksa-platform-dm/internal/storage"
+	common "github.com/artpark-hub/taksa-platform/device-management/api/common"
+	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // DeviceStore implements storage.DeviceStore for SQLite

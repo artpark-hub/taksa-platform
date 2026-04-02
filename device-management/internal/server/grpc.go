@@ -1,10 +1,10 @@
 package server
 
 import (
-	devicemgmt "taksa-platform-dm/api/devicemgmt/v1"
-	umhcore "taksa-platform-dm/api/umh-core/v2"
-	"taksa-platform-dm/internal/conf"
-	"taksa-platform-dm/internal/service"
+	devicemgmt "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	umhcore "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"taksa-platform-dm/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // Store implements storage.Store for PostgreSQL backend

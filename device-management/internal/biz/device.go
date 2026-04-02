@@ -7,11 +7,11 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	v1 "taksa-platform-dm/api/devicemgmt/v1"
-	v2 "taksa-platform-dm/api/umh-core/v2"
-	"taksa-platform-dm/api/common"
-	"taksa-platform-dm/internal/pkg/cert"
-	"taksa-platform-dm/internal/storage"
+	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/api/common"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/pkg/cert"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // DeviceUsecase handles device business logic (registration, listing, updates)

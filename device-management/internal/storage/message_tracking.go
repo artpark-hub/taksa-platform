@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 
-	"taksa-platform-dm/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 )
 
 // MessageTrackingStore handles storage of message-to-action mappings

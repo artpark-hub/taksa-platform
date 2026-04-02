@@ -7,7 +7,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"taksa-platform-dm/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // setupTestDB creates an in-memory SQLite database for testing

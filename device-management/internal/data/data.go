@@ -4,11 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 
-	"taksa-platform-dm/internal/conf"
-	dbpkg "taksa-platform-dm/internal/db"
-	"taksa-platform-dm/internal/storage"
-	"taksa-platform-dm/internal/storage/postgres"
-	"taksa-platform-dm/internal/storage/sqlite"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
+	dbpkg "github.com/artpark-hub/taksa-platform/device-management/internal/db"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage/postgres"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage/sqlite"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"

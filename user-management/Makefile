@@ -46,8 +46,13 @@ api:
 
 .PHONY: build
 # build
-build:
+build: api config wire generate
 	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./...
+
+.PHONY: wire
+# generate wire
+wire:
+	cd ./cmd/user-management && wire
 
 .PHONY: generate
 # generate
@@ -57,10 +62,16 @@ generate:
 
 .PHONY: all
 # generate all
-all:
-	make api
-	make config
-	make generate
+all: api config generate wire build
+
+.PHONY: clean
+# clean build artifacts
+clean:
+	rm -rf bin/
+	find . -name "*.pb.go" -delete
+	rm -f openapi.yaml
+	rm -f cmd/user-management/wire_gen.go
+	go clean
 
 # show help
 help:

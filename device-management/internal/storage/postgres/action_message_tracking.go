@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"taksa-platform-dm/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // ActionMessageTrackingStore implements storage.ActionMessageTracker for PostgreSQL

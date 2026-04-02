@@ -1,8 +1,6 @@
-module taksa-platform-dm
+module github.com/artpark-hub/taksa-platform/device-management
 
-go 1.24.0
-
-toolchain go1.24.6
+go 1.26.1
 
 require (
 	github.com/go-kratos/kratos/v2 v2.9.2

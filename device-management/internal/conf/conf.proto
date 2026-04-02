@@ -1,7 +1,7 @@
 syntax = "proto3";
 package kratos.api;
 
-option go_package = "taksa-platform-dm/internal/conf;conf";
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/internal/conf;conf";
 
 import "google/protobuf/duration.proto";
 

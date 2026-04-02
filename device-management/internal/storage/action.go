@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 
-	"taksa-platform-dm/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 )
 
 // ActionStore defines the interface for action storage operations

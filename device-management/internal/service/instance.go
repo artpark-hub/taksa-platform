@@ -8,9 +8,9 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"taksa-platform-dm/api/common"
-	v2 "taksa-platform-dm/api/umh-core/v2"
-	"taksa-platform-dm/internal/biz"
+	"github.com/artpark-hub/taksa-platform/device-management/api/common"
+	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/biz"
 )
 
 // InstanceService implements v2.InstanceServiceServer

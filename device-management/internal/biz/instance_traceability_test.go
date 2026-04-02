@@ -16,10 +16,10 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	v1 "taksa-platform-dm/api/devicemgmt/v1"
-	"taksa-platform-dm/internal/data"
-	"taksa-platform-dm/internal/storage"
-	"taksa-platform-dm/internal/storage/sqlite"
+	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage/sqlite"
 )
 
 // setupTestStore creates an in-memory store for testing

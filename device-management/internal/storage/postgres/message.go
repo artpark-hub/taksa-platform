@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"taksa-platform-dm/internal/models"
-	"taksa-platform-dm/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // MessageStore implements storage.MessageStore for PostgreSQL

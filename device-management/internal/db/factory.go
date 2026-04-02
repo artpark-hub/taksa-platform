@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"taksa-platform-dm/internal/conf"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
 )
 
 // NewDatabase creates a database connection based on the driver specified in config

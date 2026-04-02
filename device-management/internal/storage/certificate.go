@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 
-	v2 "taksa-platform-dm/api/umh-core/v2"
+	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 )
 
 // DeviceCertificateStore defines the interface for device certificate storage

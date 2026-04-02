@@ -20,12 +20,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
 
-	v1 "taksa-platform-dm/api/devicemgmt/v1"
-	v2 "taksa-platform-dm/api/umh-core/v2"
-	"taksa-platform-dm/internal/biz"
-	"taksa-platform-dm/internal/data"
-	"taksa-platform-dm/internal/models"
-	"taksa-platform-dm/internal/storage"
+	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/biz"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // Validation maps for Log and Metric types

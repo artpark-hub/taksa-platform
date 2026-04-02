@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"taksa-platform-dm/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // SettingStore implements storage.SettingStore for PostgreSQL

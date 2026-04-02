@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"sync"
 
-	"taksa-platform-dm/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // SQLiteStore implements storage.Store interface using SQLite backend

@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	v2 "taksa-platform-dm/api/umh-core/v2"
-	"taksa-platform-dm/internal/storage"
+	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // CertificateStore implements storage.CertificateStore for PostgreSQL
