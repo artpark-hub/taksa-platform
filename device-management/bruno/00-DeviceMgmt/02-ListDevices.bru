@@ -75,18 +75,7 @@ tests {
       const device = resp.devices[0];
       expect(device).to.have.property('id');
       expect(device).to.have.property('name');
-      expect(device).to.have.property('serialNumber');
       expect(device).to.have.property('status');
-    }
-  });
-  
-  test("Device has company info", function() {
-    const resp = res.getBody();
-    if (resp.devices && resp.devices.length > 0) {
-      const device = resp.devices[0];
-      expect(device).to.have.property('company');
-      // API returns camelCase field names
-      expect(device.company).to.have.property('name');
     }
   });
   

@@ -7,11 +7,10 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
-	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
-	"github.com/artpark-hub/taksa-platform/device-management/api/common"
-	"github.com/artpark-hub/taksa-platform/device-management/internal/pkg/cert"
-	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
+	v1 "taksa-platform-dm/api/devicemgmt/v1"
+	v2 "taksa-platform-dm/api/umh-core/v2"
+	"taksa-platform-dm/internal/pkg/cert"
+	"taksa-platform-dm/internal/storage"
 )
 
 // DeviceUsecase handles device business logic (registration, listing, updates)
@@ -41,48 +40,11 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 		return nil, fmt.Errorf("device with name '%s' already exists for this tenant", req.Name)
 	}
 
-	// Create device with license information
-	// Initialize company with default license status if not provided
-	company := req.Company
-	if company == nil {
-		company = &v1.CompanyDetailsExtended{
-			Base: &common.CompanyDetails{
-				Name: "Default Company",
-				LicenseStatus: &common.LicenseStatus{
-					IsActive: true,
-					ValidTo:  time.Now().AddDate(1, 0, 0).Format(time.RFC3339), // 1 year from now
-				},
-			},
-		}
-	} else if company.Base == nil {
-		company.Base = &common.CompanyDetails{
-			Name: "Default Company",
-			LicenseStatus: &common.LicenseStatus{
-				IsActive: true,
-				ValidTo:  time.Now().AddDate(1, 0, 0).Format(time.RFC3339),
-			},
-		}
-	} else if company.Base.LicenseStatus == nil {
-		company.Base.LicenseStatus = &common.LicenseStatus{
-			IsActive: true,
-			ValidTo:  time.Now().AddDate(1, 0, 0).Format(time.RFC3339),
-		}
-	} else if company.Base.LicenseStatus.IsActive == false || company.Base.LicenseStatus.ValidTo == "" {
-		// Ensure license is active with a default expiry
-		if !company.Base.LicenseStatus.IsActive {
-			company.Base.LicenseStatus.IsActive = true
-		}
-		if company.Base.LicenseStatus.ValidTo == "" {
-			company.Base.LicenseStatus.ValidTo = time.Now().AddDate(1, 0, 0).Format(time.RFC3339)
-		}
-	}
-
 	device := &v1.Device{
 		Id:        generateUUID(),
 		CreatedBy: req.CreatedBy,
 		Name:      req.Name,
 		Location:  req.Location,
-		Company:   company,
 		Status:    v1.DeviceStatus_PENDING,
 		CreatedAt: timestamppb.Now(),
 		LastSeen:  timestamppb.Now(),
@@ -335,7 +297,6 @@ type RegisterDeviceRequest struct {
 	CreatedBy   string
 	Name        string
 	Location    *v1.DeviceLocation
-	Company     *v1.CompanyDetailsExtended
 	Certificate string // Optional: PEM-encoded X.509 certificate (device identification only)
 }
 

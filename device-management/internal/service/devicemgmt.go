@@ -187,20 +187,12 @@ func (s *DeviceMgmtService) Health(ctx context.Context, req *emptypb.Empty) (*v1
 // RegisterDevice creates a new device and generates auth token
 // RPC: POST /api/v1/devicemgmt/devices
 func (s *DeviceMgmtService) RegisterDevice(ctx context.Context, req *v1.RegisterDeviceRequest) (*v1.RegisterDeviceResponse, error) {
-	if req == nil || req.Name == "" || req.CreatedBy == "" || req.Location == nil || req.Company == nil {
-		return nil, status.Error(codes.InvalidArgument, "name, createdBy, location, and company are required")
+	if req == nil || req.Name == "" || req.CreatedBy == "" || req.Location == nil {
+		return nil, status.Error(codes.InvalidArgument, "name, createdBy, and location are required")
 	}
 
 	if req.Location.Levels == nil || req.Location.Levels["0"] == "" {
 		return nil, status.Error(codes.InvalidArgument, "location level '0' (company) is required")
-	}
-
-	if req.Company.Base == nil || req.Company.Base.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "company name is required")
-	}
-
-	if req.Company.Base.LicenseStatus == nil {
-		return nil, status.Error(codes.InvalidArgument, "company license status is required")
 	}
 
 	// Call business logic
@@ -208,7 +200,6 @@ func (s *DeviceMgmtService) RegisterDevice(ctx context.Context, req *v1.Register
 		CreatedBy:   req.CreatedBy,
 		Name:        req.Name,
 		Location:    req.Location,
-		Company:     req.Company,
 		Certificate: req.Certificate,
 	})
 	if err != nil {

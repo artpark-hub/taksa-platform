@@ -407,10 +407,9 @@ message RegisterDeviceRequest {
   string name          = 1; // Human-readable device name
   string createdBy     = 2; // Owner UUID (tenant identifier)
   DeviceLocation location = 3;
-  CompanyDetailsExtended company  = 4; // Uses extended model with console-specific fields
   // Certificate management (optional)
   // NOTE: Certificate is for device identification only. Private keys are device-side and should NOT be transmitted to server.
-  string certificate = 5; // PEM-encoded X.509 certificate (optional - auto-generated if not provided)
+  string certificate = 4; // PEM-encoded X.509 certificate (optional - auto-generated if not provided)
 }
 
 // RegisterDeviceResponse returns registration details including auth token
@@ -476,9 +475,8 @@ message DeviceHealthResponse {
 message UpdateDeviceRequest {
   string device_id = 1;
 
-  string                 name     = 2;
-  DeviceLocation         location = 3;
-  CompanyDetailsExtended company  = 4; // Uses extended model with console-specific fields
+  string         name     = 2;
+  DeviceLocation location = 3;
 }
 
 // DeleteDeviceRequest decommissions a device

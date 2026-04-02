@@ -13,8 +13,7 @@ docs {
   
   Returns full device object with all details:
   - Device metadata (hardware, OS, firmware, network info)
-  - Location hierarchy (ISA-95 5-level)
-  - Company details with extended fields
+  - Location hierarchy (ISA-95 7-level)
   - Device certificate (PEM format)
   - Status and timestamps
   
@@ -47,14 +46,12 @@ tests {
     const resp = res.getBody();
     expect(resp).to.have.property('id');
     expect(resp).to.have.property('name');
-    expect(resp).to.have.property('serialNumber');
   });
   
   test("Device has all required fields", function() {
     const resp = res.getBody();
     expect(resp).to.have.property('metadata');
     expect(resp).to.have.property('location');
-    expect(resp).to.have.property('company');
     expect(resp).to.have.property('status');
     expect(resp).to.have.property('createdAt');
   });
@@ -88,14 +85,6 @@ tests {
     expect(resp.location).to.be.an('object');
   });
   
-  test("Device company has expected fields", function() {
-    const resp = res.getBody();
-    // GetDevice returns Device with CompanyDetailsExtended (has .base wrapper)
-    expect(resp.company).to.have.property('base');
-    if (resp.company.base) {
-      expect(resp.company.base).to.have.property('name');
-    }
-  });
   
   test("Device status is valid enum string", function() {
     const resp = res.getBody();

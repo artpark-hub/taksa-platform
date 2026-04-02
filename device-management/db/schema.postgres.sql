@@ -26,22 +26,9 @@ CREATE TABLE IF NOT EXISTS devices (
   location_work_cell TEXT,    -- Level 5
   location_work_unit TEXT,    -- Level 6
   
-  -- Company details
-  company_name TEXT,
-  company_contact_email TEXT,
-  company_support_contact TEXT,
-  company_tags TEXT,  -- JSON array as string
-  user_count INTEGER DEFAULT 1,
-  
-  -- License
-  license_is_active INTEGER DEFAULT 1,
-  license_valid_to TEXT,
-  license_description TEXT,
-  
   -- Certificates
   certificate TEXT,  -- PEM format (X.509)
   encrypted_private_key TEXT,  -- PEM format (PKCS#8)
-  company_certificate TEXT,  -- PEM format
   
   -- Status: 0=UNSPECIFIED, 1=PENDING, 2=ACTIVE, 3=INACTIVE, 4=SUSPENDED, 5=DECOMMISSIONED
   status INTEGER DEFAULT 1,

@@ -120,8 +120,11 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 		return nil, fmt.Errorf("device not found: %w", err)
 	}
 
-	// Record login activity
+	// Record login activity and transition device to ACTIVE on first successful login
 	_ = uc.store.Devices().UpdateLastLogin(ctx, deviceID, time.Now())
+	if device.Status == v1.DeviceStatus_PENDING {
+		_ = uc.store.Devices().UpdateStatus(ctx, deviceID, v1.DeviceStatus_ACTIVE)
+	}
 
 	// Renew auth token expiry to 7 days from now (keep the token valid on each login)
 	if err := uc.authUc.RenewAuthToken(ctx, token); err != nil {

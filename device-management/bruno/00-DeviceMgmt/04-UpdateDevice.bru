@@ -26,15 +26,6 @@ body:json {
         "1": "UpdatedSite",
         "2": "UpdatedArea"
       }
-    },
-    "company": {
-      "base": {
-        "name": "Updated Company",
-        "user_count": 20
-      },
-      "contact_email": "newemail@test.com",
-      "support_contact": "newsupport@test.com",
-      "tags": ["updated", "production"]
     }
   }
 }
@@ -48,7 +39,6 @@ docs {
   - name: Device name
   - metadata: Hardware/OS/network info
   - location: ISA-95 hierarchy
-  - company: Company details and tags
   
   Returns updated Device object.
 }
@@ -63,7 +53,6 @@ script:post-response {
   if (resp && resp.id) {
     console.log("✓ Device updated: " + resp.name);
     console.log("  Location: " + (resp.location.levels['0'] || "N/A"));
-    console.log("  Company: " + (resp.company.name || "N/A"));
   }
 }
 
@@ -93,11 +82,5 @@ tests {
     const resp = res.getBody();
     // Location field should exist
     expect(resp).to.have.property('location');
-  });
-  
-  test("Device company in response", function() {
-    const resp = res.getBody();
-    // Company field should exist
-    expect(resp).to.have.property('company');
   });
 }

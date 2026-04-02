@@ -100,25 +100,11 @@ tests {
     expect(resp).to.have.property('certificate');
   });
   
-  test("Response has companyDetails", function() {
+  test("Response has companyDetails field (empty - company data not managed here)", function() {
     const resp = res.getBody();
     expect(resp).to.have.property('companyDetails');
-    expect(resp.companyDetails).to.have.property('name');
-    expect(resp.companyDetails).to.have.property('licenseStatus');
-  });
-  
-  test("licenseStatus has validTo in YYYY-MM-DD format", function() {
-    const resp = res.getBody();
-    const validTo = resp.companyDetails.licenseStatus.validTo;
-    expect(validTo).to.match(/^\d{4}-\d{2}-\d{2}$/);
-  });
-  
-  test("licenseStatus has required fields", function() {
-    const resp = res.getBody();
-    const licenseStatus = resp.companyDetails.licenseStatus;
-    // validTo is required
-    expect(licenseStatus).to.have.property('validTo');
-    // isActive and description may be omitted if zero/empty (protobuf behavior)
+    // CompanyDetails is included in response for wire protocol compatibility
+    // but is empty since device management layer no longer manages company data
   });
   
   test("Field names use camelCase not snake_case", function() {

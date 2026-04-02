@@ -1173,22 +1173,6 @@ components:
                     type: string
                 structure:
                     type: object
-        api.devicemgmt.v1.CompanyDetailsExtended:
-            type: object
-            properties:
-                base:
-                    $ref: '#/components/schemas/api.common.CompanyDetails'
-                tags:
-                    type: array
-                    items:
-                        type: string
-            description: |-
-                ============================================================================
-                 Extended Company Details for Management Console
-                 ============================================================================
-                 CompanyDetailsExtended adds management console-specific fields to the
-                 canonical wire protocol CompanyDetails. These fields are NOT sent to umh-core,
-                 but are used internally by the management console.
         api.devicemgmt.v1.DataFlowComponentActionResponse:
             type: object
             properties:
@@ -1294,8 +1278,6 @@ components:
                         Location using ISA-95 5-level hierarchy (enterprise, site, area, line, workCell)
                          CRITICAL: Must be compatible with umh-core's Location struct
                          Used for Kafka topic path and location-based filtering
-                company:
-                    $ref: '#/components/schemas/api.devicemgmt.v1.CompanyDetailsExtended'
                 status:
                     type: integer
                     format: enum
@@ -1316,11 +1298,8 @@ components:
                     description: Certificate management
                 encryptedPrivateKey:
                     type: string
-                companyCertificate:
-                    type: string
             description: |-
                 Device represents a managed edge device (runs UMH Core instance)
-                 NOTE: Uses CompanyDetailsExtended which wraps the canonical wire protocol version
                  Contains full details including certificates. Use DeviceSummary for list/summary responses.
         api.devicemgmt.v1.DeviceConfigActionResponse:
             type: object
@@ -1641,8 +1620,6 @@ components:
                     type: string
                 location:
                     $ref: '#/components/schemas/api.devicemgmt.v1.DeviceLocation'
-                company:
-                    $ref: '#/components/schemas/api.devicemgmt.v1.CompanyDetailsExtended'
                 certificate:
                     type: string
                     description: |-
@@ -1710,8 +1687,6 @@ components:
                     type: string
                 location:
                     $ref: '#/components/schemas/api.devicemgmt.v1.DeviceLocation'
-                company:
-                    $ref: '#/components/schemas/api.devicemgmt.v1.CompanyDetailsExtended'
             description: UpdateDeviceRequest updates device information
         api.umh_core.v2.Agent:
             type: object

@@ -3,7 +3,6 @@ syntax = "proto3";
 package api.devicemgmt.v1;
 
 import "google/protobuf/timestamp.proto";
-import "common/models.proto";
 
 // NOTE: CompanyDetails and LicenseStatus are imported from common/models.proto
 // They are the canonical wire protocol versions used by umh-core
@@ -14,7 +13,6 @@ option java_multiple_files = true;
 option java_package = "api.devicemgmt.v1";
 
 // Device represents a managed edge device (runs UMH Core instance)
-// NOTE: Uses CompanyDetailsExtended which wraps the canonical wire protocol version
 // Contains full details including certificates. Use DeviceSummary for list/summary responses.
 message Device {
   string id = 1;
@@ -28,8 +26,6 @@ message Device {
   // Used for Kafka topic path and location-based filtering
   DeviceLocation location = 5;
 
-  CompanyDetailsExtended company = 6; // Extended model with console-specific fields
-
   DeviceStatus status = 7;
 
   google.protobuf.Timestamp created_at = 8;
@@ -40,7 +36,6 @@ message Device {
   // Certificate management
   string certificate = 12;
   string encrypted_private_key = 13;
-  string company_certificate = 14;
 }
 
 // DeviceSummary represents a lightweight device summary for list/overview responses
@@ -93,17 +88,6 @@ message DeviceLocation {
 // NOTE: CompanyDetails and LicenseStatus are now imported from api.common
 // They are the canonical wire protocol versions matching umh-core exactly
 // See api/common/models.proto for definitions
-
-// ============================================================================
-// Extended Company Details for Management Console
-// ============================================================================
-// CompanyDetailsExtended adds management console-specific fields to the
-// canonical wire protocol CompanyDetails. These fields are NOT sent to umh-core,
-// but are used internally by the management console.
-message CompanyDetailsExtended {
-  api.common.CompanyDetails base = 1; // Canonical wire protocol fields
-  repeated string tags = 4; // Organization tags
-}
 
 // DeviceStatus represents the operational state of a device
 enum DeviceStatus {

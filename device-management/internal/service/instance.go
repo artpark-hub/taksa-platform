@@ -63,10 +63,9 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 
 	// Map response to match umh-core's InstanceLoginResponse struct EXACTLY
 	// File: umh-core/pkg/communicator/backend_api_structs/backend_api_struct.go:119-125
-	validTo := ""
-	if resp.Device.Company.Base.LicenseStatus.ValidTo != "" {
-		validTo = resp.Device.Company.Base.LicenseStatus.ValidTo
-	}
+	// NOTE: Company details are no longer managed by device management layer.
+	// Device registration and login focus on device identification, location, and status.
+	// Company information should be managed separately if needed.
 
 	// Convert certificate pointers (nil-safe)
 	var certificate *string
@@ -79,20 +78,11 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 		encryptedPrivateKey = &resp.EncryptedPrivateKey
 	}
 
-	// Convert company certificate pointers
-	// Build CompanyDetails with CORRECT types matching umh-core
-	// Maps to api.common.CompanyDetails from wire protocol
+	// Send empty CompanyDetails (device management no longer persists company data)
+	// The proto requires this field for wire protocol compatibility, but company info
+	// is external to device management and should be provided by other services
 	companyDetails := &common.CompanyDetails{
-		Owner:               resp.Device.Company.Base.Owner,
-		Certificate:         resp.Device.Company.Base.Certificate,
-		EncryptedPrivateKey: resp.Device.Company.Base.EncryptedPrivateKey,
-		Name:                resp.Device.Company.Base.Name,
-		LicenseStatus: &common.LicenseStatus{
-			ValidTo:     validTo,
-			Description: resp.Device.Company.Base.LicenseStatus.Description,
-			IsActive:    resp.Device.Company.Base.LicenseStatus.IsActive,
-		},
-		UserCount: resp.Device.Company.Base.UserCount, // CRITICAL: int64, NOT string!
+		// All fields left empty - company data is not managed here
 	}
 
 	// Build LoginResponse proto

@@ -3,16 +3,14 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	common "github.com/artpark-hub/taksa-platform/device-management/api/common"
-	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
-	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
+	v1 "taksa-platform-dm/api/devicemgmt/v1"
+	"taksa-platform-dm/internal/storage"
 )
 
 // DeviceStore implements storage.DeviceStore for PostgreSQL
@@ -30,23 +28,6 @@ func (s *DeviceStore) Save(ctx context.Context, device *v1.Device) error {
 	if device.Metadata == nil {
 		device.Metadata = &v1.DeviceMetadata{}
 	}
-	if device.Company == nil {
-		device.Company = &v1.CompanyDetailsExtended{
-			Base: &common.CompanyDetails{
-				LicenseStatus: &common.LicenseStatus{},
-			},
-		}
-	}
-	if device.Company.Base == nil {
-		device.Company.Base = &common.CompanyDetails{
-			LicenseStatus: &common.LicenseStatus{},
-		}
-	}
-	if device.Company.Base.LicenseStatus == nil {
-		device.Company.Base.LicenseStatus = &common.LicenseStatus{}
-	}
-
-	tagsJSON, _ := json.Marshal(device.Company.Tags)
 
 	// Extract location from device.Location.Levels map
 	// ISA-95 hierarchy (7 levels): 0=company, 1=plant, 2=area, 3=zone, 4=line, 5=workCell, 6=workUnit
@@ -86,11 +67,9 @@ func (s *DeviceStore) Save(ctx context.Context, device *v1.Device) error {
 		id, uuid, created_by, name,
 		hardware_version, operating_system, manufacturer, firmware_version, ip_address, mac_address,
 		location_company, location_plant, location_area, location_zone, location_line, location_work_cell, location_work_unit,
-		company_name, company_contact_email, company_support_contact, company_tags,
-		user_count, license_is_active, license_valid_to, license_description,
-		certificate, encrypted_private_key, company_certificate,
+		certificate, encrypted_private_key,
 		status, created_at, last_seen, last_login_at, auth_token_expires_at
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
@@ -98,10 +77,7 @@ func (s *DeviceStore) Save(ctx context.Context, device *v1.Device) error {
 		device.Metadata.HardwareVersion, device.Metadata.OperatingSystem, device.Metadata.Manufacturer,
 		device.Metadata.FirmwareVersion, device.Metadata.IpAddress, device.Metadata.MacAddress,
 		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,  // 7-level location hierarchy
-		device.Company.Base.Name, device.Company.Base.Owner, "", string(tagsJSON),
-		device.Company.Base.UserCount, boolToInt(device.Company.Base.LicenseStatus.IsActive),
-		device.Company.Base.LicenseStatus.ValidTo, device.Company.Base.LicenseStatus.Description,
-		device.Certificate, device.EncryptedPrivateKey, device.CompanyCertificate,
+		device.Certificate, device.EncryptedPrivateKey,
 		device.Status, device.CreatedAt.AsTime().Format(time.RFC3339),
 		device.LastSeen.AsTime().Format(time.RFC3339),
 		optionalTime(device.LastLogin), optionalTime(device.AuthTokenExpiresAt),
@@ -228,9 +204,7 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 		SELECT id, uuid, created_by, name, hardware_version, operating_system, manufacturer,
 		       firmware_version, ip_address, mac_address, location_company, location_plant,
 		       location_area, location_zone, location_line, location_work_cell, location_work_unit,
-		       company_name, company_contact_email, company_support_contact,
-		       company_tags, user_count, license_is_active, license_valid_to, license_description,
-		       certificate, encrypted_private_key, company_certificate, status, created_at, last_seen,
+		       certificate, encrypted_private_key, status, created_at, last_seen,
 		       last_login_at, auth_token_expires_at
 		FROM devices %s
 		ORDER BY %s %s
@@ -292,8 +266,6 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 		return ErrInvalidInput
 	}
 
-	tagsJSON, _ := json.Marshal(device.Company.Tags)
-
 	// Extract location from device.Location.Levels map
 	// ISA-95 hierarchy (7 levels): 0=company, 1=plant, 2=area, 3=zone, 4=line, 5=workCell, 6=workUnit
 	locCompany := ""
@@ -333,11 +305,9 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 		hardware_version = $2, operating_system = $3, manufacturer = $4, firmware_version = $5,
 		ip_address = $6, mac_address = $7,
 		location_company = $8, location_plant = $9, location_area = $10, location_zone = $11, location_line = $12, location_work_cell = $13, location_work_unit = $14,
-		company_name = $15, company_contact_email = $16, company_support_contact = $17, company_tags = $18,
-		user_count = $19, license_is_active = $20, license_valid_to = $21, license_description = $22,
-		certificate = $23, encrypted_private_key = $24, company_certificate = $25,
-		status = $26, last_seen = $27, last_login_at = $28, auth_token_expires_at = $29
-	WHERE id = $30
+		certificate = $15, encrypted_private_key = $16,
+		status = $17, last_seen = $18, last_login_at = $19, auth_token_expires_at = $20
+	WHERE id = $21
 	`
 
 	result, err := s.db.ExecContext(ctx, query,
@@ -345,10 +315,7 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 		device.Metadata.HardwareVersion, device.Metadata.OperatingSystem, device.Metadata.Manufacturer,
 		device.Metadata.FirmwareVersion, device.Metadata.IpAddress, device.Metadata.MacAddress,
 		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,  // 7-level location hierarchy
-		device.Company.Base.Name, device.Company.Base.Owner, "", string(tagsJSON),
-		device.Company.Base.UserCount, boolToInt(device.Company.Base.LicenseStatus.IsActive),
-		device.Company.Base.LicenseStatus.ValidTo, device.Company.Base.LicenseStatus.Description,
-		device.Certificate, device.EncryptedPrivateKey, device.CompanyCertificate,
+		device.Certificate, device.EncryptedPrivateKey,
 		device.Status, device.LastSeen.AsTime().Format(time.RFC3339),
 		optionalTime(device.LastLogin), optionalTime(device.AuthTokenExpiresAt),
 		device.Id,
@@ -471,9 +438,7 @@ func (s *DeviceStore) getDevice(ctx context.Context, where string, args interfac
 		SELECT id, uuid, created_by, name, hardware_version, operating_system, manufacturer,
 		       firmware_version, ip_address, mac_address, location_company, location_plant,
 		       location_area, location_zone, location_line, location_work_cell, location_work_unit,
-		       company_name, company_contact_email, company_support_contact,
-		       company_tags, user_count, license_is_active, license_valid_to, license_description,
-		       certificate, encrypted_private_key, company_certificate, status, created_at, last_seen,
+		       certificate, encrypted_private_key, status, created_at, last_seen,
 		       last_login_at, auth_token_expires_at
 		FROM devices %s
 	`, where)
@@ -491,8 +456,7 @@ func (s *DeviceStore) getDevice(ctx context.Context, where string, args interfac
 }
 
 func (s *DeviceStore) scanDeviceRow(row *sql.Row, device *v1.Device) error {
-	var tagsJSON string
-	var licenseValidTo, createdAt, lastSeen sql.NullString
+	var createdAt, lastSeen sql.NullString
 	var lastLogin, authTokenExpires sql.NullString
 	var locCompany, locPlant, locArea, locZone sql.NullString
 	var locLine, locWorkCell, locWorkUnit sql.NullString  // 7-level location fields (nullable)
@@ -501,34 +465,13 @@ func (s *DeviceStore) scanDeviceRow(row *sql.Row, device *v1.Device) error {
 	if device.Metadata == nil {
 		device.Metadata = &v1.DeviceMetadata{}
 	}
-	if device.Company == nil {
-		device.Company = &v1.CompanyDetailsExtended{
-			Base: &common.CompanyDetails{
-				LicenseStatus: &common.LicenseStatus{},
-			},
-		}
-	}
-	if device.Company.Base == nil {
-		device.Company.Base = &common.CompanyDetails{
-			LicenseStatus: &common.LicenseStatus{},
-		}
-	}
-	if device.Company.Base.LicenseStatus == nil {
-		device.Company.Base.LicenseStatus = &common.LicenseStatus{}
-	}
-
-	// Temporary variables for DB columns that are not in the proto anymore
-	var supportContact string
-
+	
 	err := row.Scan(
 		&device.Id, &device.Id, &device.CreatedBy, &device.Name,
 		&device.Metadata.HardwareVersion, &device.Metadata.OperatingSystem, &device.Metadata.Manufacturer,
 		&device.Metadata.FirmwareVersion, &device.Metadata.IpAddress, &device.Metadata.MacAddress,
 		&locCompany, &locPlant, &locArea, &locZone, &locLine, &locWorkCell, &locWorkUnit,  // 7-level location fields
-		&device.Company.Base.Name, &device.Company.Base.Owner, &supportContact, &tagsJSON,
-		&device.Company.Base.UserCount,
-		&device.Company.Base.LicenseStatus.IsActive, &licenseValidTo, &device.Company.Base.LicenseStatus.Description,
-		&device.Certificate, &device.EncryptedPrivateKey, &device.CompanyCertificate,
+		&device.Certificate, &device.EncryptedPrivateKey,
 		&device.Status, &createdAt, &lastSeen, &lastLogin, &authTokenExpires,
 	)
 	
@@ -573,11 +516,6 @@ func (s *DeviceStore) scanDeviceRow(row *sql.Row, device *v1.Device) error {
 		device.Location.Levels["6"] = locWorkUnit.String
 	}
 
-	// Parse JSON tags
-	if tagsJSON != "" {
-		json.Unmarshal([]byte(tagsJSON), &device.Company.Tags)
-	}
-
 	// Parse timestamps
 	if createdAt.Valid {
 		if createdAtTime, err := time.Parse(time.RFC3339, createdAt.String); err == nil {
@@ -599,17 +537,13 @@ func (s *DeviceStore) scanDeviceRow(row *sql.Row, device *v1.Device) error {
 			device.AuthTokenExpiresAt = timestamppb.New(authTokenExpiresTime)
 		}
 	}
-	if licenseValidTo.Valid {
-		device.Company.Base.LicenseStatus.ValidTo = licenseValidTo.String
-	}
 
 	return nil
 }
 
 func (s *DeviceStore) scanDevice(rows *sql.Rows) (*v1.Device, error) {
 	device := &v1.Device{}
-	var tagsJSON string
-	var licenseValidTo, createdAt, lastSeen sql.NullString
+	var createdAt, lastSeen sql.NullString
 	var lastLogin, authTokenExpires sql.NullString
 	var locCompany, locPlant, locArea, locZone sql.NullString
 	var locLine, locWorkCell, locWorkUnit sql.NullString  // 7-level location fields (nullable)
@@ -618,34 +552,13 @@ func (s *DeviceStore) scanDevice(rows *sql.Rows) (*v1.Device, error) {
 	if device.Metadata == nil {
 		device.Metadata = &v1.DeviceMetadata{}
 	}
-	if device.Company == nil {
-		device.Company = &v1.CompanyDetailsExtended{
-			Base: &common.CompanyDetails{
-				LicenseStatus: &common.LicenseStatus{},
-			},
-		}
-	}
-	if device.Company.Base == nil {
-		device.Company.Base = &common.CompanyDetails{
-			LicenseStatus: &common.LicenseStatus{},
-		}
-	}
-	if device.Company.Base.LicenseStatus == nil {
-		device.Company.Base.LicenseStatus = &common.LicenseStatus{}
-	}
-
-	// Temporary variables for DB columns that are not in the proto anymore
-	var supportContact string
 
 	err := rows.Scan(
 		&device.Id, &device.Id, &device.CreatedBy, &device.Name,
 		&device.Metadata.HardwareVersion, &device.Metadata.OperatingSystem, &device.Metadata.Manufacturer,
 		&device.Metadata.FirmwareVersion, &device.Metadata.IpAddress, &device.Metadata.MacAddress,
 		&locCompany, &locPlant, &locArea, &locZone, &locLine, &locWorkCell, &locWorkUnit,  // 7-level location fields
-		&device.Company.Base.Name, &device.Company.Base.Owner, &supportContact, &tagsJSON,
-		&device.Company.Base.UserCount,
-		&device.Company.Base.LicenseStatus.IsActive, &licenseValidTo, &device.Company.Base.LicenseStatus.Description,
-		&device.Certificate, &device.EncryptedPrivateKey, &device.CompanyCertificate,
+		&device.Certificate, &device.EncryptedPrivateKey,
 		&device.Status, &createdAt, &lastSeen, &lastLogin, &authTokenExpires,
 	)
 	
@@ -687,11 +600,6 @@ func (s *DeviceStore) scanDevice(rows *sql.Rows) (*v1.Device, error) {
 		device.Location.Levels["6"] = locWorkUnit.String
 	}
 
-	// Parse JSON tags
-	if tagsJSON != "" {
-		json.Unmarshal([]byte(tagsJSON), &device.Company.Tags)
-	}
-
 	// Parse timestamps
 	if createdAt.Valid {
 		if createdAtTime, err := time.Parse(time.RFC3339, createdAt.String); err == nil {
@@ -712,9 +620,6 @@ func (s *DeviceStore) scanDevice(rows *sql.Rows) (*v1.Device, error) {
 		if authTokenExpiresTime, err := time.Parse(time.RFC3339, authTokenExpires.String); err == nil {
 			device.AuthTokenExpiresAt = timestamppb.New(authTokenExpiresTime)
 		}
-	}
-	if licenseValidTo.Valid {
-		device.Company.Base.LicenseStatus.ValidTo = licenseValidTo.String
 	}
 
 	return device, nil
