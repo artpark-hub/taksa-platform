@@ -17,16 +17,16 @@ build: build-dm build-user build-ui ## Build all platform service Docker images
 build-dm: ## Build device-management Docker image
 	@echo "Building device-management..."
 	$(MAKE) -C device-management build
-	docker build -t $(DOCKER_REGISTRY)/device-management:$(DOCKER_LABEL) device-management/
+	docker build -t $(DOCKER_REGISTRY)/taksa-device-management:$(DOCKER_LABEL) device-management/
 
 build-user: ## Build user-management Docker image
 	@echo "Building user-management..."
 	$(MAKE) -C user-management build
-	docker build -t $(DOCKER_REGISTRY)/user-management:$(DOCKER_LABEL) user-management/
+	docker build -t $(DOCKER_REGISTRY)/taksa-user-management:$(DOCKER_LABEL) user-management/
 
 build-ui: ## Build ui-service Docker image
 	@echo "Building ui-service..."
-	docker build -t $(DOCKER_REGISTRY)/ui-service:$(DOCKER_LABEL) ui-service/
+	docker build -t $(DOCKER_REGISTRY)/taksa-ui-service:$(DOCKER_LABEL) ui-service/
 
 clean: ## Clean build artifacts in all services
 	@for svc in $(SERVICES); do \
