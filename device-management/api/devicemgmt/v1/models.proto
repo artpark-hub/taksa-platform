@@ -19,7 +19,7 @@ option java_package = "api.devicemgmt.v1";
 message Device {
   string id = 1;
   string name = 2;
-  string created_by = 3;  // Owner UUID (tenant identifier)
+  string createdBy = 3;  // Owner UUID (tenant identifier)
  
   DeviceMetadata metadata = 4;
 
@@ -48,7 +48,7 @@ message Device {
 message DeviceSummary {
   string id = 1;
   string name = 2;
-  string created_by = 3;  // Owner UUID (tenant identifier)
+  string createdBy = 3;  // Owner UUID (tenant identifier)
 
   // Location using ISA-95 5-level hierarchy
   DeviceLocation location = 4;

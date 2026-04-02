@@ -32,10 +32,10 @@ func NewDeviceUsecase(store storage.Store, authUc *AuthUsecase) *DeviceUsecase {
 func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDeviceRequest) (*RegisterDeviceResponse, error) {
 	// Validate
 	if req.CreatedBy == "" || req.Name == "" || req.Location == nil {
-		return nil, fmt.Errorf("created_by, name, and location are required")
+		return nil, fmt.Errorf("createdBy, name, and location are required")
 	}
 
-	// Check if already exists by created_by + name (per-tenant unique)
+	// Check if already exists by createdBy + name (per-tenant unique)
 	existing, _ := uc.store.Devices().GetByCreatedByAndName(ctx, req.CreatedBy, req.Name)
 	if existing != nil {
 		return nil, fmt.Errorf("device with name '%s' already exists for this tenant", req.Name)

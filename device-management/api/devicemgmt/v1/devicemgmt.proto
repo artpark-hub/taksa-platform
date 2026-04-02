@@ -405,7 +405,7 @@ service DeviceMgmtService {
 // RegisterDeviceRequest contains device registration information
 message RegisterDeviceRequest {
   string name          = 1; // Human-readable device name
-  string created_by    = 2; // Owner UUID (tenant identifier)
+  string createdBy     = 2; // Owner UUID (tenant identifier)
   DeviceLocation location = 3;
   CompanyDetailsExtended company  = 4; // Uses extended model with console-specific fields
   // Certificate management (optional)

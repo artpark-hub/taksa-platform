@@ -188,7 +188,7 @@ func (s *DeviceMgmtService) Health(ctx context.Context, req *emptypb.Empty) (*v1
 // RPC: POST /api/v1/devicemgmt/devices
 func (s *DeviceMgmtService) RegisterDevice(ctx context.Context, req *v1.RegisterDeviceRequest) (*v1.RegisterDeviceResponse, error) {
 	if req == nil || req.Name == "" || req.CreatedBy == "" || req.Location == nil || req.Company == nil {
-		return nil, status.Error(codes.InvalidArgument, "name, created_by, location, and company are required")
+		return nil, status.Error(codes.InvalidArgument, "name, createdBy, location, and company are required")
 	}
 
 	if req.Location.Levels == nil || req.Location.Levels["0"] == "" {
