@@ -100,6 +100,7 @@ func (c *Consumer) handleMsg(msg *nats.Msg) {
 
 	if err := c.data.db.Create(&entry).Error; err != nil {
 		c.log.Errorf("DB insert failed for equipment=%s param=%s: %v", equipmentID, parameterName, err)
+		c.publishToDLQ(msg, "database error: failed to insert telemetry into equipment_telemetry")
 		return
 	}
 
@@ -139,7 +140,10 @@ func (c *Consumer) publishToDLQ(msg *nats.Msg, reason string) {
 	}
 
 	meta := map[string]string{"source_subject": msg.Subject, "error": reason}
-	metaB, _ := json.Marshal(meta)
+	metaB, err := json.Marshal(meta)
+	if err != nil {
+		c.log.Errorf("failed to marshal DLQ metadata for subject %s: %v", msg.Subject, err)
+	}
 	payload := append(metaB, '\n')
 	payload = append(payload, msg.Data...)
 
