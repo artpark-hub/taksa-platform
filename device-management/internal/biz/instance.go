@@ -126,10 +126,20 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 		_ = uc.store.Devices().UpdateStatus(ctx, deviceID, v1.DeviceStatus_ACTIVE)
 	}
 
-	// Renew auth token expiry to 7 days from now (keep the token valid on each login)
+	// Renew auth token expiry to 50 years from now (active devices stay valid indefinitely)
 	if err := uc.authUc.RenewAuthToken(ctx, token); err != nil {
 		// Log error but don't fail login - JWT is still valid
-		fmt.Printf("Warning: Failed to renew auth token for device %s: %v\n", deviceID, err)
+		fmt.Printf("ERROR: Failed to renew auth token for device %s: %v\n", deviceID, err)
+	} else {
+		// Update device's auth token expiry to match the renewed token
+		newExpiryTime := time.Now().AddDate(50, 0, 0)
+		device.AuthTokenExpiresAt = timestamppb.New(newExpiryTime)
+		fmt.Printf("DEBUG: Updating device %s auth token expiry to %v\n", deviceID, newExpiryTime)
+		if err := uc.store.Devices().Update(ctx, device); err != nil {
+			fmt.Printf("ERROR: Failed to update device auth token expiry for device %s: %v\n", deviceID, err)
+		} else {
+			fmt.Printf("DEBUG: Successfully updated device %s auth token expiry\n", deviceID)
+		}
 	}
 
 	jwtToken, err := uc.authUc.GenerateJWT(device)

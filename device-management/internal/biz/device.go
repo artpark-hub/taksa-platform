@@ -93,8 +93,8 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 		return nil, fmt.Errorf("failed to create auth token: %w", err)
 	}
 
-	// Set auth token expiry on device (7 days from now)
-	tokenExpiryTime := time.Now().AddDate(0, 0, 7)
+	// Set auth token expiry on device (50 years from now - matches token creation logic)
+	tokenExpiryTime := time.Now().AddDate(50, 0, 0)
 	device.AuthTokenExpiresAt = timestamppb.New(tokenExpiryTime)
 
 	// Update device with token expiry timestamp

@@ -63,9 +63,8 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 
 	// Map response to match umh-core's InstanceLoginResponse struct EXACTLY
 	// File: umh-core/pkg/communicator/backend_api_structs/backend_api_struct.go:119-125
-	// NOTE: Company details are no longer managed by device management layer.
-	// Device registration and login focus on device identification, location, and status.
-	// Company information should be managed separately if needed.
+	// Populate CompanyDetails with available device/tenant information
+	// This provides umh-core with useful metadata that may be needed in future versions
 
 	// Convert certificate pointers (nil-safe)
 	var certificate *string
@@ -78,11 +77,20 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 		encryptedPrivateKey = &resp.EncryptedPrivateKey
 	}
 
-	// Send empty CompanyDetails (device management no longer persists company data)
-	// The proto requires this field for wire protocol compatibility, but company info
-	// is external to device management and should be provided by other services
+	// Build CompanyDetails from available device/tenant information
+	// owner and name = device owner (tenant identifier)
+	// licenseStatus.validTo = auth token expiry date
+	// licenseStatus.isActive = true (device has valid token)
+	tokenExpiryDate := resp.Device.AuthTokenExpiresAt.AsTime().Format("2006-01-02")
+	owner := resp.Device.CreatedBy
 	companyDetails := &common.CompanyDetails{
-		// All fields left empty - company data is not managed here
+		Owner: &owner,
+		Name:  resp.Device.CreatedBy,
+		LicenseStatus: &common.LicenseStatus{
+			ValidTo:     tokenExpiryDate,
+			IsActive:    true,
+			Description: "Device token valid until " + tokenExpiryDate,
+		},
 	}
 
 	// Build LoginResponse proto

@@ -9,9 +9,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/sha3"
 
-	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
-	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
-	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
+	v1 "taksa-platform-dm/api/devicemgmt/v1"
+	"taksa-platform-dm/internal/models"
+	"taksa-platform-dm/internal/storage"
 )
 
 // AuthUsecase handles authentication and token operations
@@ -119,6 +119,7 @@ func (uc *AuthUsecase) ExtractDeviceIDFromJWT(tokenString string) (string, error
 // CreateAuthToken creates a new auth token for device registration
 // Returns: raw token (shown to user and stored in DB)
 // The raw token will be hashed during login validation to match client-sent double hash
+// Tokens are valid for 50 years from registration with no automatic renewal
 func (uc *AuthUsecase) CreateAuthToken(ctx context.Context, deviceID string, expiryDays int) (token string, err error) {
 	if deviceID == "" {
 		return "", fmt.Errorf("device ID is empty")
@@ -130,8 +131,8 @@ func (uc *AuthUsecase) CreateAuthToken(ctx context.Context, deviceID string, exp
 	// Create auth token entity
 	authToken := &models.AuthToken{
 		Token:     token,
-		DeviceID:  deviceID,
-		ExpiresAt: time.Now().AddDate(0, 0, expiryDays),
+		DeviceId:  deviceID,
+		ExpiresAt: time.Now().AddDate(50, 0, 0), // 50 year expiry from registration
 		CreatedAt: time.Now(),
 	}
 
@@ -145,15 +146,15 @@ func (uc *AuthUsecase) CreateAuthToken(ctx context.Context, deviceID string, exp
 	return token, nil
 }
 
-// RenewAuthToken extends an auth token's expiry by 7 days (called on successful login)
-// This keeps the token valid as long as the device logs in within 7 days
+// RenewAuthToken extends an auth token's expiry by another 50 years (called on successful login)
+// This ensures active devices never expire as long as they login at least once every 50 years
 func (uc *AuthUsecase) RenewAuthToken(ctx context.Context, token string) error {
 	if token == "" {
 		return fmt.Errorf("token is empty")
 	}
 
-	// Update expiry to 7 days from now
-	newExpiryTime := time.Now().AddDate(0, 0, 7)
+	// Update expiry to 50 years from now
+	newExpiryTime := time.Now().AddDate(50, 0, 0)
 	err := uc.store.AuthTokens().UpdateExpiry(ctx, token, newExpiryTime)
 	if err != nil {
 		return fmt.Errorf("failed to update auth token expiry: %w", err)
