@@ -405,30 +405,21 @@ service DeviceMgmtService {
 // RegisterDeviceRequest contains device registration information
 message RegisterDeviceRequest {
   string name          = 1; // Human-readable device name
-  string serial_number = 2; // Unique device serial number
-
-  DeviceMetadata         metadata = 3;
-  DeviceLocation         location = 4;
-  CompanyDetailsExtended company  = 5; // Uses extended model with console-specific fields
-  
+  string created_by    = 2; // Owner UUID (tenant identifier)
+  DeviceLocation location = 3;
+  CompanyDetailsExtended company  = 4; // Uses extended model with console-specific fields
   // Certificate management (optional)
   // NOTE: Certificate is for device identification only. Private keys are device-side and should NOT be transmitted to server.
-  string certificate = 6; // PEM-encoded X.509 certificate (optional - auto-generated if not provided)
-  
-  // Note: Admin authorization via HTTP Authorization header (not in request body for security)
+  string certificate = 5; // PEM-encoded X.509 certificate (optional - auto-generated if not provided)
 }
 
 // RegisterDeviceResponse returns registration details including auth token
 // NOTE: Timestamps duplicated from device summary for convenience (device.created_at, device.auth_token_expires_at)
 message RegisterDeviceResponse {
-  string device_id       = 1;
+  DeviceSummary device = 1; // Summary of registered device (no certificate data)
   string auth_token      = 2; // One-time auth token (shown only here)
-  string auth_token_hash = 3; // For verification
-
-  DeviceSummary device = 4; // Summary of registered device (no certificate data)
-
   // Setup instructions
-  map<string, string> instructions = 5;
+  map<string, string> instructions = 3;
 }
 
 // ListDevicesRequest filters and paginates device listing

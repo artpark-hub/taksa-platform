@@ -19,8 +19,8 @@ option java_package = "api.devicemgmt.v1";
 message Device {
   string id = 1;
   string name = 2;
-  string serial_number = 3;
-
+  string created_by = 3;  // Owner UUID (tenant identifier)
+ 
   DeviceMetadata metadata = 4;
 
   // Location using ISA-95 5-level hierarchy (enterprise, site, area, line, workCell)
@@ -48,21 +48,15 @@ message Device {
 message DeviceSummary {
   string id = 1;
   string name = 2;
-  string serial_number = 3;
-
-  DeviceMetadata metadata = 4;
+  string created_by = 3;  // Owner UUID (tenant identifier)
 
   // Location using ISA-95 5-level hierarchy
-  DeviceLocation location = 5;
+  DeviceLocation location = 4;
 
-  // Basic company info (name and license only, no contact/support/tags)
-  api.common.CompanyDetails company = 6;
+  DeviceStatus status = 5;
 
-  DeviceStatus status = 7;
-
-  google.protobuf.Timestamp created_at = 8;
-  google.protobuf.Timestamp last_seen = 9;
-  google.protobuf.Timestamp auth_token_expires_at = 11;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_seen = 7;
 }
 
 // DeviceMetadata contains hardware and software information
@@ -108,8 +102,6 @@ message DeviceLocation {
 // but are used internally by the management console.
 message CompanyDetailsExtended {
   api.common.CompanyDetails base = 1; // Canonical wire protocol fields
-  string contact_email = 2; // Management console contact email
-  string support_contact = 3; // Support contact information
   repeated string tags = 4; // Organization tags
 }
 

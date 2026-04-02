@@ -15,12 +15,11 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/artpark-hub/taksa-platform/device-management/api/common"
-	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
-	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
-	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
-	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
-	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
+	v1 "taksa-platform-dm/api/devicemgmt/v1"
+	v2 "taksa-platform-dm/api/umh-core/v2"
+	"taksa-platform-dm/internal/data"
+	"taksa-platform-dm/internal/models"
+	"taksa-platform-dm/internal/storage"
 )
 
 // generateUUID generates a proper UUID v4
@@ -700,96 +699,9 @@ type LoginResponse struct {
 }
 
 // RegisterDevice creates a new device and generates its initial auth token.
-// Validates input, checks for duplicates, creates the device, and issues a
-// one-time auth token valid for 7 days.
+// Deprecated: Use DeviceUsecase.RegisterDevice instead.
 func (uc *InstanceUsecase) RegisterDevice(ctx context.Context, req *RegisterDeviceRequest) (*RegisterDeviceResponse, error) {
-	if req.Name == "" || req.SerialNumber == "" {
-		return nil, fmt.Errorf("name and serial number required")
-	}
-
-	existing, _ := uc.store.Devices().GetBySerialNumber(ctx, req.SerialNumber)
-	if existing != nil {
-		return nil, fmt.Errorf("device already registered")
-	}
-
-	// Initialize company with license information if not provided
-	company := req.Company
-	if company == nil {
-		company = &v1.CompanyDetailsExtended{
-			Base: &common.CompanyDetails{
-				Name: "Default Company",
-				LicenseStatus: &common.LicenseStatus{
-					IsActive: true,
-					ValidTo:  time.Now().AddDate(1, 0, 0).Format(time.RFC3339),
-				},
-			},
-		}
-	} else if company.Base == nil {
-		company.Base = &common.CompanyDetails{
-			Name: "Default Company",
-			LicenseStatus: &common.LicenseStatus{
-				IsActive: true,
-				ValidTo:  time.Now().AddDate(1, 0, 0).Format(time.RFC3339),
-			},
-		}
-	} else if company.Base.LicenseStatus == nil {
-		company.Base.LicenseStatus = &common.LicenseStatus{
-			IsActive: true,
-			ValidTo:  time.Now().AddDate(1, 0, 0).Format(time.RFC3339),
-		}
-	} else if !company.Base.LicenseStatus.IsActive || company.Base.LicenseStatus.ValidTo == "" {
-		if !company.Base.LicenseStatus.IsActive {
-			company.Base.LicenseStatus.IsActive = true
-		}
-		if company.Base.LicenseStatus.ValidTo == "" {
-			company.Base.LicenseStatus.ValidTo = time.Now().AddDate(1, 0, 0).Format(time.RFC3339)
-		}
-	}
-
-	device := &v1.Device{
-		Id:           generateUUID(),
-		Name:         req.Name,
-		SerialNumber: req.SerialNumber,
-		Metadata:     req.Metadata,
-		Location:     req.Location,
-		Company:      company,
-		Status:       v1.DeviceStatus_PENDING,
-		CreatedAt:    timestamppb.Now(),
-		LastSeen:     timestamppb.Now(),
-	}
-
-	if err := uc.store.Devices().Save(ctx, device); err != nil {
-		return nil, fmt.Errorf("failed to save device: %w", err)
-	}
-
-	token, err := uc.authUc.CreateAuthToken(ctx, device.Id, 7)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create auth token: %w", err)
-	}
-
-	// Set auth token expiry on device (7 days from now)
-	tokenExpiryTime := time.Now().AddDate(0, 0, 7)
-	device.AuthTokenExpiresAt = timestamppb.New(tokenExpiryTime)
-
-	// Update device with token expiry timestamp
-	if err := uc.store.Devices().Update(ctx, device); err != nil {
-		return nil, fmt.Errorf("failed to update device with token expiry: %w", err)
-	}
-
-	// Calculate the double hash for the response (convenience for client)
-	doubleHash := hashToken(token)
-
-	return &RegisterDeviceResponse{
-		DeviceId:      device.Id,
-		AuthToken:     token, // Display only once - instruct user to save securely
-		AuthTokenHash: doubleHash,
-		Device:        deviceToSummary(device), // Return summary, not full device with cert data
-		Instructions: map[string]string{
-			"step1": "Save the auth token securely",
-			"step2": "Use token to generate double hash (SHA3(SHA3(token)))",
-			"step3": "Send double hash in Authorization header to Login endpoint",
-		},
-	}, nil
+	return nil, fmt.Errorf("use DeviceUsecase.RegisterDevice")
 }
 
 // createActionMessageTracking creates a tracking record for an action being sent to device.
@@ -1280,7 +1192,7 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 		// UUID generation is deterministic: GenerateUUIDFromName(name) == same UUID every time for same name
 		if actionType == "deploy" {
 			if name, ok := protocolConverter["name"].(string); ok && name != "" {
-				// Import would be needed: "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+				// Import would be needed: "taksa-platform-dm/api/umh-core/v2"
 				// For now, try to get from request payload
 				if action.Payload != nil {
 					var origPayload map[string]interface{}

@@ -83,7 +83,7 @@ func (s *DeviceStore) Save(ctx context.Context, device *v1.Device) error {
 
 	query := `
 	INSERT INTO devices (
-		id, uuid, name, serial_number,
+		id, uuid, created_by, name,
 		hardware_version, operating_system, manufacturer, firmware_version, ip_address, mac_address,
 		location_company, location_plant, location_area, location_zone, location_line, location_work_cell, location_work_unit,
 		company_name, company_contact_email, company_support_contact, company_tags,
@@ -100,11 +100,11 @@ func (s *DeviceStore) Save(ctx context.Context, device *v1.Device) error {
 	}
 
 	_, err := s.db.ExecContext(ctx, query,
-		device.Id, device.Id, device.Name, device.SerialNumber,
+		device.Id, device.Id, device.CreatedBy, device.Name,
 		device.Metadata.HardwareVersion, device.Metadata.OperatingSystem, device.Metadata.Manufacturer,
 		device.Metadata.FirmwareVersion, device.Metadata.IpAddress, device.Metadata.MacAddress,
 		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,  // 7-level location hierarchy
-		device.Company.Base.Name, device.Company.ContactEmail, device.Company.SupportContact, string(tagsJSON),
+		device.Company.Base.Name, device.Company.Base.Owner, "", string(tagsJSON),  // owner instead of ContactEmail, empty support contact
 		device.Company.Base.UserCount, boolToInt(device.Company.Base.LicenseStatus.IsActive),
 		validToTime, device.Company.Base.LicenseStatus.Description,
 		device.Certificate, device.EncryptedPrivateKey, device.CompanyCertificate,
@@ -137,19 +137,21 @@ func (s *DeviceStore) GetByID(ctx context.Context, id string) (*v1.Device, error
 	return device, nil
 }
 
-// GetBySerialNumber retrieves a device by serial number
-func (s *DeviceStore) GetBySerialNumber(ctx context.Context, serialNumber string) (*v1.Device, error) {
-	if serialNumber == "" {
+// GetByName retrieves a device by name (globally unique)
+func (s *DeviceStore) GetByName(ctx context.Context, name string) (*v1.Device, error) {
+	if name == "" {
 		return nil, ErrInvalidInput
 	}
 
 	device := &v1.Device{}
-	err := s.getDevice(ctx, "WHERE serial_number = ?", serialNumber, device)
+	err := s.getDevice(ctx, "WHERE name = ?", name, device)
 	if err != nil {
 		return nil, err
 	}
 	return device, nil
 }
+
+
 
 // GetByUUID retrieves a device by UUID
 func (s *DeviceStore) GetByUUID(ctx context.Context, uuid string) (*v1.Device, error) {
@@ -175,19 +177,22 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 	where := []string{}
 	args := []interface{}{}
 
-	if filters.StatusFilter != nil {
-		where = append(where, "status = ?")
-		args = append(args, *filters.StatusFilter)
+	if len(filters.StatusFilters) > 0 {
+		placeholders := strings.Repeat("?,", len(filters.StatusFilters)-1) + "?"
+		where = append(where, "status IN ("+placeholders+")")
+		for _, status := range filters.StatusFilters {
+			args = append(args, int(status))
+		}
 	}
 
 	if filters.LocationFilter != "" {
-		where = append(where, "(location_company LIKE ? OR location_plant LIKE ?)")
-		args = append(args, "%"+filters.LocationFilter+"%", "%"+filters.LocationFilter+"%")
+		where = append(where, "location_company LIKE ?")
+		args = append(args, "%"+filters.LocationFilter+"%")
 	}
 
 	if filters.Search != "" {
-		where = append(where, "(name LIKE ? OR serial_number LIKE ?)")
-		args = append(args, "%"+filters.Search+"%", "%"+filters.Search+"%")
+		where = append(where, "name LIKE ?")
+		args = append(args, "%"+filters.Search+"%")
 	}
 
 	whereClause := ""
@@ -216,7 +221,7 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 
 	// Execute query with limit and offset
 	query := fmt.Sprintf(`
-		SELECT id, uuid, name, serial_number, hardware_version, operating_system, manufacturer,
+		SELECT id, uuid, created_by, name, hardware_version, operating_system, manufacturer,
 		       firmware_version, ip_address, mac_address, location_company, location_plant,
 		       location_area, location_zone, location_line, location_work_cell, location_work_unit,
 		       company_name, company_contact_email, company_support_contact,
@@ -250,6 +255,140 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 	}
 
 	return devices, nil
+}
+
+// ListSummaries retrieves device summaries with optional filtering and pagination
+func (s *DeviceStore) ListSummaries(ctx context.Context, filters *storage.DeviceListFilter) ([]*v1.DeviceSummary, error) {
+	if filters == nil {
+		filters = storage.DefaultDeviceListFilter()
+	}
+
+	// Build WHERE clause
+	where := []string{}
+	args := []interface{}{}
+
+	if len(filters.StatusFilters) > 0 {
+		placeholders := strings.Repeat("?,", len(filters.StatusFilters)-1) + "?"
+		where = append(where, "status IN ("+placeholders+")")
+		for _, status := range filters.StatusFilters {
+			args = append(args, int(status))
+		}
+	}
+
+	if filters.LocationFilter != "" {
+		where = append(where, "location_company LIKE ?")
+		args = append(args, "%"+filters.LocationFilter+"%")
+	}
+
+	if filters.Search != "" {
+		where = append(where, "name LIKE ?")
+		args = append(args, "%"+filters.Search+"%")
+	}
+
+	whereClause := ""
+	if len(where) > 0 {
+		whereClause = "WHERE " + strings.Join(where, " AND ")
+	}
+
+	// Build ORDER BY
+	orderBy := "created_at"
+	if filters.SortBy != "" {
+		orderBy = filters.SortBy
+	}
+	orderDirection := "ASC"
+	if filters.SortDesc {
+		orderDirection = "DESC"
+	}
+
+	// Use offset from cursor pagination
+	offset := filters.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	// Fetch page_size + 1 to detect if more results exist
+	limit := filters.PageSize + 1
+
+	// Execute query with limit and offset - SELECT only summary fields
+	query := fmt.Sprintf(`
+		SELECT id, created_by, name, location_company, location_plant, location_area, 
+		       location_zone, location_line, location_work_cell, location_work_unit,
+		       status, created_at, last_seen
+		FROM devices %s
+		ORDER BY %s %s
+		LIMIT ? OFFSET ?
+	`, whereClause, orderBy, orderDirection)
+
+	args = append(args, limit, offset)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query device summaries: %w", err)
+	}
+	defer rows.Close()
+
+	summaries := make([]*v1.DeviceSummary, 0, filters.PageSize+1)
+	for rows.Next() {
+		var id, createdBy, name, locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit string
+		var status int
+		var createdAt, lastSeen string
+
+		err := rows.Scan(&id, &createdBy, &name, &locCompany, &locPlant, &locArea, &locZone, &locLine, &locWorkCell, &locWorkUnit, &status, &createdAt, &lastSeen)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan device summary: %w", err)
+		}
+
+		// Reconstruct location from individual level columns
+		location := &v1.DeviceLocation{
+			Levels: make(map[string]string),
+		}
+		if locCompany != "" {
+			location.Levels["0"] = locCompany
+		}
+		if locPlant != "" {
+			location.Levels["1"] = locPlant
+		}
+		if locArea != "" {
+			location.Levels["2"] = locArea
+		}
+		if locZone != "" {
+			location.Levels["3"] = locZone
+		}
+		if locLine != "" {
+			location.Levels["4"] = locLine
+		}
+		if locWorkCell != "" {
+			location.Levels["5"] = locWorkCell
+		}
+		if locWorkUnit != "" {
+			location.Levels["6"] = locWorkUnit
+		}
+
+		var createdAtTime, lastSeenTime *timestamppb.Timestamp
+		if createdAtTs, err := time.Parse(time.RFC3339, createdAt); err == nil {
+			createdAtTime = timestamppb.New(createdAtTs)
+		}
+		if lastSeenTs, err := time.Parse(time.RFC3339, lastSeen); err == nil {
+			lastSeenTime = timestamppb.New(lastSeenTs)
+		}
+
+		summary := &v1.DeviceSummary{
+			Id:        id,
+			CreatedBy: createdBy,
+			Name:      name,
+			Location:  location,
+			Status:    v1.DeviceStatus(status),
+			CreatedAt: createdAtTime,
+			LastSeen:  lastSeenTime,
+		}
+		summaries = append(summaries, summary)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error reading device summaries: %w", err)
+	}
+
+	return summaries, nil
 }
 
 // Update updates an existing device
@@ -295,7 +434,7 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 
 	query := `
 	UPDATE devices SET
-		name = ?, serial_number = ?,
+		name = ?,
 		hardware_version = ?, operating_system = ?, manufacturer = ?, firmware_version = ?,
 		ip_address = ?, mac_address = ?,
 		location_company = ?, location_plant = ?, location_area = ?, location_zone = ?, location_line = ?, location_work_cell = ?, location_work_unit = ?,
@@ -313,11 +452,11 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 	}
 
 	result, err := s.db.ExecContext(ctx, query,
-		device.Name, device.SerialNumber,
+		device.Name,
 		device.Metadata.HardwareVersion, device.Metadata.OperatingSystem, device.Metadata.Manufacturer,
 		device.Metadata.FirmwareVersion, device.Metadata.IpAddress, device.Metadata.MacAddress,
 		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,  // 7-level location hierarchy
-		device.Company.Base.Name, device.Company.ContactEmail, device.Company.SupportContact, string(tagsJSON),
+		device.Company.Base.Name, device.Company.Base.Owner, "", string(tagsJSON),  // owner instead of ContactEmail, empty support contact
 		device.Company.Base.UserCount, boolToInt(device.Company.Base.LicenseStatus.IsActive),
 		validToTime, device.Company.Base.LicenseStatus.Description,
 		device.Certificate, device.EncryptedPrivateKey, device.CompanyCertificate,
@@ -440,7 +579,7 @@ func (s *DeviceStore) UpdateLastLogin(ctx context.Context, id string, timestamp 
 
 func (s *DeviceStore) getDevice(ctx context.Context, where string, arg interface{}, device *v1.Device) error {
 	query := fmt.Sprintf(`
-		SELECT id, uuid, name, serial_number, hardware_version, operating_system, manufacturer,
+		SELECT id, uuid, created_by, name, hardware_version, operating_system, manufacturer,
 		       firmware_version, ip_address, mac_address, location_company, location_plant,
 		       location_area, location_zone, location_line, location_work_cell, location_work_unit,
 		       company_name, company_contact_email, company_support_contact,
@@ -480,12 +619,15 @@ func (s *DeviceStore) scanDeviceRow(row *sql.Row, device *v1.Device) error {
 		device.Company.Base.LicenseStatus = &common.LicenseStatus{}
 	}
 
+	// Temporary variables for DB columns that are not in the proto anymore
+	var supportContact string
+	
 	err := row.Scan(
-		&device.Id, &device.Id, &device.Name, &device.SerialNumber,
+		&device.Id, &device.Id, &device.CreatedBy, &device.Name,
 		&device.Metadata.HardwareVersion, &device.Metadata.OperatingSystem, &device.Metadata.Manufacturer,
 		&device.Metadata.FirmwareVersion, &device.Metadata.IpAddress, &device.Metadata.MacAddress,
 		&locCompany, &locPlant, &locArea, &locZone, &locLine, &locWorkCell, &locWorkUnit,  // 7-level location fields
-		&device.Company.Base.Name, &device.Company.ContactEmail, &device.Company.SupportContact, &tagsJSON,
+		&device.Company.Base.Name, &device.Company.Base.Owner, &supportContact, &tagsJSON,
 		&device.Company.Base.UserCount,
 		&device.Company.Base.LicenseStatus.IsActive, &licenseValidTo, &device.Company.Base.LicenseStatus.Description,
 		&device.Certificate, &device.EncryptedPrivateKey, &device.CompanyCertificate,
@@ -594,12 +736,15 @@ func (s *DeviceStore) scanDevice(rows *sql.Rows) (*v1.Device, error) {
 		device.Company.Base.LicenseStatus = &common.LicenseStatus{}
 	}
 
+	// Temporary variables for DB columns that are not in the proto anymore
+	var supportContact string
+
 	err := rows.Scan(
-		&device.Id, &device.Id, &device.Name, &device.SerialNumber,
+		&device.Id, &device.Id, &device.CreatedBy, &device.Name,
 		&device.Metadata.HardwareVersion, &device.Metadata.OperatingSystem, &device.Metadata.Manufacturer,
 		&device.Metadata.FirmwareVersion, &device.Metadata.IpAddress, &device.Metadata.MacAddress,
 		&locCompany, &locPlant, &locArea, &locZone, &locLine, &locWorkCell, &locWorkUnit,  // 7-level location fields
-		&device.Company.Base.Name, &device.Company.ContactEmail, &device.Company.SupportContact, &tagsJSON,
+		&device.Company.Base.Name, &device.Company.Base.Owner, &supportContact, &tagsJSON,
 		&device.Company.Base.UserCount,
 		&device.Company.Base.LicenseStatus.IsActive, &licenseValidTo, &device.Company.Base.LicenseStatus.Description,
 		&device.Certificate, &device.EncryptedPrivateKey, &device.CompanyCertificate,

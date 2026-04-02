@@ -185,17 +185,28 @@ func (s *DeviceMgmtService) Health(ctx context.Context, req *emptypb.Empty) (*v1
 }
 
 // RegisterDevice creates a new device and generates auth token
-// RPC: POST /api/v1/devicemgmt/devices/register
+// RPC: POST /api/v1/devicemgmt/devices
 func (s *DeviceMgmtService) RegisterDevice(ctx context.Context, req *v1.RegisterDeviceRequest) (*v1.RegisterDeviceResponse, error) {
-	if req == nil || req.Name == "" || req.SerialNumber == "" {
-		return nil, status.Error(codes.InvalidArgument, "name and serial number required")
+	if req == nil || req.Name == "" || req.CreatedBy == "" || req.Location == nil || req.Company == nil {
+		return nil, status.Error(codes.InvalidArgument, "name, created_by, location, and company are required")
+	}
+
+	if req.Location.Levels == nil || req.Location.Levels["0"] == "" {
+		return nil, status.Error(codes.InvalidArgument, "location level '0' (company) is required")
+	}
+
+	if req.Company.Base == nil || req.Company.Base.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "company name is required")
+	}
+
+	if req.Company.Base.LicenseStatus == nil {
+		return nil, status.Error(codes.InvalidArgument, "company license status is required")
 	}
 
 	// Call business logic
 	resp, err := s.deviceUc.RegisterDevice(ctx, &biz.RegisterDeviceRequest{
+		CreatedBy:   req.CreatedBy,
 		Name:        req.Name,
-		SerialNumber: req.SerialNumber,
-		Metadata:    req.Metadata,
 		Location:    req.Location,
 		Company:     req.Company,
 		Certificate: req.Certificate,
@@ -209,10 +220,8 @@ func (s *DeviceMgmtService) RegisterDevice(ctx context.Context, req *v1.Register
 
 	// Map response
 	return &v1.RegisterDeviceResponse{
-		DeviceId:     resp.DeviceId,
-		AuthToken:    resp.AuthToken,
-		AuthTokenHash: resp.AuthTokenHash,
 		Device:       resp.Device,
+		AuthToken:    resp.AuthToken,
 		Instructions: resp.Instructions,
 	}, nil
 }
@@ -221,12 +230,14 @@ func (s *DeviceMgmtService) RegisterDevice(ctx context.Context, req *v1.Register
 // RPC: GET /api/v1/devicemgmt/devices
 func (s *DeviceMgmtService) ListDevices(ctx context.Context, req *v1.ListDevicesRequest) (*v1.ListDevicesResponse, error) {
 	if req == nil {
-		req = &v1.ListDevicesRequest{PageSize: 50}
+		req = &v1.ListDevicesRequest{PageSize: 20}
 	}
 
-	// Default pagination
-	if req.PageSize == 0 {
-		req.PageSize = 50
+	// Default pagination with max limit
+	if req.PageSize <= 0 {
+		req.PageSize = 20
+	} else if req.PageSize > 100 {
+		req.PageSize = 100
 	}
 
 	// Decode page token to offset

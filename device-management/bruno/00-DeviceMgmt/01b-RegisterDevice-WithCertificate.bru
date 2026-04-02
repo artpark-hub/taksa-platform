@@ -15,14 +15,8 @@ headers {
 
 body:json {
   {
+    "created_by": "secure-user-{{timestamp}}",
     "name": "Certified Device {{timestamp}}",
-    "serial_number": "SN-CERT-{{timestamp}}",
-    "metadata": {
-      "hardware_version": "2.0",
-      "operating_system": "Linux",
-      "manufacturer": "SecureManufacturer",
-      "firmware_version": "2.0.0"
-    },
     "location": {
       "levels": {
         "0": "SecureEnterprise",
@@ -33,14 +27,13 @@ body:json {
     "company": {
       "base": {
         "name": "Secure Company",
+        "owner": "owner@secure.com",
         "user_count": 50,
         "license_status": {
           "is_active": true,
           "valid_to": "2026-12-31"
         }
       },
-      "contact_email": "secure@company.com",
-      "support_contact": "security@company.com",
       "tags": ["production", "secure", "certified"]
     }
   }
@@ -90,36 +83,17 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
   
-  test("Response has deviceId", function() {
+  test("Response has device object", function() {
     const resp = res.getBody();
-    expect(resp).to.have.property('deviceId');
-    expect(resp.deviceId).to.be.a('string');
-    expect(resp.deviceId).to.not.be.empty;
-  });
-  
-  test("Response has authToken", function() {
-    const resp = res.getBody();
-    expect(resp).to.have.property('authToken');
-    expect(resp.authToken).to.be.a('string');
-  });
-  
-  test("Response has authTokenHash", function() {
-    const resp = res.getBody();
-    expect(resp).to.have.property('authTokenHash');
-    expect(resp.authTokenHash).to.be.a('string');
+    expect(resp).to.have.property('device');
+    expect(resp.device).to.have.property('id');
+    expect(resp.device).to.have.property('name');
   });
   
   test("Device has PENDING status", function() {
     const resp = res.getBody();
     // Proto enums are marshaled as strings: PENDING
     expect(resp.device.status).to.equal("PENDING");
-  });
-  
-  test("Device metadata is preserved", function() {
-    const resp = res.getBody();
-    expect(resp.device).to.have.property('metadata');
-    expect(resp.device.metadata.hardwareVersion).to.equal('2.0');
-    expect(resp.device.metadata.manufacturer).to.equal('SecureManufacturer');
   });
   
   test("Device location is preserved", function() {
@@ -129,11 +103,9 @@ tests {
     expect(resp.device.location.levels['2']).to.equal('SecureArea');
   });
   
-  test("Device company details preserved", function() {
+  test("Response has authToken", function() {
     const resp = res.getBody();
-    expect(resp.device).to.have.property('company');
-    // DeviceSummary uses api.common.CompanyDetails (direct fields, no .base wrapper)
-    expect(resp.device.company).to.have.property('name');
-    expect(resp.device.company.name).to.equal('Secure Company');
+    expect(resp).to.have.property('authToken');
+    expect(resp.authToken).to.be.a('string');
   });
 }

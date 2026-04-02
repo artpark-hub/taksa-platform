@@ -15,14 +15,8 @@ headers {
 
 body:json {
   {
+    "created_by": "user-{{timestamp}}",
     "name": "Test Device {{timestamp}}",
-    "serial_number": "SN-{{timestamp}}",
-    "metadata": {
-      "hardware_version": "1.0",
-      "operating_system": "Linux",
-      "manufacturer": "Test",
-      "firmware_version": "1.0.0"
-    },
     "location": {
       "levels": {
         "0": "TestEnterprise",
@@ -32,14 +26,13 @@ body:json {
     "company": {
       "base": {
         "name": "Test Company",
+        "owner": "owner-email@test.com",
         "user_count": 10,
         "license_status": {
           "is_active": true,
           "valid_to": "2025-12-31"
         }
       },
-      "contact_email": "contact@test.com",
-      "support_contact": "support@test.com",
       "tags": ["test", "demo"]
     }
   }
@@ -95,31 +88,12 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
   
-  test("Response has deviceId", function() {
-    const resp = res.getBody();
-    expect(resp).to.have.property('deviceId');
-    expect(resp.deviceId).to.be.a('string');
-    expect(resp.deviceId).to.not.be.empty;
-  });
-  
-  test("Response has authToken", function() {
-    const resp = res.getBody();
-    expect(resp).to.have.property('authToken');
-    expect(resp.authToken).to.be.a('string');
-  });
-  
-  test("Response has authTokenHash", function() {
-    const resp = res.getBody();
-    expect(resp).to.have.property('authTokenHash');
-    expect(resp.authTokenHash).to.be.a('string');
-  });
-  
   test("Response has device object", function() {
     const resp = res.getBody();
     expect(resp).to.have.property('device');
     expect(resp.device).to.have.property('id');
     expect(resp.device).to.have.property('name');
-    expect(resp.device).to.have.property('serialNumber');
+    expect(resp.device).to.have.property('createdBy');
   });
   
   test("Device has PENDING status", function() {
@@ -128,23 +102,16 @@ tests {
     expect(resp.device.status).to.equal("PENDING");
   });
   
-  test("Device has metadata", function() {
-    const resp = res.getBody();
-    expect(resp.device).to.have.property('metadata');
-    expect(resp.device.metadata).to.have.property('hardwareVersion');
-  });
-  
   test("Device has location", function() {
     const resp = res.getBody();
     expect(resp.device).to.have.property('location');
     expect(resp.device.location).to.have.property('levels');
   });
   
-  test("Device has company details", function() {
+  test("Response has authToken", function() {
     const resp = res.getBody();
-    expect(resp.device).to.have.property('company');
-    // RegisterDevice returns DeviceSummary with api.common.CompanyDetails (no .base wrapper)
-    expect(resp.device.company).to.have.property('name');
+    expect(resp).to.have.property('authToken');
+    expect(resp.authToken).to.be.a('string');
   });
   
   test("Instructions provided", function() {

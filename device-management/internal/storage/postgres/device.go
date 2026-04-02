@@ -83,7 +83,7 @@ func (s *DeviceStore) Save(ctx context.Context, device *v1.Device) error {
 
 	query := `
 	INSERT INTO devices (
-		id, uuid, name, serial_number,
+		id, uuid, created_by, name,
 		hardware_version, operating_system, manufacturer, firmware_version, ip_address, mac_address,
 		location_company, location_plant, location_area, location_zone, location_line, location_work_cell, location_work_unit,
 		company_name, company_contact_email, company_support_contact, company_tags,
@@ -94,11 +94,11 @@ func (s *DeviceStore) Save(ctx context.Context, device *v1.Device) error {
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
-		device.Id, device.Id, device.Name, device.SerialNumber,
+		device.Id, device.Id, device.CreatedBy, device.Name,
 		device.Metadata.HardwareVersion, device.Metadata.OperatingSystem, device.Metadata.Manufacturer,
 		device.Metadata.FirmwareVersion, device.Metadata.IpAddress, device.Metadata.MacAddress,
 		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,  // 7-level location hierarchy
-		device.Company.Base.Name, device.Company.ContactEmail, device.Company.SupportContact, string(tagsJSON),
+		device.Company.Base.Name, device.Company.Base.Owner, "", string(tagsJSON),
 		device.Company.Base.UserCount, boolToInt(device.Company.Base.LicenseStatus.IsActive),
 		device.Company.Base.LicenseStatus.ValidTo, device.Company.Base.LicenseStatus.Description,
 		device.Certificate, device.EncryptedPrivateKey, device.CompanyCertificate,
@@ -131,19 +131,21 @@ func (s *DeviceStore) GetByID(ctx context.Context, id string) (*v1.Device, error
 	return device, nil
 }
 
-// GetBySerialNumber retrieves a device by serial number
-func (s *DeviceStore) GetBySerialNumber(ctx context.Context, serialNumber string) (*v1.Device, error) {
-	if serialNumber == "" {
+// GetByName retrieves a device by name (globally unique)
+func (s *DeviceStore) GetByName(ctx context.Context, name string) (*v1.Device, error) {
+	if name == "" {
 		return nil, ErrInvalidInput
 	}
 
 	device := &v1.Device{}
-	err := s.getDevice(ctx, "WHERE serial_number = $1", serialNumber, device)
+	err := s.getDevice(ctx, "WHERE name = $1", name, device)
 	if err != nil {
 		return nil, err
 	}
 	return device, nil
 }
+
+
 
 // GetByUUID retrieves a device by UUID
 func (s *DeviceStore) GetByUUID(ctx context.Context, uuid string) (*v1.Device, error) {
@@ -170,22 +172,31 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 	args := []interface{}{}
 	paramCounter := 1
 
-	if filters.StatusFilter != nil {
-		where = append(where, fmt.Sprintf("status = $%d", paramCounter))
-		args = append(args, *filters.StatusFilter)
-		paramCounter++
+	if len(filters.StatusFilters) > 0 {
+		placeholders := ""
+		for range filters.StatusFilters {
+			if placeholders != "" {
+				placeholders += ", "
+			}
+			placeholders += fmt.Sprintf("$%d", paramCounter)
+			paramCounter++
+		}
+		where = append(where, "status IN ("+placeholders+")")
+		for _, status := range filters.StatusFilters {
+			args = append(args, int(status))
+		}
 	}
 
 	if filters.LocationFilter != "" {
-		where = append(where, fmt.Sprintf("(location_company ILIKE $%d OR location_plant ILIKE $%d)", paramCounter, paramCounter+1))
-		args = append(args, "%"+filters.LocationFilter+"%", "%"+filters.LocationFilter+"%")
-		paramCounter += 2
+		where = append(where, fmt.Sprintf("location_company ILIKE $%d", paramCounter))
+		args = append(args, "%"+filters.LocationFilter+"%")
+		paramCounter++
 	}
 
 	if filters.Search != "" {
-		where = append(where, fmt.Sprintf("(name ILIKE $%d OR serial_number ILIKE $%d)", paramCounter, paramCounter+1))
-		args = append(args, "%"+filters.Search+"%", "%"+filters.Search+"%")
-		paramCounter += 2
+		where = append(where, fmt.Sprintf("name ILIKE $%d", paramCounter))
+		args = append(args, "%"+filters.Search+"%")
+		paramCounter++
 	}
 
 	whereClause := ""
@@ -214,7 +225,7 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 
 	// Execute query with limit and offset
 	query := fmt.Sprintf(`
-		SELECT id, uuid, name, serial_number, hardware_version, operating_system, manufacturer,
+		SELECT id, uuid, created_by, name, hardware_version, operating_system, manufacturer,
 		       firmware_version, ip_address, mac_address, location_company, location_plant,
 		       location_area, location_zone, location_line, location_work_cell, location_work_unit,
 		       company_name, company_contact_email, company_support_contact,
@@ -248,6 +259,31 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 	}
 
 	return devices, nil
+}
+
+// ListSummaries retrieves device summaries with optional filtering and pagination
+func (s *DeviceStore) ListSummaries(ctx context.Context, filters *storage.DeviceListFilter) ([]*v1.DeviceSummary, error) {
+	// For PostgreSQL, we can reuse List and convert to summaries
+	// Or optimize by selecting only summary fields
+	devices, err := s.List(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+	
+	summaries := make([]*v1.DeviceSummary, 0, len(devices))
+	for _, device := range devices {
+		summary := &v1.DeviceSummary{
+			Id:        device.Id,
+			CreatedBy: device.CreatedBy,
+			Name:      device.Name,
+			Location:  device.Location,
+			Status:    device.Status,
+			CreatedAt: device.CreatedAt,
+			LastSeen:  device.LastSeen,
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries, nil
 }
 
 // Update updates an existing device
@@ -293,23 +329,23 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 
 	query := `
 	UPDATE devices SET
-		name = $1, serial_number = $2,
-		hardware_version = $3, operating_system = $4, manufacturer = $5, firmware_version = $6,
-		ip_address = $7, mac_address = $8,
-		location_company = $9, location_plant = $10, location_area = $11, location_zone = $12, location_line = $13, location_work_cell = $14, location_work_unit = $15,
-		company_name = $16, company_contact_email = $17, company_support_contact = $18, company_tags = $19,
-		user_count = $20, license_is_active = $21, license_valid_to = $22, license_description = $23,
-		certificate = $24, encrypted_private_key = $25, company_certificate = $26,
-		status = $27, last_seen = $28, last_login_at = $29, auth_token_expires_at = $30
-	WHERE id = $31
+		name = $1,
+		hardware_version = $2, operating_system = $3, manufacturer = $4, firmware_version = $5,
+		ip_address = $6, mac_address = $7,
+		location_company = $8, location_plant = $9, location_area = $10, location_zone = $11, location_line = $12, location_work_cell = $13, location_work_unit = $14,
+		company_name = $15, company_contact_email = $16, company_support_contact = $17, company_tags = $18,
+		user_count = $19, license_is_active = $20, license_valid_to = $21, license_description = $22,
+		certificate = $23, encrypted_private_key = $24, company_certificate = $25,
+		status = $26, last_seen = $27, last_login_at = $28, auth_token_expires_at = $29
+	WHERE id = $30
 	`
 
 	result, err := s.db.ExecContext(ctx, query,
-		device.Name, device.SerialNumber,
+		device.Name,
 		device.Metadata.HardwareVersion, device.Metadata.OperatingSystem, device.Metadata.Manufacturer,
 		device.Metadata.FirmwareVersion, device.Metadata.IpAddress, device.Metadata.MacAddress,
 		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,  // 7-level location hierarchy
-		device.Company.Base.Name, device.Company.ContactEmail, device.Company.SupportContact, string(tagsJSON),
+		device.Company.Base.Name, device.Company.Base.Owner, "", string(tagsJSON),
 		device.Company.Base.UserCount, boolToInt(device.Company.Base.LicenseStatus.IsActive),
 		device.Company.Base.LicenseStatus.ValidTo, device.Company.Base.LicenseStatus.Description,
 		device.Certificate, device.EncryptedPrivateKey, device.CompanyCertificate,
@@ -432,7 +468,7 @@ func (s *DeviceStore) Delete(ctx context.Context, id string) error {
 
 func (s *DeviceStore) getDevice(ctx context.Context, where string, arg interface{}, device *v1.Device) error {
 	query := fmt.Sprintf(`
-		SELECT id, uuid, name, serial_number, hardware_version, operating_system, manufacturer,
+		SELECT id, uuid, created_by, name, hardware_version, operating_system, manufacturer,
 		       firmware_version, ip_address, mac_address, location_company, location_plant,
 		       location_area, location_zone, location_line, location_work_cell, location_work_unit,
 		       company_name, company_contact_email, company_support_contact,
@@ -472,12 +508,15 @@ func (s *DeviceStore) scanDeviceRow(row *sql.Row, device *v1.Device) error {
 		device.Company.Base.LicenseStatus = &common.LicenseStatus{}
 	}
 
+	// Temporary variables for DB columns that are not in the proto anymore
+	var supportContact string
+
 	err := row.Scan(
-		&device.Id, &device.Id, &device.Name, &device.SerialNumber,
+		&device.Id, &device.Id, &device.CreatedBy, &device.Name,
 		&device.Metadata.HardwareVersion, &device.Metadata.OperatingSystem, &device.Metadata.Manufacturer,
 		&device.Metadata.FirmwareVersion, &device.Metadata.IpAddress, &device.Metadata.MacAddress,
 		&locCompany, &locPlant, &locArea, &locZone, &locLine, &locWorkCell, &locWorkUnit,  // 7-level location fields
-		&device.Company.Base.Name, &device.Company.ContactEmail, &device.Company.SupportContact, &tagsJSON,
+		&device.Company.Base.Name, &device.Company.Base.Owner, &supportContact, &tagsJSON,
 		&device.Company.Base.UserCount,
 		&device.Company.Base.LicenseStatus.IsActive, &licenseValidTo, &device.Company.Base.LicenseStatus.Description,
 		&device.Certificate, &device.EncryptedPrivateKey, &device.CompanyCertificate,
@@ -586,12 +625,15 @@ func (s *DeviceStore) scanDevice(rows *sql.Rows) (*v1.Device, error) {
 		device.Company.Base.LicenseStatus = &common.LicenseStatus{}
 	}
 
+	// Temporary variables for DB columns that are not in the proto anymore
+	var supportContact string
+
 	err := rows.Scan(
-		&device.Id, &device.Id, &device.Name, &device.SerialNumber,
+		&device.Id, &device.Id, &device.CreatedBy, &device.Name,
 		&device.Metadata.HardwareVersion, &device.Metadata.OperatingSystem, &device.Metadata.Manufacturer,
 		&device.Metadata.FirmwareVersion, &device.Metadata.IpAddress, &device.Metadata.MacAddress,
 		&locCompany, &locPlant, &locArea, &locZone, &locLine, &locWorkCell, &locWorkUnit,  // 7-level location fields
-		&device.Company.Base.Name, &device.Company.ContactEmail, &device.Company.SupportContact, &tagsJSON,
+		&device.Company.Base.Name, &device.Company.Base.Owner, &supportContact, &tagsJSON,
 		&device.Company.Base.UserCount,
 		&device.Company.Base.LicenseStatus.IsActive, &licenseValidTo, &device.Company.Base.LicenseStatus.Description,
 		&device.Certificate, &device.EncryptedPrivateKey, &device.CompanyCertificate,

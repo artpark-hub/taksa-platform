@@ -1178,10 +1178,6 @@ components:
             properties:
                 base:
                     $ref: '#/components/schemas/api.common.CompanyDetails'
-                contactEmail:
-                    type: string
-                supportContact:
-                    type: string
                 tags:
                     type: array
                     items:
@@ -1287,7 +1283,7 @@ components:
                     type: string
                 name:
                     type: string
-                serialNumber:
+                createdBy:
                     type: string
                 metadata:
                     $ref: '#/components/schemas/api.devicemgmt.v1.DeviceMetadata'
@@ -1410,18 +1406,12 @@ components:
                     type: string
                 name:
                     type: string
-                serialNumber:
+                createdBy:
                     type: string
-                metadata:
-                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceMetadata'
                 location:
                     allOf:
                         - $ref: '#/components/schemas/api.devicemgmt.v1.DeviceLocation'
                     description: Location using ISA-95 5-level hierarchy
-                company:
-                    allOf:
-                        - $ref: '#/components/schemas/api.common.CompanyDetails'
-                    description: Basic company info (name and license only, no contact/support/tags)
                 status:
                     type: integer
                     format: enum
@@ -1429,9 +1419,6 @@ components:
                     type: string
                     format: date-time
                 lastSeen:
-                    type: string
-                    format: date-time
-                authTokenExpiresAt:
                     type: string
                     format: date-time
             description: |-
@@ -1650,10 +1637,8 @@ components:
             properties:
                 name:
                     type: string
-                serialNumber:
+                createdBy:
                     type: string
-                metadata:
-                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceMetadata'
                 location:
                     $ref: '#/components/schemas/api.devicemgmt.v1.DeviceLocation'
                 company:
@@ -1667,14 +1652,10 @@ components:
         api.devicemgmt.v1.RegisterDeviceResponse:
             type: object
             properties:
-                deviceId:
-                    type: string
-                authToken:
-                    type: string
-                authTokenHash:
-                    type: string
                 device:
                     $ref: '#/components/schemas/api.devicemgmt.v1.DeviceSummary'
+                authToken:
+                    type: string
                 instructions:
                     type: object
                     additionalProperties:

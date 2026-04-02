@@ -5,8 +5,8 @@
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
   uuid TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  serial_number TEXT UNIQUE NOT NULL,
+  created_by TEXT,  -- Owner UUID (tenant identifier)
+  name TEXT NOT NULL UNIQUE,
   
   -- Hardware metadata
   hardware_version TEXT,
@@ -51,12 +51,12 @@ CREATE TABLE IF NOT EXISTS devices (
   last_login_at TEXT,
   auth_token_expires_at TEXT,
   
-  -- Indexes for performance
-  UNIQUE(serial_number),
+  -- Unique constraint on name (globally unique)
+  UNIQUE(name),
   UNIQUE(uuid)
 );
 
-CREATE INDEX IF NOT EXISTS idx_devices_serial_number ON devices(serial_number);
+CREATE INDEX IF NOT EXISTS idx_devices_created_by ON devices(created_by);
 CREATE INDEX IF NOT EXISTS idx_devices_uuid ON devices(uuid);
 CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
 CREATE INDEX IF NOT EXISTS idx_devices_company ON devices(location_company);

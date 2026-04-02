@@ -31,14 +31,14 @@ func NewDeviceUsecase(store storage.Store, authUc *AuthUsecase) *DeviceUsecase {
 // RegisterDevice creates a new device and auth token
 func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDeviceRequest) (*RegisterDeviceResponse, error) {
 	// Validate
-	if req.Name == "" || req.SerialNumber == "" {
-		return nil, fmt.Errorf("name and serial number required")
+	if req.CreatedBy == "" || req.Name == "" || req.Location == nil {
+		return nil, fmt.Errorf("created_by, name, and location are required")
 	}
 
-	// Check if already exists
-	existing, _ := uc.store.Devices().GetBySerialNumber(ctx, req.SerialNumber)
+	// Check if already exists by name (globally unique)
+	existing, _ := uc.store.Devices().GetByName(ctx, req.Name)
 	if existing != nil {
-		return nil, fmt.Errorf("device already registered")
+		return nil, fmt.Errorf("device with name '%s' already exists", req.Name)
 	}
 
 	// Create device with license information
@@ -78,15 +78,14 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 	}
 
 	device := &v1.Device{
-		Id:           generateUUID(),
-		Name:         req.Name,
-		SerialNumber: req.SerialNumber,
-		Metadata:     req.Metadata,
-		Location:     req.Location,
-		Company:      company,
-		Status:       v1.DeviceStatus_PENDING,
-		CreatedAt:    timestamppb.Now(),
-		LastSeen:     timestamppb.Now(),
+		Id:        generateUUID(),
+		CreatedBy: req.CreatedBy,
+		Name:      req.Name,
+		Location:  req.Location,
+		Company:   company,
+		Status:    v1.DeviceStatus_PENDING,
+		CreatedAt: timestamppb.Now(),
+		LastSeen:  timestamppb.Now(),
 		// AuthTokenExpiresAt will be set after token creation
 	}
 
@@ -141,18 +140,13 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 		return nil, fmt.Errorf("failed to update device with token expiry: %w", err)
 	}
 
-	// Calculate the double hash that umh-core will send during login
-	doubleHash := hashToken(token)
-	
 	return &RegisterDeviceResponse{
-		DeviceId:      device.Id,
-		AuthToken:     token, // Shown only once! Raw token
-		AuthTokenHash: doubleHash, // Pre-calculated double hash for convenience
-		Device:        deviceToSummary(device), // Return summary, not full device with cert data
+		Device:       deviceToSummary(device),
+		AuthToken:    token,
 		Instructions: map[string]string{
-			"step1": "Save the auth token securely",
-			"step2": "Use token to generate double hash (SHA3-256(SHA3-256(token)))",
-			"step3": "Send double hash in Authorization header to Login endpoint",
+			"setup_guide":     "https://docs.example.com/setup-guide",
+			"firmware_update": "Download firmware from releases endpoint",
+			"config_path":     "/etc/umh-core/config.yaml",
 		},
 	}, nil
 }
@@ -164,11 +158,11 @@ func (uc *DeviceUsecase) ListDevices(ctx context.Context, filters *storage.Devic
 		filters = storage.DefaultDeviceListFilter()
 	}
 
-	devices, err := uc.store.Devices().List(ctx, filters)
+	summaries, err := uc.store.Devices().ListSummaries(ctx, filters)
 	if err != nil {
 		return nil, err
 	}
-	return devicesToSummaries(devices), nil
+	return summaries, nil
 }
 
 // GetDevice retrieves a device by ID
@@ -260,16 +254,13 @@ func deviceToSummary(device *v1.Device) *v1.DeviceSummary {
 		return nil
 	}
 	return &v1.DeviceSummary{
-		Id:            device.Id,
-		Name:          device.Name,
-		SerialNumber:  device.SerialNumber,
-		Metadata:      device.Metadata,
-		Location:      device.Location,
-		Company:       device.Company.Base, // Extract canonical company details only
-		Status:        device.Status,
-		CreatedAt:     device.CreatedAt,
-		LastSeen:      device.LastSeen,
-		AuthTokenExpiresAt: device.AuthTokenExpiresAt,
+		Id:        device.Id,
+		CreatedBy: device.CreatedBy,
+		Name:      device.Name,
+		Location:  device.Location,
+		Status:    device.Status,
+		CreatedAt: device.CreatedAt,
+		LastSeen:  device.LastSeen,
 	}
 }
 
@@ -341,19 +332,16 @@ type DeviceUpdate struct {
 
 // RegisterDeviceRequest for device registration workflow
 type RegisterDeviceRequest struct {
-	Name         string
-	SerialNumber string
-	Metadata     *v1.DeviceMetadata
-	Location     *v1.DeviceLocation
-	Company      *v1.CompanyDetailsExtended
-	Certificate  string // Optional: PEM-encoded X.509 certificate (device identification only)
+	CreatedBy   string
+	Name        string
+	Location    *v1.DeviceLocation
+	Company     *v1.CompanyDetailsExtended
+	Certificate string // Optional: PEM-encoded X.509 certificate (device identification only)
 }
 
 // RegisterDeviceResponse for device registration workflow
 type RegisterDeviceResponse struct {
-	DeviceId      string
-	AuthToken     string
-	AuthTokenHash string
-	Device        *v1.DeviceSummary // Changed to DeviceSummary to avoid sending certificate data
-	Instructions  map[string]string
+	Device       *v1.DeviceSummary
+	AuthToken    string
+	Instructions map[string]string
 }

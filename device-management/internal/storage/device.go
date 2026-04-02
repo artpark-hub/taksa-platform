@@ -15,8 +15,8 @@ type DeviceStore interface {
 	// GetByID retrieves a device by its ID
 	GetByID(ctx context.Context, id string) (*v1.Device, error)
 
-	// GetBySerialNumber retrieves a device by serial number
-	GetBySerialNumber(ctx context.Context, serialNumber string) (*v1.Device, error)
+	// GetByName retrieves a device by name (globally unique)
+	GetByName(ctx context.Context, name string) (*v1.Device, error)
 
 	// GetByUUID retrieves a device by UUID
 	GetByUUID(ctx context.Context, uuid string) (*v1.Device, error)
@@ -24,6 +24,9 @@ type DeviceStore interface {
 	// List retrieves devices with optional filtering and cursor pagination
 	// Returns up to page_size+1 results (extra result indicates more pages exist)
 	List(ctx context.Context, filters *DeviceListFilter) ([]*v1.Device, error)
+
+	// ListSummaries retrieves device summaries with optional filtering and pagination
+	ListSummaries(ctx context.Context, filters *DeviceListFilter) ([]*v1.DeviceSummary, error)
 
 	// Update updates an existing device
 	Update(ctx context.Context, device *v1.Device) error
@@ -43,13 +46,13 @@ type DeviceStore interface {
 
 // DeviceListFilter defines filtering and pagination for device listing
 type DeviceListFilter struct {
-	PageSize       int32                // Items per page
-	Offset         int32                // Calculated from page_token
-	StatusFilter   *v1.DeviceStatus     // Filter by status (nil = all)
-	LocationFilter string               // Filter by company/plant
-	Search         string               // Search in name, serial number, etc.
-	SortBy         string               // "name", "created_at", "last_seen"
-	SortDesc       bool                 // Sort descending
+	PageSize       int32              // Items per page
+	Offset         int32              // Calculated from page_token
+	StatusFilters  []v1.DeviceStatus  // Filter by status (empty = all)
+	LocationFilter string             // Filter by company/plant
+	Search         string             // Search in device name
+	SortBy         string             // "name", "created_at", "last_seen"
+	SortDesc       bool               // Sort descending
 }
 
 // DefaultDeviceListFilter returns default filter values
