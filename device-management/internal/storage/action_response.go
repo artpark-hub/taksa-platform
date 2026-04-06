@@ -12,15 +12,15 @@ type ActionResponseStore interface {
 	// Save stores an action response
 	Save(ctx context.Context, response *models.ActionResponse) error
 
-	// GetByActionId retrieves all responses for an action
-	GetByActionId(ctx context.Context, actionId string) ([]*models.ActionResponse, error)
+	// GetByActionID retrieves all responses for an action
+	GetByActionID(ctx context.Context, actionID string) ([]*models.ActionResponse, error)
 
-	// GetByTraceId retrieves response by message trace ID
-	GetByTraceId(ctx context.Context, messageTraceId string) (*models.ActionResponse, error)
+	// GetByTraceID retrieves response by message trace ID
+	GetByTraceID(ctx context.Context, messageTraceID string) (*models.ActionResponse, error)
 
-	// GetByDeviceId retrieves all responses from a device
-	GetByDeviceId(ctx context.Context, deviceId string) ([]*models.ActionResponse, error)
+	// GetByDeviceID retrieves all responses from a device
+	GetByDeviceID(ctx context.Context, deviceID string) ([]*models.ActionResponse, error)
 
 	// Delete removes an action response
-	Delete(ctx context.Context, responseId string) error
+	Delete(ctx context.Context, responseID string) error
 }

@@ -3,7 +3,6 @@ package cert
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -17,6 +16,11 @@ import (
 // GenerateCertificateAndKey generates a self-signed X.509 certificate and PKCS#8 encrypted private key
 // for a device. Returns PEM-encoded certificate and encrypted private key strings.
 func GenerateCertificateAndKey(deviceID, deviceName string) (certPEM, keyPEM string, err error) {
+	// Validate deviceID length to avoid panic on slicing
+	if len(deviceID) < 8 {
+		return "", "", fmt.Errorf("deviceID must be at least 8 characters, got %d", len(deviceID))
+	}
+
 	// Generate RSA private key (2048-bit)
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -70,41 +74,40 @@ func GenerateCertificateAndKey(deviceID, deviceName string) (certPEM, keyPEM str
 		Bytes: certBytes,
 	}))
 
-	// Create PKCS#8 private key using device ID as password
-	password := derivePassword(deviceID)
-	keyPEM, err = encryptPrivateKey(privateKey, password)
+	// Create PKCS#8 private key
+	// NOTE: This key is returned UNENCRYPTED. The PEM label says "ENCRYPTED PRIVATE KEY"
+	// for compatibility, but no actual encryption is applied. Secure the key in transit
+	// (HTTPS) and at rest (proper secret management / KMS). Do NOT rely on the label.
+	keyPEM, err = encryptPrivateKey(privateKey)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to encrypt private key: %w", err)
+		return "", "", fmt.Errorf("failed to encode private key: %w", err)
 	}
 
 	return certPEM, keyPEM, nil
 }
 
-// encryptPrivateKey encrypts an RSA private key using PKCS#8 format
-// This is a simplified encryption - in production, use proper PBKDF2 or scrypt
-func encryptPrivateKey(privateKey *rsa.PrivateKey, password string) (string, error) {
-	// Marshal private key to PKCS#1 DER format
-	privateKeyDER := x509.MarshalPKCS1PrivateKey(privateKey)
+// encryptPrivateKey encodes an RSA private key to PEM format
+// WARNING: The resulting PEM is labeled "ENCRYPTED PRIVATE KEY" for compatibility,
+// but NO actual encryption is applied. This is suitable ONLY when:
+// - Private keys are transmitted over secure channels (HTTPS)
+// - Private keys are stored with appropriate access controls
+// - A proper KMS or secret management system controls access
+// For true encryption, implement PBKDF2 + AES-256-GCM or use a proper HSM/KMS.
+func encryptPrivateKey(privateKey *rsa.PrivateKey) (string, error) {
+	// Marshal private key to PKCS#8 DER format (unencrypted)
+	privateKeyDER, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal private key to PKCS#8: %w", err)
+	}
 
-	// Create PKCS#8 structure with password hint (not actual encryption for simplicity)
-	// In production, this should use proper encryption like AES-256-CBC with PBKDF2
+	// Encode to PEM with "ENCRYPTED PRIVATE KEY" label for compatibility
+	// Note: This is a misnomer - the key is NOT encrypted
 	encryptedBlock := &pem.Block{
-		Type: "ENCRYPTED PRIVATE KEY",
-		Headers: map[string]string{
-			"DEK-Info": "DES-EDE3-CBC,0000000000000000", // Placeholder for encryption info
-		},
+		Type:  "ENCRYPTED PRIVATE KEY",
 		Bytes: privateKeyDER,
 	}
 
 	return string(pem.EncodeToMemory(encryptedBlock)), nil
-}
-
-// derivePassword derives a password from device ID for key encryption
-// Uses SHA256 hash of the device ID
-func derivePassword(deviceID string) string {
-	hash := sha256.Sum256([]byte(deviceID))
-	// Return hex representation of first 16 bytes
-	return fmt.Sprintf("%x", hash[:16])
 }
 
 // ValidateCertificatePEM validates that a string is a valid PEM-encoded certificate

@@ -52,9 +52,9 @@ func (s *actionResponseStore) Save(ctx context.Context, response *models.ActionR
 	return nil
 }
 
-// GetByActionId retrieves all responses for an action
-func (s *actionResponseStore) GetByActionId(ctx context.Context, actionId string) ([]*models.ActionResponse, error) {
-	if actionId == "" {
+// GetByActionID retrieves all responses for an action
+func (s *actionResponseStore) GetByActionID(ctx context.Context, actionID string) ([]*models.ActionResponse, error) {
+	if actionID == "" {
 		return nil, fmt.Errorf("action ID cannot be empty")
 	}
 
@@ -65,7 +65,7 @@ func (s *actionResponseStore) GetByActionId(ctx context.Context, actionId string
 		ORDER BY completed_at DESC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, actionId)
+	rows, err := s.db.QueryContext(ctx, query, actionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query action responses: %w", err)
 	}
@@ -92,7 +92,10 @@ func (s *actionResponseStore) GetByActionId(ctx context.Context, actionId string
 		}
 
 		if completedAtStr != "" {
-			completedAt, _ := time.Parse("2006-01-02 15:04:05", completedAtStr)
+			completedAt, err := time.Parse("2006-01-02 15:04:05", completedAtStr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse completed_at %q for action response %q: %w", completedAtStr, response.ID, err)
+			}
 			response.CompletedAt = completedAt
 		}
 
@@ -106,9 +109,9 @@ func (s *actionResponseStore) GetByActionId(ctx context.Context, actionId string
 	return responses, nil
 }
 
-// GetByTraceId retrieves response by message trace ID
-func (s *actionResponseStore) GetByTraceId(ctx context.Context, messageTraceId string) (*models.ActionResponse, error) {
-	if messageTraceId == "" {
+// GetByTraceID retrieves response by message trace ID
+func (s *actionResponseStore) GetByTraceID(ctx context.Context, messageTraceID string) (*models.ActionResponse, error) {
+	if messageTraceID == "" {
 		return nil, fmt.Errorf("message trace ID cannot be empty")
 	}
 
@@ -121,7 +124,7 @@ func (s *actionResponseStore) GetByTraceId(ctx context.Context, messageTraceId s
 	var response models.ActionResponse
 	var completedAtStr string
 
-	err := s.db.QueryRowContext(ctx, query, messageTraceId).Scan(
+	err := s.db.QueryRowContext(ctx, query, messageTraceID).Scan(
 		&response.ID,
 		&response.ActionID,
 		&response.DeviceID,
@@ -140,16 +143,19 @@ func (s *actionResponseStore) GetByTraceId(ctx context.Context, messageTraceId s
 	}
 
 	if completedAtStr != "" {
-		completedAt, _ := time.Parse("2006-01-02 15:04:05", completedAtStr)
+		completedAt, err := time.Parse("2006-01-02 15:04:05", completedAtStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse completed_at %q for action response %q: %w", completedAtStr, response.ID, err)
+		}
 		response.CompletedAt = completedAt
 	}
 
 	return &response, nil
 }
 
-// GetByDeviceId retrieves all responses from a device
-func (s *actionResponseStore) GetByDeviceId(ctx context.Context, deviceId string) ([]*models.ActionResponse, error) {
-	if deviceId == "" {
+// GetByDeviceID retrieves all responses from a device
+func (s *actionResponseStore) GetByDeviceID(ctx context.Context, deviceID string) ([]*models.ActionResponse, error) {
+	if deviceID == "" {
 		return nil, fmt.Errorf("device ID cannot be empty")
 	}
 
@@ -160,7 +166,7 @@ func (s *actionResponseStore) GetByDeviceId(ctx context.Context, deviceId string
 		ORDER BY completed_at DESC
 	`
 
-	rows, err := s.db.QueryContext(ctx, query, deviceId)
+	rows, err := s.db.QueryContext(ctx, query, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query action responses: %w", err)
 	}
@@ -187,7 +193,10 @@ func (s *actionResponseStore) GetByDeviceId(ctx context.Context, deviceId string
 		}
 
 		if completedAtStr != "" {
-			completedAt, _ := time.Parse("2006-01-02 15:04:05", completedAtStr)
+			completedAt, err := time.Parse("2006-01-02 15:04:05", completedAtStr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse completed_at %q for action response %q: %w", completedAtStr, response.ID, err)
+			}
 			response.CompletedAt = completedAt
 		}
 
@@ -202,14 +211,14 @@ func (s *actionResponseStore) GetByDeviceId(ctx context.Context, deviceId string
 }
 
 // Delete removes an action response
-func (s *actionResponseStore) Delete(ctx context.Context, responseId string) error {
-	if responseId == "" {
+func (s *actionResponseStore) Delete(ctx context.Context, responseID string) error {
+	if responseID == "" {
 		return fmt.Errorf("response ID cannot be empty")
 	}
 
 	query := `DELETE FROM action_responses WHERE id = ?`
 
-	_, err := s.db.ExecContext(ctx, query, responseId)
+	_, err := s.db.ExecContext(ctx, query, responseID)
 	if err != nil {
 		return fmt.Errorf("failed to delete action response: %w", err)
 	}

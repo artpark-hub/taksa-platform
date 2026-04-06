@@ -10,6 +10,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// Context key types for storing values in context
+type contextKey string
+
+const (
+	authorizationKey contextKey = "authorization"
+	jwtTokenKey      contextKey = "jwt_token"
+)
+
 // AuthMiddleware extracts Bearer token from Authorization header and logs request details
 func AuthMiddleware(logger *zap.Logger) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
@@ -43,10 +51,10 @@ func AuthMiddleware(logger *zap.Logger) middleware.Middleware {
 				if strings.HasPrefix(authHeader, bearerPrefix) {
 					token := strings.TrimPrefix(authHeader, bearerPrefix)
 					logger.Debug("Authorization header found",
-						zap.String("token_preview", token[:min(len(token), 20)]+"..."),
+						zap.Bool("has_token", true),
 					)
-					// Store in context
-					ctx = context.WithValue(ctx, "authorization", token)
+					// Store in context with typed key
+					ctx = context.WithValue(ctx, authorizationKey, token)
 				}
 			} else {
 				logger.Debug("No authorization header provided",
@@ -96,18 +104,12 @@ func ExtractJWTTokenMiddleware(logger *zap.Logger) middleware.Middleware {
 			// Get request to access cookies
 			request := httpTr.Request()
 
-			// logger.Debug("Cookies in request",
-			// 	zap.String("cookie_header", request.Header.Get("Cookie")),
-			// )
-
 			// Try to get JWT token from cookie
 			cookie, err := request.Cookie("token")
 			if err == nil && cookie.Value != "" {
-				// Store JWT in context for use by services
-				ctx = context.WithValue(ctx, "jwt_token", cookie.Value)
-				logger.Debug("Extracted JWT token from cookie",
-					zap.String("token_preview", cookie.Value[:min(len(cookie.Value), 20)]+"..."),
-				)
+				// Store JWT in context for use by services (with typed key)
+				ctx = context.WithValue(ctx, jwtTokenKey, cookie.Value)
+				logger.Debug("Extracted JWT token from cookie")
 			} else {
 				logger.Debug("No 'token' cookie found in request",
 					zap.Error(err),

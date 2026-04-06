@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	devicemgmt "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
-	umhcore "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/service"
@@ -41,18 +40,23 @@ func loginResponseEncoder(w http.ResponseWriter, r *http.Request, v interface{})
 		}
 	}
 	
-	// Use protojson with EmitDefaults to ensure empty fields are included
+	// Use protojson with EmitUnpopulated to ensure empty fields are included
 	// proto3 by default omits zero/empty values, which breaks empty list APIs
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	
 	if protoMsg, ok := v.(proto.Message); ok {
-		// Marshal with protojson to handle proto types properly
-		data, err := protojson.Marshal(protoMsg)
+		// Marshal with protojson to handle proto types properly and emit default values
+		marshalOptions := protojson.MarshalOptions{
+			EmitUnpopulated: true,
+		}
+		data, err := marshalOptions.Marshal(protoMsg)
 		if err != nil {
 			return err
 		}
-		_, err = w.Write(data)
-		w.Write([]byte("\n"))
+		if _, err = w.Write(data); err != nil {
+			return err
+		}
+		_, err = w.Write([]byte("\n"))
 		return err
 	}
 	
@@ -88,7 +92,7 @@ func NewHTTPServer(
 		opts = append(opts, khttp.Timeout(c.Http.Timeout.AsDuration()))
 	}
 	srv := khttp.NewServer(opts...)
-	umhcore.RegisterInstanceServiceHTTPServer(srv, instance)
+	v2.RegisterInstanceServiceHTTPServer(srv, instance)
 	devicemgmt.RegisterDeviceMgmtServiceHTTPServer(srv, deviceMgmt)
 	return srv
 }

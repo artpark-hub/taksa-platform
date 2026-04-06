@@ -8,7 +8,7 @@ import (
 // Internal use only - used for storage and business logic
 type AuthToken struct {
 	Token     string
-	DeviceId  string
+	DeviceID  string
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }

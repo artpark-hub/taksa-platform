@@ -20,7 +20,7 @@ type AuthTokenStore struct {
 // This matches umh-mock-console approach: GetAllValidAuthTokens retrieves raw tokens
 // and hashes them during login to compare with client-sent hash
 func (s *AuthTokenStore) Save(ctx context.Context, token *models.AuthToken, rawToken string) error {
-	if token == nil || token.DeviceId == "" || rawToken == "" {
+	if token == nil || token.DeviceID == "" || rawToken == "" {
 		return ErrInvalidInput
 	}
 
@@ -33,7 +33,7 @@ func (s *AuthTokenStore) Save(ctx context.Context, token *models.AuthToken, rawT
 	_, err := s.db.ExecContext(ctx, query,
 		id,
 		rawToken,
-		token.DeviceId,
+		token.DeviceID,
 		time.Now().Format(time.RFC3339),
 		token.ExpiresAt.Format(time.RFC3339),
 	)
@@ -140,7 +140,7 @@ func (s *AuthTokenStore) GetByToken(ctx context.Context, rawToken string) (*mode
 	token := &models.AuthToken{}
 	var id, createdAt, expiresAt string
 
-	err := row.Scan(&id, &token.Token, &token.DeviceId, &createdAt, &expiresAt)
+	err := row.Scan(&id, &token.Token, &token.DeviceID, &createdAt, &expiresAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
@@ -366,7 +366,7 @@ func (s *AuthTokenStore) scanAuthToken(rows *sql.Rows) (*models.AuthToken, error
 	err := rows.Scan(
 		&id,
 		&token.Token,
-		&token.DeviceId,
+		&token.DeviceID,
 		&createdAt,
 		&expiresAt,
 	)

@@ -10,11 +10,11 @@ Monorepo for the **Taksa Platform** — a microservices-based IoT/device managem
 - `user-management/` — User CRUD, JWT tokens, Ory Kratos identity integration (Go/Kratos, HTTP :8083, external PostgreSQL via Kratos)
 - `ui-service/` — Web dashboard and auth flows (Next.js 16 / React 19 / TypeScript 5, port :3000)
 
-There is no top-level Makefile or CI/CD configuration. Each service is built independently from its own directory.
+There is a top-level Makefile at the repository root that serves as the shared build entrypoint for repo-level workflows. Individual services also have their own Makefiles and can be built independently from their respective directories.
 
 ## Commands
 
-All `make` commands must be run from the respective service directory.
+Use the repository-root `Makefile` for top-level workflows. Use each service's own `Makefile` from that service directory for service-specific targets documented below.
 
 ### device-management (Go 1.24)
 

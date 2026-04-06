@@ -2,7 +2,7 @@
 
 ## Pre-Flight Checklist (5 minutes)
 
-- [ ] Go 1.20+ installed: `go version`
+- [ ] Go version required by `go.mod` installed: `go version`
 - [ ] Proto tools installed: `make init`
 - [ ] Protos regenerated: `make all`
 - [ ] Project builds: `make build`
@@ -88,7 +88,7 @@ export JWT_TOKEN=<value-from-login>
 
 ```bash
 # 1. Register
-curl -X POST http://localhost:8000/v2/device/register \
+curl -X POST http://localhost:8000/api/v2/device/register \
   -H "Content-Type: application/json" \
   -d '{"name":"quick-test","serial_number":"QT-001","location":"Lab","company":"Test"}' | jq .
 
@@ -97,7 +97,7 @@ export DEVICE_ID=dev-xxx
 export DOUBLE_HASH=xxx  # Compute using SHA3(SHA3(token))
 
 # 3. Login
-curl -X POST http://localhost:8000/v2/instance/login \
+curl -X POST http://localhost:8000/api/v2/instance/login \
   -H "Authorization: Bearer $DOUBLE_HASH" \
   -H "Content-Type: application/json" \
   -d '{"device_id":"'$DEVICE_ID'"}' | jq .
@@ -106,7 +106,7 @@ curl -X POST http://localhost:8000/v2/instance/login \
 export JWT_TOKEN=eyJ...
 
 # 5. Push
-curl -X POST http://localhost:8000/v2/instance/push \
+curl -X POST http://localhost:8000/api/v2/instance/push \
   -H "Authorization: Bearer $JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

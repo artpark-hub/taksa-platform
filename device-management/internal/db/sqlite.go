@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"sync"
@@ -104,19 +105,11 @@ func (d *Database) BeginTx() (*sql.Tx, error) {
 	return d.DB.Begin()
 }
 
-// HealthCheck verifies database connectivity
+// HealthCheck verifies database connectivity with context timeout
 func (d *Database) HealthCheck() error {
-	ctx := make(chan error, 1)
-	go func() {
-		ctx <- d.Ping()
-	}()
-
-	select {
-	case err := <-ctx:
-		return err
-	case <-time.After(5 * time.Second):
-		return fmt.Errorf("database health check timeout")
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return d.DB.PingContext(ctx)
 }
 
 // Stats returns connection pool statistics

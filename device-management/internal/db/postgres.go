@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -30,6 +31,12 @@ func NewPostgresDatabase(config PostgresConfig) (*sql.DB, error) {
 	}
 	if config.MaxIdleConns > 0 {
 		db.SetMaxIdleConns(config.MaxIdleConns)
+	}
+	if config.ConnMaxLifetime > 0 {
+		db.SetConnMaxLifetime(time.Duration(config.ConnMaxLifetime) * time.Second)
+	}
+	if config.ConnMaxIdleTime > 0 {
+		db.SetConnMaxIdleTime(time.Duration(config.ConnMaxIdleTime) * time.Second)
 	}
 
 	// Test connection

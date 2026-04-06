@@ -130,7 +130,7 @@ func (uc *AuthUsecase) CreateAuthToken(ctx context.Context, deviceID string, exp
 	// Create auth token entity
 	authToken := &models.AuthToken{
 		Token:     token,
-		DeviceId:  deviceID,
+		DeviceID:  deviceID,
 		ExpiresAt: time.Now().AddDate(0, 0, expiryDays),
 		CreatedAt: time.Now(),
 	}
