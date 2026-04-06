@@ -1,7 +1,7 @@
 syntax = "proto3";
 package kratos.api;
 
-option go_package = "github.com/artpark-hub/taksa-platform/device-management/internal/conf;conf";
+option go_package = "taksa-platform-dm/internal/conf;conf";
 
 import "google/protobuf/duration.proto";
 
@@ -9,7 +9,13 @@ message Bootstrap {
   Server server = 1;
   Data data = 2;
   string log_level = 3;  // Log level: debug, info, warn, error, production
-  string log_file = 4;   // Log file path (optional, e.g., /tmp/device-management.log)
+  string log_file = 4;   // Log file path (optional, e.g., /tmp/taksa-platform-dm.log)
+  Deployment deployment = 5; // Deployment configuration (docker image, base URLs)
+}
+
+message Deployment {
+  string base_url = 1;              // API base URL (e.g., http://localhost:8000)
+  string umh_core_docker_image = 2; // UMH-Core docker image URI
 }
 
 message Server {

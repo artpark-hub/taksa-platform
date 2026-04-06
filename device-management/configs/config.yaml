@@ -15,3 +15,6 @@ data:
     max_idle_conns: 5
     conn_max_lifetime: 300
     conn_max_idle_time: 10
+deployment:
+  base_url: http://localhost:8000
+  umh_core_docker_image: management.umh.app/oci/united-manufacturing-hub/umh-core:v0.43.17

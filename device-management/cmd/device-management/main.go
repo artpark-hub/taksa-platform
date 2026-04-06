@@ -132,6 +132,12 @@ func main() {
 	if dbSource := os.Getenv("TAKSA_DM_DATABASE_SOURCE"); dbSource != "" {
 		bc.Data.Database.Source = dbSource
 	}
+	if baseURL := os.Getenv("TAKSA_DM_BASE_URL"); baseURL != "" {
+		bc.Deployment.BaseUrl = baseURL
+	}
+	if dockerImage := os.Getenv("TAKSA_DM_UMH_CORE_DOCKER_IMAGE"); dockerImage != "" {
+		bc.Deployment.UmhCoreDockerImage = dockerImage
+	}
 
 	// Initialize Zap logger based on config log_level and log_file
 	zapLogger, err := newZapLogger(bc.LogLevel, bc.LogFile)
@@ -165,7 +171,7 @@ func main() {
 		zap.String("database.source", bc.Data.Database.Source),
 	)
 
-	app, cleanup, err := wireApp(bc.Server, bc.Data, logger, zapLogger)
+	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Deployment, logger, zapLogger)
 	if err != nil {
 		zapLogger.Fatal("Failed to wire app", zap.Error(err))
 	}

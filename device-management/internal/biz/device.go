@@ -3,6 +3,8 @@ package biz
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -15,15 +17,19 @@ import (
 
 // DeviceUsecase handles device business logic (registration, listing, updates)
 type DeviceUsecase struct {
-	store   storage.Store
-	authUc  *AuthUsecase
+	store              storage.Store
+	authUc             *AuthUsecase
+	baseURL            string
+	umhCoreDockerImage string
 }
 
 // NewDeviceUsecase creates a new device use case
-func NewDeviceUsecase(store storage.Store, authUc *AuthUsecase) *DeviceUsecase {
+func NewDeviceUsecase(store storage.Store, authUc *AuthUsecase, baseURL, umhCoreDockerImage string) *DeviceUsecase {
 	return &DeviceUsecase{
-		store:  store,
-		authUc: authUc,
+		store:              store,
+		authUc:             authUc,
+		baseURL:            baseURL,
+		umhCoreDockerImage: umhCoreDockerImage,
 	}
 }
 
@@ -102,13 +108,14 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 		return nil, fmt.Errorf("failed to update device with token expiry: %w", err)
 	}
 
+	// Generate Docker command for device deployment
+	dockerCmd := uc.buildDockerCommand(device.Name, device.Location, token)
+
 	return &RegisterDeviceResponse{
 		Device:       deviceToSummary(device),
 		AuthToken:    token,
 		Instructions: map[string]string{
-			"setup_guide":     "https://docs.example.com/setup-guide",
-			"firmware_update": "Download firmware from releases endpoint",
-			"config_path":     "/etc/umh-core/config.yaml",
+			"docker_command": dockerCmd,
 		},
 	}, nil
 }
@@ -305,4 +312,66 @@ type RegisterDeviceResponse struct {
 	Device       *v1.DeviceSummary
 	AuthToken    string
 	Instructions map[string]string
+}
+
+// buildDockerCommand generates a ready-to-use Docker command for umh-core deployment
+func (uc *DeviceUsecase) buildDockerCommand(
+	deviceName string,
+	location *v1.DeviceLocation,
+	authToken string,
+) string {
+	// Set defaults if config values are missing
+	baseURL := uc.baseURL
+	if baseURL == "" {
+		baseURL = "http://localhost:8000"
+	}
+	dockerImage := uc.umhCoreDockerImage
+	if dockerImage == "" {
+		dockerImage = "management.umh.app/oci/united-manufacturing-hub/umh-core:v0.43.17"
+	}
+
+	// Sanitize device name for container and volume naming
+	sanitizedName := sanitizeDeviceName(deviceName)
+
+	// Build base command
+	cmd := fmt.Sprintf("docker run -d --restart unless-stopped --name umh-core-%s", sanitizedName)
+
+	// Add named volume mount (docker volume instead of bind mount)
+	cmd += fmt.Sprintf(" -v umh-core-data-%s:/data", sanitizedName)
+
+	// Add auth token
+	cmd += fmt.Sprintf(` -e AUTH_TOKEN="%s"`, authToken)
+
+	// Add release channel
+	cmd += " -e RELEASE_CHANNEL=stable"
+
+	// Add LOCATION_* environment variables from the 7-level hierarchy
+	// Keys are "0" through "6" per ISA-95 levels
+	if location != nil && location.Levels != nil {
+		for i := 0; i < 7; i++ {
+			levelKey := fmt.Sprintf("%d", i)
+			if val, exists := location.Levels[levelKey]; exists && val != "" {
+				cmd += fmt.Sprintf(" -e LOCATION_%d=%s", i, val)
+			}
+		}
+	}
+
+	// Add API URL
+	apiURL := fmt.Sprintf("%s/api", strings.TrimSuffix(baseURL, "/"))
+	cmd += fmt.Sprintf(` -e API_URL="%s"`, apiURL)
+
+	// Add docker image
+	cmd += fmt.Sprintf(" %s", dockerImage)
+
+	return cmd
+}
+
+// sanitizeDeviceName removes special characters for use in container/dir names
+func sanitizeDeviceName(name string) string {
+	// Replace non-alphanumeric characters with hyphens
+	reg := regexp.MustCompile("[^a-zA-Z0-9-]")
+	sanitized := reg.ReplaceAllString(name, "-")
+	// Remove consecutive hyphens
+	reg = regexp.MustCompile("-+")
+	return reg.ReplaceAllString(sanitized, "-")
 }
