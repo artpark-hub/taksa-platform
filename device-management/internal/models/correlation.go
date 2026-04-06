@@ -4,7 +4,7 @@ import "time"
 
 // RequestCorrelation tracks a user's request to queue an action
 // INTERNAL ONLY: Not sent to device or umh-core
-// Used by taksa-platform-dm to track request-response correlation
+// Used by device-management to track request-response correlation
 type RequestCorrelation struct {
 	RequestID string    // Unique per API request
 	TraceID   string    // For distributed tracing

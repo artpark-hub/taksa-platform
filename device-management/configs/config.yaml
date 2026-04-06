@@ -6,7 +6,7 @@ server:
     addr: 0.0.0.0:9000
     timeout: 1s
 log_level: debug  # Options: debug, info, warn, error, production
-log_file: /data/taksa-platform-dm.log  # Log file path (logs to both console and file)
+log_file: /data/taksa-device-management.log  # Log file path (logs to both console and file)
 data:
   database:
     driver: sqlite3

@@ -2179,7 +2179,7 @@ components:
                     $ref: '#/components/schemas/api.common.CompanyDetails'
                 jwtToken:
                     type: string
-            description: "LoginResponse returns device information and authentication token\n Matches umh-core's InstanceLoginResponse (backend_api_structs/backend_api_struct.go:119-125)\n but includes jwtToken for taksa-platform-dm client convenience\n \n CRITICAL: Uses common.CompanyDetails and common.LicenseStatus for wire protocol compatibility\n These are the exact types that umh-core sends, ensuring 100% compatibility"
+            description: "LoginResponse returns device information and authentication token\n Matches umh-core's InstanceLoginResponse (backend_api_structs/backend_api_struct.go:119-125)\n but includes jwtToken for device-management client convenience\n \n CRITICAL: Uses common.CompanyDetails and common.LicenseStatus for wire protocol compatibility\n These are the exact types that umh-core sends, ensuring 100% compatibility"
         api.umh_core.v2.Memory:
             type: object
             properties:
@@ -2402,7 +2402,7 @@ components:
                 UMHMessage is the standard message format for device-console communication
                  MUST match umh-core's models.UMHMessage exactly (pkg/models/action_models.go:79-84)
                  Wire protocol - clean, simple, compatible with umh-core
-                 Internal correlation tracking is handled separately in taksa-platform-dm
+                 Internal correlation tracking is handled separately in device-management
         api.umh_core.v2.Version:
             type: object
             properties:

@@ -96,7 +96,7 @@ Tests are numbered and should be run in order:
 
 ```bash
 # Navigate to project root
-cd /home/rajeevb/projects/taksa-platform-dm
+cd <project-root>/repos/taksa-platform/device-management
 
 # Run all DataModel tests in sequence
 bruno run --collection bruno --env default
@@ -111,7 +111,7 @@ bruno run --env default --set base_url=http://localhost:8000
 ### Via Bruno UI
 
 1. Open Bruno application
-2. Load collection: `/home/rajeevb/projects/taksa-platform-dm/bruno`
+2. Load collection: `<project-root>/repos/taksa-platform/device-management/bruno`
 3. Select environment: `default` (or custom)
 4. Navigate to `03-DataModels` folder
 5. Click **Run** on each test sequentially

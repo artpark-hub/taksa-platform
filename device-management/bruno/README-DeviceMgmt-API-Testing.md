@@ -1,6 +1,6 @@
 # Device Management API - Bruno Testing Guide
 
-This directory contains Bruno API test files for the Taksa Platform Device Management API (taksa-platform-dm).
+This directory contains Bruno API test files for the Taksa Platform Device Management API (device-management).
 
 ## API Patterns
 
@@ -216,7 +216,7 @@ Logs/Metrics actions may complete immediately if device is responsive:
 ### Verify proto changes
 After modifying `devicemgmt.proto`:
 ```bash
-cd /home/rajeevb/projects/taksa-platform-dm
+cd <project-root>/repos/taksa-platform/device-management
 make clean && make all
 ```
 

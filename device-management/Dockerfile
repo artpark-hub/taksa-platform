@@ -1,7 +1,7 @@
 # Dockerfile - For Production Deployment of Taksa Platform DM
 # TODO: Address Optimization and Security Enhancements (e.g., multi-stage builds, non-root user, minimal base image)
 # Build locally with: make build
-# Then build image with: docker build -t taksa-platform-dm:latest .
+# Then build image with: docker build -t taksa-device-management:latest .
 
 FROM ubuntu:24.04
 
@@ -17,7 +17,7 @@ RUN mkdir -p /data /home/taksa && chown -R taksa:taksa /data /home/taksa
 WORKDIR /home/taksa
 
 # Copy pre-built binary (built with: make build)
-COPY --chown=taksa:taksa bin/taksa-platform-dm /home/taksa/taksa-platform-dm
+COPY --chown=taksa:taksa bin/device-management /home/taksa/device-management
 
 # Copy config and db schema
 COPY --chown=taksa:taksa configs/ /home/taksa/configs/
@@ -34,4 +34,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
 EXPOSE 8000 9000
 
 # Run
-CMD ["/home/taksa/taksa-platform-dm", "-conf", "/home/taksa/configs"]
+CMD ["/home/taksa/device-management", "-conf", "/home/taksa/configs"]

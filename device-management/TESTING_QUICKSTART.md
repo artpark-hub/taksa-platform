@@ -12,7 +12,7 @@
 
 **Option A: kratos run from sources (development)**
 ```bash
-cd /home/rajeevb/projects/taksa-platform-dm
+cd <project-root>/repos/taksa-platform/device-management
 make clean; make all;
 kratos run
 ```
@@ -20,7 +20,7 @@ kratos run
 **Option B: go run from sources (development)**
 
 ```bash
-cd /home/rajeevb/projects/taksa-platform-dm/cmd/taksa-platform-dm
+cd <project-root>/repos/taksa-platform/device-management/cmd/device-management
 go run . -conf ../../configs
 ```
 
@@ -36,7 +36,7 @@ INFO http listening on [::]:8000
 
 ```bash
 # Terminal 2
-cd /home/rajeevb/projects/taksa-platform-dm
+cd <project-root>/repos/taksa-platform/device-management
 
 # 1. Register device and export variables
 ./setup_device.sh
@@ -62,7 +62,7 @@ cat results.json | jq .
 
 ```bash
 # Terminal 2
-cd /home/rajeevb/projects/taksa-platform-dm
+cd <project-root>/repos/taksa-platform/device-management
 
 # 1. Register device
 ./test-instance-service.sh register-device --name "quick-test" --serial "QT-001"

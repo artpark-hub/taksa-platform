@@ -38,7 +38,7 @@ func init() {
 func newZapLogger(logLevel, logFile string) (*zap.Logger, error) {
 	// Default log file path
 	if logFile == "" {
-		logFile = "/tmp/taksa-platform-dm.log"
+		logFile = "/tmp/device-management.log"
 	}
 	
 	cfg := zap.NewDevelopmentConfig()
@@ -151,7 +151,7 @@ func main() {
 		"span.id", tracing.SpanID(),
 	)
 
-	zapLogger.Info("Starting taksa-platform-dm",
+	zapLogger.Info("Starting device-management",
 		zap.String("service.id", id),
 		zap.String("service.name", Name),
 		zap.String("service.version", Version),

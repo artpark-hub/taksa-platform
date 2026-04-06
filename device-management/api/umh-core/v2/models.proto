@@ -22,7 +22,7 @@ message Certificate {
 // UMHMessage is the standard message format for device-console communication
 // MUST match umh-core's models.UMHMessage exactly (pkg/models/action_models.go:79-84)
 // Wire protocol - clean, simple, compatible with umh-core
-// Internal correlation tracking is handled separately in taksa-platform-dm
+// Internal correlation tracking is handled separately in device-management
 message UMHMessage {
   api.common.MessageMetadata metadata = 1; // Distributed tracing ID only
   string email = 2; // Sender email

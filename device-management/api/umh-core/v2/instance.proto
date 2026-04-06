@@ -56,7 +56,7 @@ service InstanceService {
 
 // LoginResponse returns device information and authentication token
 // Matches umh-core's InstanceLoginResponse (backend_api_structs/backend_api_struct.go:119-125)
-// but includes jwtToken for taksa-platform-dm client convenience
+// but includes jwtToken for device-management client convenience
 // 
 // CRITICAL: Uses common.CompanyDetails and common.LicenseStatus for wire protocol compatibility
 // These are the exact types that umh-core sends, ensuring 100% compatibility

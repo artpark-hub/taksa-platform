@@ -9,7 +9,7 @@ message Bootstrap {
   Server server = 1;
   Data data = 2;
   string log_level = 3;  // Log level: debug, info, warn, error, production
-  string log_file = 4;   // Log file path (optional, e.g., /tmp/taksa-platform-dm.log)
+  string log_file = 4;   // Log file path (optional, e.g., /tmp/device-management.log)
 }
 
 message Server {

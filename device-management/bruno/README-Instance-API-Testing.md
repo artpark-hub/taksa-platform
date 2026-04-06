@@ -1,6 +1,6 @@
 # Instance API Testing Guide (umh-core Compatible)
 
-Updated Bruno tests for taksa-platform-dm instance APIs with full umh-core compatibility.
+Updated Bruno tests for device-management instance APIs with full umh-core compatibility.
 
 ## Test Suite Files
 
@@ -11,10 +11,10 @@ Updated Bruno tests for taksa-platform-dm instance APIs with full umh-core compa
 
 ## Prerequisites
 
-1. **Start taksa-platform-dm server:**
+1. **Start device-management server:**
    ```bash
-   cd taksa-platform-dm
-   go run ./cmd/taksa-platform-dm/
+   cd <project-root>/repos/taksa-platform/device-management
+   go run ./cmd/device-management/
    ```
 
 2. **Register a device** (if not already done):
@@ -221,4 +221,4 @@ All files follow umh-core's exact request/response patterns:
 - umh-core Pull Implementation: `umh-core/pkg/communicator/api/v2/pull/pull.go`
 - umh-core Push Implementation: `umh-core/pkg/communicator/api/v2/push/push.go`
 - umh-core HTTP Client: `umh-core/pkg/communicator/api/v2/http/requester.go`
-- taksa-platform-dm Instance Service: `internal/service/instance.go`
+- device-management Instance Service: `internal/service/instance.go`

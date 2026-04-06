@@ -1,15 +1,15 @@
 services:
-  taksa-platform-dm:
+  taksa-device-management:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: taksa-platform-dm
+    container_name: taksa-device-management
     ports:
       - "${TAKSA_DM_HTTP_PORT:-8000}:8000"
       - "${TAKSA_DM_GRPC_PORT:-9000}:9000"
     environment:
       - TAKSA_DM_LOG_LEVEL=${TAKSA_DM_LOG_LEVEL:-debug}
-      - TAKSA_DM_LOG_FILE=${TAKSA_DM_LOG_FILE:-/data/taksa-platform-dm.log}
+      - TAKSA_DM_LOG_FILE=${TAKSA_DM_LOG_FILE:-/data/taksa-device-management.log}
       - TAKSA_DM_HTTP_PORT=${TAKSA_DM_HTTP_PORT:-8000}
       - TAKSA_DM_GRPC_PORT=${TAKSA_DM_GRPC_PORT:-9000}
       - TAKSA_DM_DATABASE_SOURCE=${TAKSA_DM_DATABASE_SOURCE:-/data/taksa_platform_dm.db}
@@ -20,11 +20,11 @@ services:
       - taksa-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "ps aux | grep taksa-platform-dm | grep -v grep | grep -q taksa-platform-dm && exit 0 || exit 1"]
-      interval: 30s
-      timeout: 5s
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/" ]
+      interval: 10s
+      timeout: 3s
       retries: 3
-      start_period: 10s
+      start_period: 5s
 
 volumes:
   taksa-data:

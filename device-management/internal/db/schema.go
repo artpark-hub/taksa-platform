@@ -36,7 +36,6 @@ func readSchemaFile(filename string) ([]byte, error) {
 		filename,                                                     // Relative path
 		"../" + filename,                                             // One level up
 		"../../" + filename,                                          // Two levels up
-		"/home/rajeevb/projects/taksa-platform-dm/" + filename,      // Absolute path
 	}
 
 	for _, path := range possiblePaths {

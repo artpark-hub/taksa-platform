@@ -46,8 +46,8 @@ api:
 
 .PHONY: build
 # build
-build:
-	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./...
+build: api config generate wire
+	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/device-management ./cmd/device-management
 
 .PHONY: wire
 # generate wire
