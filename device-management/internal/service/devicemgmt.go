@@ -270,9 +270,11 @@ func (s *DeviceMgmtService) ListDevices(ctx context.Context, req *v1.ListDevices
 	}
 
 	// Prepare next page token
+	// Storage layer fetches pageSize + 1 to detect if more results exist
 	nextPageToken := ""
-	if len(devices) == int(req.PageSize) {
-		// More results available
+	if len(devices) > int(req.PageSize) {
+		// More results available - truncate to requested page size
+		devices = devices[:req.PageSize]
 		nextPageToken = encodePageToken(offset + req.PageSize)
 	}
 
@@ -1088,12 +1090,21 @@ func (s *DeviceMgmtService) ListProtocolConverters(ctx context.Context, req *v1.
 		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to list protocol converters: %v", err))
 	}
 
+	// Prepare next page token
+	// Storage layer fetches pageSize + 1 to detect if more results exist
+	nextPageToken := ""
+	if len(converters) > int(pageSize) {
+		// More results available - truncate to requested page size
+		converters = converters[:pageSize]
+		nextPageToken = encodePageToken(int32(offset + int64(pageSize)))
+	}
+
 	// Build response
 	// Note: We always initialize converters slice to ensure it appears in JSON output (even if empty)
 	// This is necessary because proto3 omits nil/empty slices by default
 	response := &v1.ListProtocolConvertersResponse{
 		Converters: make([]*v1.ProtocolConverterSummary, len(converters)),
-		NextPageToken: "", // Explicitly set to ensure field appears in JSON
+		NextPageToken: nextPageToken,
 	}
 
 	for i, pc := range converters {
@@ -1125,13 +1136,6 @@ func (s *DeviceMgmtService) ListProtocolConverters(ctx context.Context, req *v1.
 			LastSyncTime:       lastSyncTime,
 			ErrorMessage:       errorMessage,
 		}
-	}
-
-	// Set next page token if there are more results
-	if len(converters) == int(pageSize) {
-		// There may be more results, encode the next offset
-		nextOffset := offset + int64(pageSize)
-		response.NextPageToken = encodePageToken(int32(nextOffset))
 	}
 
 	// NOTE: Proto3 omits empty slices/zero values in JSON by default
@@ -1701,10 +1705,19 @@ func (s *DeviceMgmtService) ListDataModels(ctx context.Context, req *v1.ListData
 		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to list data models: %v", err))
 	}
 
+	// Prepare next page token
+	// Storage layer fetches pageSize + 1 to detect if more results exist
+	nextPageToken := ""
+	if len(models) > int(pageSize) {
+		// More results available - truncate to requested page size
+		models = models[:pageSize]
+		nextPageToken = encodePageToken(int32(offset + int64(pageSize)))
+	}
+
 	// Build response
 	response := &v1.ListDataModelsResponse{
 		Models:        make([]*v1.DataModelSummary, len(models)),
-		NextPageToken: "", // Explicitly set to ensure field appears in JSON
+		NextPageToken: nextPageToken,
 	}
 
 	for i, dm := range models {
@@ -1713,11 +1726,6 @@ func (s *DeviceMgmtService) ListDataModels(ctx context.Context, req *v1.ListData
 			Version:     dm.Version,
 			Description: dm.Description.String,
 		}
-	}
-
-	// Set next page token if there might be more results
-	if len(models) == int(pageSize) {
-		response.NextPageToken = encodePageToken(int32(offset + int64(pageSize)))
 	}
 
 	return response, nil
@@ -2011,9 +2019,18 @@ func (s *DeviceMgmtService) ListStreamProcessors(ctx context.Context, req *v1.Li
 		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to list stream processors: %v", err))
 	}
 
+	// Prepare next page token
+	// Storage layer fetches pageSize + 1 to detect if more results exist
+	nextPageToken := ""
+	if len(models) > int(pageSize) {
+		// More results available - truncate to requested page size
+		models = models[:pageSize]
+		nextPageToken = encodePageToken(offset + pageSize)
+	}
+
 	response := &v1.ListStreamProcessorsResponse{
 		Processors:    make([]*v1.StreamProcessorSummary, len(models)),
-		NextPageToken: "", // Explicitly set to ensure field appears in JSON
+		NextPageToken: nextPageToken,
 	}
 
 	for i, sp := range models {
@@ -2025,11 +2042,6 @@ func (s *DeviceMgmtService) ListStreamProcessors(ctx context.Context, req *v1.Li
 				Version: sp.ModelVersion.String,
 			},
 		}
-	}
-
-	// Set next page token if there might be more results
-	if len(models) == int(pageSize) {
-		response.NextPageToken = encodePageToken(offset + pageSize)
 	}
 
 	return response, nil
