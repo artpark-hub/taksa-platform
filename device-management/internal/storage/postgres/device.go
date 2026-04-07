@@ -9,8 +9,8 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	v1 "taksa-platform-dm/api/devicemgmt/v1"
-	"taksa-platform-dm/internal/storage"
+	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // DeviceStore implements storage.DeviceStore for PostgreSQL

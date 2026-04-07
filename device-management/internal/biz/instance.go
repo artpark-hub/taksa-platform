@@ -15,11 +15,11 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	v1 "taksa-platform-dm/api/devicemgmt/v1"
-	v2 "taksa-platform-dm/api/umh-core/v2"
-	"taksa-platform-dm/internal/data"
-	"taksa-platform-dm/internal/models"
-	"taksa-platform-dm/internal/storage"
+	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // generateUUID generates a proper UUID v4
@@ -1205,7 +1205,7 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 		// UUID generation is deterministic: GenerateUUIDFromName(name) == same UUID every time for same name
 		if actionType == "deploy" {
 			if name, ok := protocolConverter["name"].(string); ok && name != "" {
-				// Import would be needed: "taksa-platform-dm/api/umh-core/v2"
+				// Import would be needed: "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 				// For now, try to get from request payload
 				if action.Payload != nil {
 					var origPayload map[string]interface{}

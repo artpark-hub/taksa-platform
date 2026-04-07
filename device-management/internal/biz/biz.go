@@ -1,8 +1,8 @@
 package biz
 
 import (
-	"taksa-platform-dm/internal/conf"
-	"taksa-platform-dm/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 
 	"github.com/google/wire"
 )

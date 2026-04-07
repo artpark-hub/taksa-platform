@@ -9,9 +9,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/sha3"
 
-	v1 "taksa-platform-dm/api/devicemgmt/v1"
-	"taksa-platform-dm/internal/models"
-	"taksa-platform-dm/internal/storage"
+	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
 // AuthUsecase handles authentication and token operations
@@ -131,7 +131,7 @@ func (uc *AuthUsecase) CreateAuthToken(ctx context.Context, deviceID string, exp
 	// Create auth token entity
 	authToken := &models.AuthToken{
 		Token:     token,
-		DeviceId:  deviceID,
+		DeviceID:  deviceID,
 		ExpiresAt: time.Now().AddDate(50, 0, 0), // 50 year expiry from registration
 		CreatedAt: time.Now(),
 	}
