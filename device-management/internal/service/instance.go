@@ -37,7 +37,7 @@ func NewInstanceService(instanceUc *biz.InstanceUsecase, authUc *biz.AuthUsecase
 func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.LoginResponse, error) {
 	// Extract token hash from context (set by middleware)
 	// Device sends: Authorization: Bearer <token-hash>
-	tokenHash, ok := ctx.Value("authorization").(string)
+	tokenHash, ok := ctx.Value(AuthorizationKey).(string)
 	if !ok || tokenHash == "" {
 		s.logger.Warn("Login failed: missing or invalid authorization header")
 		return nil, status.Error(codes.Unauthenticated, "missing or invalid authorization header")
@@ -115,7 +115,7 @@ func (s *InstanceService) Pull(ctx context.Context, req *emptypb.Empty) (*v2.Pul
 
 	// Extract JWT from context (set by middleware)
 	jwtDeviceID := ""
-	if jwtToken, ok := ctx.Value("jwt_token").(string); ok && jwtToken != "" {
+	if jwtToken, ok := ctx.Value(JWTTokenKey).(string); ok && jwtToken != "" {
 		// s.logger.Debug("JWT token found in context",
 		// 	zap.String("token_preview", jwtToken[:min(len(jwtToken), 30)]+"..."),
 		// )
@@ -216,7 +216,7 @@ func (s *InstanceService) Push(ctx context.Context, req *v2.PushRequest) (*empty
 	// Extract JWT from context (set by middleware) to determine device context
 	// This is used as fallback if umhInstance field is not populated in messages
 	jwtDeviceID := ""
-	if jwtToken, ok := ctx.Value("jwt_token").(string); ok && jwtToken != "" {
+	if jwtToken, ok := ctx.Value(JWTTokenKey).(string); ok && jwtToken != "" {
 		deviceID, err := s.authUc.ExtractDeviceIDFromJWT(jwtToken)
 		if err != nil {
 			s.logger.Warn("Failed to extract device ID from JWT, will rely on message umhInstance field",
@@ -269,7 +269,7 @@ func (s *InstanceService) Push(ctx context.Context, req *v2.PushRequest) (*empty
 // (pkg/communicator/api/v2/pull/pull.go:147-151)
 func (s *InstanceService) GetCertificate(ctx context.Context, req *v2.GetCertificateRequest) (*v2.Certificate, error) {
 	// Extract device_id from JWT token (set by ExtractJWTTokenMiddleware)
-	jwtToken, ok := ctx.Value("jwt_token").(string)
+	jwtToken, ok := ctx.Value(JWTTokenKey).(string)
 	if !ok || jwtToken == "" {
 		s.logger.Warn("GetCertificate failed: missing JWT token")
 		return nil, status.Error(codes.Unauthenticated, "missing JWT token")

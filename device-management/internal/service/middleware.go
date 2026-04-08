@@ -11,11 +11,11 @@ import (
 )
 
 // Context key types for storing values in context
-type contextKey string
+type ContextKey string
 
 const (
-	authorizationKey contextKey = "authorization"
-	jwtTokenKey      contextKey = "jwt_token"
+	AuthorizationKey ContextKey = "authorization"
+	JWTTokenKey      ContextKey = "jwt_token"
 )
 
 // AuthMiddleware extracts Bearer token from Authorization header and logs request details
@@ -54,7 +54,7 @@ func AuthMiddleware(logger *zap.Logger) middleware.Middleware {
 						zap.Bool("has_token", true),
 					)
 					// Store in context with typed key
-					ctx = context.WithValue(ctx, authorizationKey, token)
+					ctx = context.WithValue(ctx, AuthorizationKey, token)
 				}
 			} else {
 				logger.Debug("No authorization header provided",
@@ -108,7 +108,7 @@ func ExtractJWTTokenMiddleware(logger *zap.Logger) middleware.Middleware {
 			cookie, err := request.Cookie("token")
 			if err == nil && cookie.Value != "" {
 				// Store JWT in context for use by services (with typed key)
-				ctx = context.WithValue(ctx, jwtTokenKey, cookie.Value)
+				ctx = context.WithValue(ctx, JWTTokenKey, cookie.Value)
 				logger.Debug("Extracted JWT token from cookie")
 			} else {
 				logger.Debug("No 'token' cookie found in request",
