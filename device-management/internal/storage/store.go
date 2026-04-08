@@ -89,18 +89,17 @@ type Store interface {
 	Close() error
 }
 
-// NewStore creates a new Store with SQLite backend
-// This function will be implemented in internal/storage/sqlite/store.go
+// NewStore creates a new Store with PostgreSQL backend
+// This is initialized by data package after postgres is imported
 func NewStore(db *sql.DB) (Store, error) {
-	return newSQLiteStore(db)
+	return newPostgresStore(db)
 }
 
-// newSQLiteStore is declared in the sqlite subpackage
-// It's a forward declaration that will be satisfied by the sqlite implementation
-var newSQLiteStore func(db *sql.DB) (Store, error)
+// newPostgresStore is the factory function set by postgres subpackage
+var newPostgresStore func(db *sql.DB) (Store, error)
 
-// RegisterSQLiteStore registers the SQLite store factory
-// This should be called from the sqlite subpackage's init() function
-func RegisterSQLiteStore(factory func(db *sql.DB) (Store, error)) {
-	newSQLiteStore = factory
+// RegisterPostgresStore registers the PostgreSQL store factory
+// Called from postgres subpackage's init
+func RegisterPostgresStore(factory func(db *sql.DB) (Store, error)) {
+	newPostgresStore = factory
 }

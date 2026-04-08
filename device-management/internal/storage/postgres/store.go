@@ -98,3 +98,8 @@ func (s *Store) Close() error {
 	}
 	return nil
 }
+
+// init registers the PostgreSQL store factory with the storage package
+func init() {
+	storage.RegisterPostgresStore(NewStore)
+}

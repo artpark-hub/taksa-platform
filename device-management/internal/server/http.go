@@ -17,12 +17,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// loginResponseEncoder encodes LoginResponse with JWT token as HttpOnly cookie
-// Only the cookie should contain the JWT token, NOT the response body
-// This matches umh-core's security model
+// loginResponseEncoder handles Login response encoding with cookie management
 func loginResponseEncoder(w http.ResponseWriter, r *http.Request, v interface{}) error {
+	// Handle LoginResponse - set JWT cookie before writing body
 	if loginResp, ok := v.(*v2.LoginResponse); ok {
-		// Set JWT cookie if token exists
+		// Set cookie FIRST, before any writes
 		if loginResp.JwtToken != "" {
 			cookie := &http.Cookie{
 				Name:     "token",
@@ -33,34 +32,23 @@ func loginResponseEncoder(w http.ResponseWriter, r *http.Request, v interface{})
 				MaxAge:   3600,
 			}
 			http.SetCookie(w, cookie)
-			
-			// Remove JWT token from response body (only send in cookie)
-			// This matches umh-core's InstanceLoginResponse structure
+			// Remove JWT from response body
 			loginResp.JwtToken = ""
 		}
 	}
-	
-	// Use protojson with EmitUnpopulated to ensure empty fields are included
-	// proto3 by default omits zero/empty values, which breaks empty list APIs
+
+	// Default Kratos proto/JSON encoding
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	
 	if protoMsg, ok := v.(proto.Message); ok {
-		// Marshal with protojson to handle proto types properly and emit default values
-		marshalOptions := protojson.MarshalOptions{
-			EmitUnpopulated: true,
-		}
-		data, err := marshalOptions.Marshal(protoMsg)
+		data, err := protojson.Marshal(protoMsg)
 		if err != nil {
 			return err
 		}
-		if _, err = w.Write(data); err != nil {
-			return err
-		}
-		_, err = w.Write([]byte("\n"))
+		_, err = w.Write(data)
 		return err
 	}
 	
-	// Fallback to standard JSON encoding for non-proto types
 	return json.NewEncoder(w).Encode(v)
 }
 
@@ -76,10 +64,8 @@ func NewHTTPServer(
 		khttp.Middleware(
 			recovery.Recovery(),
 			service.AuthMiddleware(zapLogger),
-			service.SetLoginCookieMiddleware(zapLogger),
 			service.ExtractJWTTokenMiddleware(zapLogger),
 		),
-		// Use custom encoder for Login responses
 		khttp.ResponseEncoder(loginResponseEncoder),
 	}
 	if c.Http.Network != "" {

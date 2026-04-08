@@ -9,7 +9,6 @@ require (
 	github.com/google/wire v0.7.0
 	github.com/klauspost/compress v1.18.4
 	github.com/lib/pq v1.11.1
-	github.com/mattn/go-sqlite3 v1.14.33
 	go.uber.org/automaxprocs v1.5.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.47.0

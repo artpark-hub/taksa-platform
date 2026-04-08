@@ -8,12 +8,10 @@ import (
 	dbpkg "github.com/artpark-hub/taksa-platform/device-management/internal/db"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage/postgres"
-	"github.com/artpark-hub/taksa-platform/device-management/internal/storage/sqlite"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // Data holds the database connection and storage layer
@@ -40,25 +38,14 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		return nil, nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// Initialize database schema for SQLite (PostgreSQL uses migrations)
-	if c.Database.Driver == "sqlite3" {
-		if err := dbpkg.InitializeSchema(db); err != nil {
-			_ = db.Close()
-			return nil, nil, fmt.Errorf("failed to initialize SQLite schema: %w", err)
-		}
+	// PostgreSQL only: schema is managed via migrations
+	if c.Database.Driver != "postgres" {
+		_ = db.Close()
+		return nil, nil, fmt.Errorf("unsupported database driver: %s (PostgreSQL only)", c.Database.Driver)
 	}
 
-	// Create appropriate storage implementation
-	var store storage.Store
-	switch c.Database.Driver {
-	case "sqlite3":
-		store, err = sqlite.NewStore(db)
-	case "postgres":
-		store, err = postgres.NewStore(db)
-	default:
-		_ = db.Close()
-		return nil, nil, fmt.Errorf("unsupported database driver: %s (use 'sqlite3' or 'postgres')", c.Database.Driver)
-	}
+	// Create PostgreSQL storage implementation
+	store, err := postgres.NewStore(db)
 
 	if err != nil {
 		_ = db.Close()

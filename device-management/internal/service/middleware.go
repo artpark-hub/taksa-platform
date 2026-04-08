@@ -74,8 +74,7 @@ func min(a, b int) int {
 	return b
 }
 
-// SetLoginCookieMiddleware is deprecated - cookie is now set in loginResponseEncoder
-// Kept as no-op for compatibility
+// SetLoginCookieMiddleware is no-op - cookie is now handled in loginResponseEncoder
 func SetLoginCookieMiddleware(logger *zap.Logger) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req interface{}) (interface{}, error) {
