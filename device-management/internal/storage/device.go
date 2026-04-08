@@ -51,7 +51,8 @@ type DeviceListFilter struct {
 	StatusFilters  []v1.DeviceStatus  // Filter by status (empty = all)
 	LocationFilter string             // Filter by company/plant
 	Search         string             // Search in device name
-	SortBy         string             // "name", "created_at", "last_seen"
+	CreatedBy      string             // Filter by device owner/tenant UUID
+	SortBy         string             // "name", "created_at", "last_seen", "created_by"
 	SortDesc       bool               // Sort descending
 }
 

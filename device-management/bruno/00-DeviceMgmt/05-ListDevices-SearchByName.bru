@@ -1,0 +1,85 @@
+meta {
+  name: List Devices - Search by Name
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices
+}
+
+params:query {
+  page_size: 10
+  search: prod
+}
+
+docs {
+  Search devices by name (partial substring match).
+  
+  This endpoint searches devices by name using case-insensitive substring matching.
+  Useful for finding devices by partial name patterns.
+  
+  Query Parameters:
+  - search: Search term (case-insensitive, substring match)
+  - page_size: Maximum results per page
+  
+  Response includes:
+  - devices: Array of DeviceSummary objects matching the search term
+  - next_page_token: Token for pagination if more results exist
+  
+  Example searches:
+  - search=prod → matches "production", "prod-1", "prod-line-2"
+  - search=device → matches "edge-device", "device-01", "smart-device"
+  - search=test → matches "test-1", "testing-device"
+}
+
+script:post-response {
+  const resp = res.getBody();
+  const searchTerm = bru.getQueryParam('search');
+  
+  if (resp && resp.devices) {
+    console.log("✓ Retrieved " + resp.devices.length + " devices matching '" + searchTerm + "'");
+    
+    if (resp.devices.length > 0) {
+      console.log("  Matching devices:");
+      resp.devices.slice(0, 5).forEach((device, idx) => {
+        console.log("    " + (idx + 1) + ". " + device.name);
+      });
+    }
+  }
+}
+
+tests {
+  test("Search successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has devices array", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('devices');
+    expect(resp.devices).to.be.an('array');
+  });
+  
+  test("All returned devices match search term", function() {
+    const resp = res.getBody();
+    const searchTerm = bru.getQueryParam('search');
+    
+    if (resp.devices && resp.devices.length > 0 && searchTerm) {
+      resp.devices.forEach(device => {
+        // Device name should contain the search term (case-insensitive)
+        expect(device.name.toLowerCase()).to.include(searchTerm.toLowerCase());
+      });
+    }
+  });
+  
+  test("Device names are returned", function() {
+    const resp = res.getBody();
+    if (resp.devices && resp.devices.length > 0) {
+      resp.devices.forEach(device => {
+        expect(device).to.have.property('name');
+        expect(device.name).to.be.a('string');
+        expect(device.name.length).to.be.greaterThan(0);
+      });
+    }
+  });
+}

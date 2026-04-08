@@ -428,6 +428,7 @@ enum DeviceSortField {
   NAME = 1;
   CREATED_AT = 2;
   LAST_SEEN = 3;
+  CREATED_BY = 4;
 }
 
 message ListDevicesRequest {
@@ -439,6 +440,7 @@ message ListDevicesRequest {
   string location_level_0 = 4; // Filter by enterprise/company level
 
   string search = 5; // Full-text search in name, serial number
+  string created_by = 8; // Filter by device owner/tenant UUID
 
   // Sorting
   DeviceSortField sort_by   = 6; // Sort field (default: CREATED_AT)

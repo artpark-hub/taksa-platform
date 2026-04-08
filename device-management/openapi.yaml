@@ -38,6 +38,10 @@ paths:
                   in: query
                   schema:
                     type: string
+                - name: createdBy
+                  in: query
+                  schema:
+                    type: string
                 - name: sortBy
                   in: query
                   description: Sorting

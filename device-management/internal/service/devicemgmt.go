@@ -247,6 +247,8 @@ func (s *DeviceMgmtService) ListDevices(ctx context.Context, req *v1.ListDevices
 		sortBy = "name"
 	} else if req.SortBy == v1.DeviceSortField_LAST_SEEN {
 		sortBy = "last_seen"
+	} else if req.SortBy == v1.DeviceSortField_CREATED_BY {
+		sortBy = "created_by"
 	}
 
 	// Build filter
@@ -255,6 +257,7 @@ func (s *DeviceMgmtService) ListDevices(ctx context.Context, req *v1.ListDevices
 		Offset:         offset,
 		LocationFilter: req.LocationLevel_0,
 		Search:         req.Search,
+		CreatedBy:      req.CreatedBy,
 		SortBy:         sortBy,
 		SortDesc:       req.SortDesc,
 	}

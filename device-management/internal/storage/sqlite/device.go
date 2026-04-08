@@ -165,14 +165,28 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 		args = append(args, "%"+filters.Search+"%")
 	}
 
+	if filters.CreatedBy != "" {
+		where = append(where, "created_by LIKE ?")
+		args = append(args, "%"+filters.CreatedBy+"%")
+	}
+
 	whereClause := ""
 	if len(where) > 0 {
 		whereClause = "WHERE " + strings.Join(where, " AND ")
 	}
 
-	// Build ORDER BY
+	// Build ORDER BY with whitelist to prevent SQL injection
 	orderBy := "created_at"
-	if filters.SortBy != "" {
+	allowedColumns := map[string]bool{
+		"id":               true,
+		"name":             true,
+		"created_at":       true,
+		"last_seen":        true,
+		"created_by":       true,
+		"status":           true,
+		"location_company": true,
+	}
+	if filters.SortBy != "" && allowedColumns[filters.SortBy] {
 		orderBy = filters.SortBy
 	}
 	orderDirection := "ASC"

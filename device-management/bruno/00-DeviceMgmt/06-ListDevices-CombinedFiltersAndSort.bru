@@ -1,0 +1,134 @@
+meta {
+  name: List Devices - Combined Filters and Sort
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices
+}
+
+params:query {
+  page_size: 5
+  created_by: {{device_owner_uuid}}
+  search: 
+  location_level_0: 
+  sort_by: 1
+  sort_desc: false
+}
+
+docs {
+  List devices with combined filtering and sorting.
+  
+  This demonstrates using multiple filters and sort parameters together:
+  - Filter by owner (createdBy)
+  - Filter by name (search)
+  - Filter by location (location_level_0)
+  - Sort by name (ascending)
+  - Paginate with page_size and page_token
+  
+  Query Parameters:
+  - created_by: Filter by device owner UUID
+  - search: Filter by device name (substring match)
+  - location_level_0: Filter by enterprise/company location
+  - sort_by: 1 (NAME), 2 (CREATED_AT), 3 (LAST_SEEN), 4 (CREATED_BY)
+  - sort_desc: false for ascending, true for descending
+  - page_size: Maximum results per page
+  - page_token: Cursor token for pagination
+  
+  Response includes:
+  - devices: Array of DeviceSummary objects matching all filters, sorted by specified field
+  - next_page_token: Token for pagination if more results exist
+  
+  Example usage patterns:
+  1. Filter by owner + sort by name
+  2. Filter by owner + search term + sort by creation date
+  3. Filter by location + sort by last seen (to find active devices)
+}
+
+script:post-response {
+  const resp = res.getBody();
+  const createdBy = bru.getQueryParam('created_by');
+  const search = bru.getQueryParam('search');
+  const location = bru.getQueryParam('location_level_0');
+  
+  console.log("Filters applied:");
+  if (createdBy) console.log("  - Owner: " + createdBy);
+  if (search) console.log("  - Search: " + search);
+  if (location) console.log("  - Location: " + location);
+  console.log("  - Sort: Name (ascending)");
+  
+  if (resp && resp.devices) {
+    console.log("✓ Retrieved " + resp.devices.length + " matching devices");
+    
+    if (resp.devices.length > 0) {
+      console.log("  Results (sorted by name):");
+      resp.devices.forEach((device, idx) => {
+        console.log("    " + (idx + 1) + ". " + device.name + " (owner: " + device.createdBy + ")");
+      });
+    }
+    
+    if (resp.next_page_token) {
+      bru.setEnvVar('next_page_token', resp.next_page_token);
+      console.log("✓ More pages available - next_page_token saved");
+    }
+  }
+}
+
+tests {
+  test("Combined filter request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has devices array", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('devices');
+    expect(resp.devices).to.be.an('array');
+  });
+  
+  test("Devices are sorted by name in ascending order", function() {
+    const resp = res.getBody();
+    
+    if (resp.devices && resp.devices.length > 1) {
+      for (let i = 0; i < resp.devices.length - 1; i++) {
+        const current = resp.devices[i].name || "";
+        const next = resp.devices[i + 1].name || "";
+        // Should be in ascending order
+        expect(current.localeCompare(next) <= 0).to.be.true;
+      }
+    }
+  });
+  
+  test("Returned devices match filters", function() {
+    const resp = res.getBody();
+    const createdBy = bru.getQueryParam('created_by');
+    const search = bru.getQueryParam('search');
+    
+    if (resp.devices && resp.devices.length > 0) {
+      resp.devices.forEach(device => {
+        // Check createdBy filter
+        if (createdBy) {
+          expect(device.createdBy.toLowerCase()).to.include(createdBy.toLowerCase());
+        }
+        
+        // Check search filter
+        if (search) {
+          expect(device.name.toLowerCase()).to.include(search.toLowerCase());
+        }
+        
+        // All devices should have required fields
+        expect(device).to.have.property('id');
+        expect(device).to.have.property('name');
+        expect(device).to.have.property('createdBy');
+      });
+    }
+  });
+  
+  test("Response respects page_size limit", function() {
+    const resp = res.getBody();
+    const pageSize = parseInt(bru.getQueryParam('page_size') || "10");
+    
+    // Devices returned should be <= page_size
+    expect(resp.devices.length).to.be.lessThanOrEqual(pageSize);
+  });
+}
