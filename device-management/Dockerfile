@@ -1,27 +1,34 @@
-# Dockerfile - For Production Deployment of Taksa Platform DM
-# TODO: Address Optimization and Security Enhancements (e.g., multi-stage builds, non-root user, minimal base image)
-# Build locally with: make build
-# Then build image with: docker build -t taksa-device-management:latest .
+# -------- Build stage --------
+FROM golang:1.26-alpine AS builder
 
-FROM ubuntu:24.04
+WORKDIR /app
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y ca-certificates wget && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache make git protobuf
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN make init && make all && go build -o device-management ./cmd/device-management
+
+# -------- Runtime stage --------
+FROM alpine:3.23
+
+RUN apk add --no-cache ca-certificates wget gettext
 
 # Create app user
-RUN groupadd -g 2000 taksa && useradd -u 2000 -g taksa -s /sbin/nologin taksa
+RUN addgroup -S taksa && adduser -S taksa -G taksa
 
-# Create directories
-RUN mkdir -p /data /home/taksa && chown -R taksa:taksa /data /home/taksa
+# Create directories with writable permissions
+# /data is world-writable for host volume mount compatibility (docker-compose dev)
+RUN mkdir -p /data /home/taksa && chown -R taksa:taksa /home/taksa && chmod 777 /data
 
 WORKDIR /home/taksa
 
-# Copy pre-built binary (built with: make build)
-COPY --chown=taksa:taksa bin/device-management /home/taksa/device-management
-
-# Copy config and db schema
-COPY --chown=taksa:taksa configs/ /home/taksa/configs/
-COPY --chown=taksa:taksa db/ /home/taksa/db/
+# Copy pre-built binary and configs from builder
+COPY --from=builder --chown=taksa:taksa /app/device-management /home/taksa/device-management
+COPY --from=builder --chown=taksa:taksa /app/configs ./configs
 
 # Switch to non-root user
 USER taksa
@@ -33,5 +40,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
 # Expose ports
 EXPOSE 8000 9000
 
-# Run
 CMD ["/home/taksa/device-management", "-conf", "/home/taksa/configs"]

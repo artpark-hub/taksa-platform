@@ -2,8 +2,11 @@ services:
   taksa-device-management:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     container_name: taksa-device-management
+    # Note: docker-compose dev mode runs as root for simplicity. 
+    # Production Kubernetes/orchestrators use non-root 'taksa' user from Dockerfile.
+    user: root
     ports:
       - "${TAKSA_DM_HTTP_PORT:-8000}:8000"
       - "${TAKSA_DM_GRPC_PORT:-9000}:9000"

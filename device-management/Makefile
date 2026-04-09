@@ -97,8 +97,9 @@ help:
 .PHONY: docker-init docker-up docker-down docker-start docker-stop docker-logs docker-clean docker-fresh reset
 
 # Docker deployment targets (aligned with taksa-deployments)
+# Note: docker-fresh builds image inside container (multi-stage), so no need to run 'make all' first
 
-docker-fresh: clean all docker-init docker-up ## Full clean build and container startup
+docker-fresh: docker-init docker-up ## Build Docker image and start container
 
 docker-init: ## Initialize Docker environment (create data directories and .env file)
 	test -f .env || cp .env.example .env
