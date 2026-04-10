@@ -1,0 +1,17 @@
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 1s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 1s
+data:
+  database:
+    driver: postgres
+    source: "postgres://${TSDB_PG_USER}:${TSDB_PG_PASSWORD}@taksa-tsdb:5432/${TSDB_PG_DB}?sslmode=disable"
+  nats:
+    url: "nats://${TAKSA_NATS_APP_USER}:${TAKSA_NATS_APP_PASSWORD}@taksa-nats:4222"
+    subject: "${NATS_SUBJECT:-uns.v1.>}"
+    queue_group: "${NATS_QUEUE_GROUP:-traceability_workers}"
+    stream: "${NATS_STREAM:-UNS_DATA}"
+    dlq: "${NATS_DLQ:-uns.dlq}"

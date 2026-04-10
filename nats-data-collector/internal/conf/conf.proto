@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package kratos.api;
+
+option go_package = "nats-data-collector/internal/conf;conf";
+
+import "google/protobuf/duration.proto";
+
+message Bootstrap {
+  Server server = 1;
+  Data data = 2;
+}
+
+message Server {
+  message HTTP {
+    string addr = 1;
+    google.protobuf.Duration timeout = 2;
+  }
+  message GRPC {
+    string addr = 1;
+    google.protobuf.Duration timeout = 2;
+  }
+  HTTP http = 1;
+  GRPC grpc = 2;
+}
+
+message Data {
+  message Database {
+    string driver = 1;
+    string source = 2;
+  }
+  message Nats {
+    string url = 1;
+    string subject = 2;
+    string stream = 3;
+    string queue_group = 4;
+    string dlq = 5;
+  }
+  Database database = 1;
+  Nats nats = 2;
+}

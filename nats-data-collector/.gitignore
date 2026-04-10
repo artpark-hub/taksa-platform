@@ -1,0 +1,3 @@
+bin/
+internal/conf/conf.pb.go
+cmd/nats-data-collector/wire_gen.go
