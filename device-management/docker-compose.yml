@@ -1,0 +1,43 @@
+services:
+  taksa-device-management:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taksa-device-management
+    # Note: docker-compose dev mode runs as root for simplicity. 
+    # Production Kubernetes/orchestrators use non-root 'taksa' user from Dockerfile.
+    user: root
+    ports:
+      - "${TAKSA_DM_HTTP_PORT:-8000}:8000"
+      - "${TAKSA_DM_GRPC_PORT:-9000}:9000"
+    environment:
+      - TAKSA_DM_LOG_LEVEL=${TAKSA_DM_LOG_LEVEL:-debug}
+      - TAKSA_DM_LOG_FILE=${TAKSA_DM_LOG_FILE:-/data/taksa-device-management.log}
+      - TAKSA_DM_HTTP_PORT=${TAKSA_DM_HTTP_PORT:-8000}
+      - TAKSA_DM_GRPC_PORT=${TAKSA_DM_GRPC_PORT:-9000}
+      - TAKSA_DM_DATABASE_SOURCE=${TAKSA_DM_DATABASE_SOURCE:-/data/taksa_platform_dm.db}
+      - TAKSA_DM_DATABASE_DRIVER=${TAKSA_DM_DATABASE_DRIVER:-sqlite3}
+      - TAKSA_DM_BASE_URL=${TAKSA_DM_BASE_URL:-http://localhost:8000}
+      - TAKSA_DM_UMH_CORE_DOCKER_IMAGE=${TAKSA_DM_UMH_CORE_DOCKER_IMAGE:-management.umh.app/oci/united-manufacturing-hub/umh-core:v0.43.17}
+    volumes:
+      - ${TAKSA_DM_DATA_DIR:-./data}:/data
+    networks:
+      - taksa-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  taksa-data:
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '${TAKSA_DM_DATA_DIR:-./data}'
+
+networks:
+  taksa-network:
+    driver: bridge

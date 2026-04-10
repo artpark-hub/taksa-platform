@@ -1,0 +1,73 @@
+meta {
+  name: List Protocol Converters With Pagination
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters?page_size=5&page_token={{next_page_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  List protocol converters with explicit pagination.
+  
+  This is an advanced example of the List API with pagination cursor handling.
+  It demonstrates how to:
+  1. Request a small page_size (5 items)
+  2. Use next_page_token from a previous response to fetch the next page
+  
+  Query Parameters:
+  - page_size: 5 (small size to demonstrate pagination)
+  - page_token: {{next_page_token}} (saved from previous list response)
+  
+  Usage:
+  1. Run "List Protocol Converters" first (saves next_page_token if available)
+  2. Run this test to get the next page
+  3. If next_page_token is empty in response, no more pages
+  
+  This pattern allows efficient browsing of large converter lists without
+  loading all data at once.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.converters) {
+    console.log("✓ Page retrieved with " + resp.converters.length + " converters");
+    
+    if (resp.next_page_token) {
+      bru.setEnvVar('next_page_token', resp.next_page_token);
+      console.log("  ➜ More pages available");
+    } else {
+      console.log("  ➜ Last page (no more results)");
+    }
+  }
+}
+
+tests {
+  test("Paginated list retrieved successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Page size respects request limit", function() {
+    const resp = res.getBody();
+    expect(resp.converters.length).to.be.at.most(5);
+  });
+  
+  test("Each converter has complete structure", function() {
+    const resp = res.getBody();
+    if (resp.converters.length > 0) {
+      resp.converters.forEach((converter) => {
+        expect(converter).to.have.property('uuid');
+        expect(converter).to.have.property('name');
+        expect(converter).to.have.property('type');
+        expect(converter).to.have.property('deploymentStatus');
+        expect(converter).to.have.property('healthStatus');
+      });
+    }
+  });
+}

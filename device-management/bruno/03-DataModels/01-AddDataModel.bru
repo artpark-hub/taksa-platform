@@ -1,0 +1,97 @@
+meta {
+  name: Add Data Model
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/data-models
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "TestModel",
+    "description": "Test data model",
+    "structure": {
+      "temperature": {
+        "_payloadshape": "timeseries-number"
+      },
+      "humidity": {
+        "_payloadshape": "timeseries-number"
+      },
+      "timestamp": {
+        "_payloadshape": "timeseries-string"
+      }
+    }
+  }
+}
+
+docs {
+   Queue action to add a new data model to a device.
+   
+   This endpoint queues an asynchronous action to add a data model.
+   The action is executed on the device, and results are returned via 
+   the GetDataModelActionResult endpoint.
+   
+   Request body:
+   - name: Display name for the data model (required)
+   - description: Optional description
+   - structure: JSON object with field definitions (will be converted to YAML and base64 encoded server-side)
+     Each field should have _payloadshape property indicating the data type
+   
+   Returns:
+   - action_id: UUID of the queued action (use for polling results)
+   - created_at: Timestamp when action was created
+   - expires_at: Timestamp when action will expire
+   
+   Status codes:
+   - 200: Action queued successfully
+   - 400: Invalid request (missing required fields)
+   - 404: Device not found
+   - 500: Server error
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_data_model', resp.actionId);
+    bru.setEnvVar('data_model_name', 'TestModel');
+    console.log("✓ Data model add action queued");
+    console.log("  Action ID: " + resp.actionId);
+    console.log("  Created: " + resp.createdAt);
+    console.log("  Expires: " + resp.expiresAt);
+    console.log("  Name: TestModel");
+    console.log("  Next: Poll GetDataModelActionResult using {{action_id_data_model}}");
+  }
+}
+
+tests {
+  test("Add action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+    expect(resp.actionId).to.not.be.empty;
+  });
+  
+  test("Response has timestamps", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('createdAt');
+    expect(resp).to.have.property('expiresAt');
+  });
+  
+  test("Action ID is UUID format", function() {
+    const resp = res.getBody();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(resp.actionId).to.match(uuidRegex);
+  });
+}

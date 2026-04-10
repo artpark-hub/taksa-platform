@@ -1,0 +1,74 @@
+meta {
+  name: Get Protocol Converter
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/{{converter_uuid}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Queue a GET action to retrieve detailed information about a protocol converter.
+  
+  This endpoint queues an asynchronous action on the device to get detailed
+  information about a specific protocol converter. The device will respond with
+  the current configuration and status.
+  
+  Path Parameter:
+  - uuid: UUID of the protocol converter to retrieve
+  
+  Returns:
+  - action_id: UUID of the queued action (use for polling GetProtocolConverterActionResult)
+  - created_at: Timestamp when action was created
+  - expires_at: Timestamp when action will expire
+  
+  The actual converter details will be available in the GetProtocolConverterActionResult
+  endpoint once the action completes (status=COMPLETED).
+  
+  Status codes:
+  - 200: GET action queued successfully
+  - 400: Invalid request
+  - 404: Device or converter not found
+  - 500: Server error
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('get_action_id', resp.actionId);
+    console.log("✓ GET protocol converter action queued");
+    console.log("  Action ID: " + resp.actionId);
+    console.log("  Use GetProtocolConverterActionResult to poll for completion");
+  }
+}
+
+tests {
+  test("GET action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+    expect(resp.actionId).to.not.be.empty;
+  });
+  
+  test("Response has timestamps", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('createdAt');
+    expect(resp).to.have.property('expiresAt');
+  });
+  
+  test("Action ID is UUID format", function() {
+    const resp = res.getBody();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(resp.actionId).to.match(uuidRegex);
+  });
+}

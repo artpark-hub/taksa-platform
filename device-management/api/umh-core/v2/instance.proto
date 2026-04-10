@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package api.umh_core.v2;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "common/models.proto";
+import "umh-core/v2/models.proto";
+
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2;v2";
+option java_multiple_files = true;
+option java_package = "api.umh-core.v2";
+
+// InstanceService handles device-facing operations
+// These are called by edge devices (umh-core)
+// All endpoints are compatible with umh-core expectations
+service InstanceService {
+    
+  // Login/authenticate a device
+  // RPC: POST /api/v2/instance/login
+  // Compatible with: umh-core v0.43.17+
+  // Client sends: POST with Authorization: Bearer <SHA3(SHA3(token))> header, no body
+  // Server returns: JWT token in "token" HttpOnly cookie + LoginResponse JSON body
+  // Authentication: token hash validated against stored raw auth tokens
+  rpc Login(google.protobuf.Empty) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v2/instance/login"
+    };
+  }
+  
+  // Push device status and telemetry to console
+  // Compatible with: POST /api/v2/instance/push
+  rpc Push(PushRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/api/v2/instance/push"
+      body: "*"
+    };
+  }
+  
+  // Pull (retrieve) queued actions from console
+  // Compatible with: GET /api/v2/instance/pull
+  rpc Pull(google.protobuf.Empty) returns (PullResponse) {
+    option (google.api.http) = {
+      get: "/api/v2/instance/pull"
+    };
+  }
+  
+  // Get device certificate for TLS communication
+  // Compatible with: GET /api/v2/instance/user/certificate
+  rpc GetCertificate(GetCertificateRequest) returns (Certificate) {
+    option (google.api.http) = {
+      get: "/api/v2/instance/user/certificate"
+    };
+  }
+}
+
+// LoginResponse returns device information and authentication token
+// Matches umh-core's InstanceLoginResponse (backend_api_structs/backend_api_struct.go:119-125)
+// but includes jwtToken for device-management client convenience
+// 
+// CRITICAL: Uses common.CompanyDetails and common.LicenseStatus for wire protocol compatibility
+// These are the exact types that umh-core sends, ensuring 100% compatibility
+message LoginResponse {
+  optional string certificate = 1;  // Optional: Device certificate PEM
+  optional string encryptedPrivateKey = 2;  // Optional: Encrypted private key
+  string uuid = 3; // Device UUID (required)
+  string name = 4; // Device name (required)
+  api.common.CompanyDetails companyDetails = 5; // Company details from common (wire protocol canonical form)
+  string jwtToken = 6; // JWT token for authentication (set in HttpOnly cookie)
+}
+
+
+// PushRequest sends device status/telemetry to console
+message PushRequest {
+  repeated UMHMessage UMHMessages = 1; // Array of telemetry messages from device (must include InstanceUUID in UMHMessage)
+}
+
+// PullResponse retrieves queued actions
+message PullResponse {
+  repeated UMHMessage UMHMessages = 1; // Queued actions for device
+}
+
+// GetCertificateRequest retrieves device certificate
+// Matches umh-core's expectations: GET /api/v2/instance/user/certificate?email=<email>
+// Only email is required as a query parameter, device_id is authenticated via JWT
+message GetCertificateRequest {
+  string email = 1; // Email of certificate owner (required, query parameter)
+}

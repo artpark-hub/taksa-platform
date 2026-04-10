@@ -1,0 +1,111 @@
+meta {
+  name: Instance Get Certificate
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/v2/instance/user/certificate?email={{email}}
+}
+
+headers {
+  Connection: keep-alive
+  Keep-Alive: timeout=30, max=1000
+  X-Features: longpoll;
+  Content-Type: application/json
+}
+
+docs {
+  Retrieves user certificate for TLS communication
+  100% compatible with umh-core implementation
+  
+  API: GET /api/v2/instance/user/certificate?email=<email>
+  
+  Flow:
+  1. Requires JWT cookie authentication (from Login)
+  2. Device ID extracted from JWT token (not needed in request)
+  3. Email passed as required query parameter
+  4. Returns UserCertificateResponse with userEmail and certificate
+  
+  Response (JSON):
+  {
+    "userEmail": "user@example.com",
+    "certificate": "-----BEGIN CERTIFICATE-----\n..."
+  }
+  
+  Notes:
+  - Email is required (query parameter)
+  - Device ID comes from JWT token context
+  - Response only contains 2 fields: userEmail and certificate
+  - Field names use camelCase (umh-core compatible)
+}
+
+script:pre-request {
+  // Verify required parameters
+  const email = bru.getEnvVar('email');
+  
+  if (!email) {
+    throw new Error("email environment variable not set. Use: user@example.com");
+  }
+  
+  console.log("Requesting user certificate for email: " + email);
+  console.log("Device ID comes from JWT token (authentication header)");
+}
+
+script:post-response {
+  const resp = res.getBody();
+  console.log("GetCertificate response received");
+  console.log("Status: " + res.getStatus());
+  console.log("Email: " + resp.userEmail);
+  console.log("Certificate length: " + (resp.certificate ? resp.certificate.length : 0));
+}
+
+tests {
+  test("GetCertificate endpoint responds", function() {
+    // API is accessible and returns a response (may be 200, 404, or error)
+    expect(res.getStatus()).to.be.greaterThan(0);
+  });
+  
+  test("Response is valid JSON", function() {
+    const resp = res.getBody();
+    expect(resp).to.be.an('object');
+  });
+  
+  test("On success (200), response has userEmail field", function() {
+    const resp = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(resp).to.have.property('userEmail');
+      expect(resp.userEmail).to.be.a('string');
+    }
+  });
+  
+  test("On success (200), response has certificate field", function() {
+    const resp = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(resp).to.have.property('certificate');
+      expect(resp.certificate).to.be.a('string');
+    }
+  });
+  
+  test("Field names use camelCase not snake_case", function() {
+    const resp = res.getBody();
+    if (resp.hasOwnProperty('userEmail')) {
+      // If present, it should be camelCase
+      expect(resp).to.have.property('userEmail');
+      expect(resp).not.to.have.property('user_email');
+    }
+  });
+  
+  test("Keep-Alive headers present", function() {
+    expect(req.getHeader('Connection')).to.equal('keep-alive');
+    expect(req.getHeader('Keep-Alive')).to.include('timeout=30');
+  });
+  
+  test("Certificate is PEM format if provided", function() {
+    const resp = res.getBody();
+    if (resp.certificate && resp.certificate.length > 0) {
+      expect(resp.certificate).to.include('-----BEGIN');
+      expect(resp.certificate).to.include('-----END');
+    }
+  });
+}

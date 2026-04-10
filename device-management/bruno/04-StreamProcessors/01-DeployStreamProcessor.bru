@@ -1,0 +1,98 @@
+meta {
+  name: Deploy Stream Processor
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "stream-processor-{{timestamp}}",
+    "uuid": "",
+    "config": {
+      "sources": {
+        "vibration": "umh.v1.{{ .enterprise }}.{{ .site }}.vibration",
+        "temperature": "umh.v1.{{ .enterprise }}.{{ .site }}.temperature"
+      },
+      "mapping": {
+        "vibration_level": "vibration.value",
+        "temp_celsius": "temperature.celsius"
+      }
+    },
+    "modelName": "Pump",
+    "modelVersion": "2",
+    "location": {
+      "0": "TestEnterprise",
+      "1": "TestSite"
+    },
+    "ignoreHealthCheck": false
+  }
+}
+
+docs {
+  Deploy a new stream processor to a device.
+  
+  This endpoint queues an asynchronous action to deploy a stream processor.
+  The deployment happens on the device, and results are returned via the 
+  GetStreamProcessorActionResponse endpoint.
+  
+  Request body:
+  - name: Display name for the processor (required, string)
+  - uuid: Optional UUID for the processor (empty = server-generated, string)
+  - config: JSON configuration object (required, object)
+    Must contain sources and mappings. Service layer converts JSON → YAML → Base64 automatically
+  - modelName: Data model reference name (required, string)
+  - modelVersion: Data model reference version (required, string)
+  - location: Hierarchical location levels as map (optional, map<int32,string>)
+    Keys are numeric (0=enterprise, 1=site, 2=area, etc.)
+  - ignoreHealthCheck: Whether to skip health checks (optional, boolean, default false)
+  
+  Returns:
+  - action_id: UUID of the queued action (use for polling results)
+  - created_at: Timestamp when action was created
+  - expires_at: Timestamp when action will expire
+}
+
+script:pre-request {
+  bru.setEnvVar('timestamp', Date.now().toString());
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_stream_processor', resp.actionId);
+    console.log("✓ Stream processor deployment queued");
+    console.log("  Action ID: " + resp.actionId);
+    console.log("  Created: " + resp.createdAt);
+    console.log("  Expires: " + resp.expiresAt);
+    console.log("  Next: Poll GetStreamProcessorActionResult using {{action_id_stream_processor}}");
+  }
+}
+
+tests {
+  test("Deployment action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+    expect(resp.actionId).to.not.be.empty;
+  });
+  
+  test("Action ID is UUID format", function() {
+    const resp = res.getBody();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(resp.actionId).to.match(uuidRegex);
+  });
+}

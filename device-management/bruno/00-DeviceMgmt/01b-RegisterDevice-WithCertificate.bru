@@ -1,0 +1,111 @@
+meta {
+  name: Register Device With Certificate
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "created_by": "secure-user-{{timestamp}}",
+    "name": "Certified Device {{timestamp}}",
+    "location": {
+      "levels": {
+        "0": "SecureEnterprise",
+        "1": "SecureSite",
+        "2": "SecureArea"
+      }
+    },
+    "company": {
+      "base": {
+        "name": "Secure Company",
+        "owner": "owner@secure.com",
+        "user_count": 50,
+        "license_status": {
+          "is_active": true,
+          "valid_to": "2026-12-31"
+        }
+      },
+      "tags": ["production", "secure", "certified"]
+    }
+  }
+}
+
+docs {
+  Register a device WITHOUT certificate to test auto-generation.
+  
+  This is the safest test since certificate PEM formatting in JSON can be tricky.
+  The API auto-generates a valid certificate when none is provided.
+  
+  To test with a provided certificate:
+  1. First register a device (01-RegisterDevice.bru)
+  2. Get its certificate via GetDevice
+  3. Include that certificate in the JSON body above
+  
+  The certificate field is optional - this test verifies the auto-generation path.
+}
+
+script:pre-request {
+  // Generate timestamp for unique device naming
+  bru.setEnvVar('timestamp', Date.now().toString());
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.deviceId) {
+    // Save device_id for subsequent tests
+    bru.setEnvVar('device_id_cert', resp.deviceId);
+    console.log("✓ Device registered with auto-generated cert: " + resp.deviceId);
+    
+    if (resp.authToken) {
+      bru.setEnvVar('token_raw_cert', resp.authToken);
+      console.log("✓ Auth token saved (will expire in 7 days)");
+    }
+    
+    if (resp.authTokenHash) {
+      bru.setEnvVar('token_hash_cert', resp.authTokenHash);
+      console.log("✓ Token hash saved for Login API");
+    }
+  }
+}
+
+tests {
+  test("Device registered successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has device object", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('device');
+    expect(resp.device).to.have.property('id');
+    expect(resp.device).to.have.property('name');
+  });
+  
+  test("Device has PENDING status", function() {
+    const resp = res.getBody();
+    // Proto enums are marshaled as strings: PENDING
+    expect(resp.device.status).to.equal("PENDING");
+  });
+  
+  test("Device location is preserved", function() {
+    const resp = res.getBody();
+    expect(resp.device).to.have.property('location');
+    expect(resp.device.location.levels['0']).to.equal('SecureEnterprise');
+    expect(resp.device.location.levels['2']).to.equal('SecureArea');
+  });
+  
+  test("Response has authToken", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('authToken');
+    expect(resp.authToken).to.be.a('string');
+  });
+}

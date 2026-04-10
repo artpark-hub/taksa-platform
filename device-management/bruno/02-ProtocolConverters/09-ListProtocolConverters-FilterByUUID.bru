@@ -1,0 +1,65 @@
+meta {
+  name: List Protocol Converters Filter by UUID
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters?uuid_filter={{converter_uuid}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Filter protocol converters by exact UUID match.
+  
+  This is useful to retrieve a specific converter by its UUID.
+  
+  Query Parameter:
+  - uuid_filter: Exact UUID of the converter to retrieve
+  
+  Returns:
+  - Single converter if UUID matches
+  - Empty result if UUID doesn't exist
+  
+  Note: Set converter_uuid environment variable first by running
+  a List or Get Protocol Converter test that returns a UUID.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.converters) {
+    console.log("✓ Retrieved " + resp.converters.length + " converter(s) by UUID");
+    
+    resp.converters.forEach((converter) => {
+      console.log(`  UUID: ${converter.uuid}`);
+      console.log(`  Name: ${converter.name}`);
+      console.log(`  Status: ${converter.deployment_status}`);
+    });
+  } else {
+    console.log("✓ No converters found for UUID");
+  }
+}
+
+tests {
+  test("UUID filter request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Result contains at most 1 converter", function() {
+    const resp = res.getBody();
+    if (resp.converters) {
+      expect(resp.converters.length).to.be.at.most(1);
+    }
+  });
+  
+  test("If result exists, UUID matches filter", function() {
+    const resp = res.getBody();
+    if (resp.converters && resp.converters.length > 0) {
+      expect(resp.converters[0].uuid).to.equal(bru.getEnvVar('converter_uuid'));
+    }
+  });
+}

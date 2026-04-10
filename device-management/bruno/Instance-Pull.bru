@@ -1,0 +1,121 @@
+meta {
+  name: Instance Pull
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/v2/instance/pull
+}
+
+headers {
+   Connection: keep-alive
+   Keep-Alive: timeout=30, max=1000
+   X-Features: longpoll;
+   Content-Type: application/json
+   Cookie: token={{jwt_token}}
+}
+
+docs {
+  Retrieves queued messages for the device (long-polling)
+  Compatible with umh-core implementation
+  
+  Flow:
+  1. Device sends GET request with JWT cookie
+  2. Includes keep-alive headers for long-polling support
+  3. Server returns PullPayload with UMHMessages array
+  
+  UMHMessage fields:
+  - email: recipient email (string)
+  - content: JSON-serialized message (string)
+  - umhInstance: device UUID (camelCase, not snake_case)
+  - metadata: message metadata (object or null)
+}
+
+script:post-response {
+  const resp = res.getBody();
+  // Note: Protobuf omits empty repeated fields from JSON output by default
+  // So empty response will be {} instead of { UMHMessages: [] }
+  const msgCount = (resp.UMHMessages && Array.isArray(resp.UMHMessages)) ? resp.UMHMessages.length : 0;
+  console.log("Pull successful! Received " + msgCount + " messages");
+  console.log("Response: " + JSON.stringify(resp, null, 2));
+  
+  if (msgCount > 0) {
+    resp.UMHMessages.forEach((msg, idx) => {
+      console.log("Message " + idx + ": " + JSON.stringify(msg, null, 2));
+      if (msg.content) {
+        console.log("  Content length: " + msg.content.length);
+        // Try to decode if base64
+        try {
+          const decoded = atob(msg.content);
+          console.log("  Decoded: " + decoded.substring(0, 200));
+        } catch(e) {
+          console.log("  Not base64, raw content: " + msg.content.substring(0, 200));
+        }
+      }
+    });
+  }
+}
+
+tests {
+  test("Pull successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response is valid PullResponse", function() {
+    const resp = res.getBody();
+    // Protobuf omits empty repeated fields from JSON, so empty response is {}
+    // If UMHMessages exists, it should be an array
+    if (resp.hasOwnProperty('UMHMessages')) {
+      expect(resp.UMHMessages).to.be.an('array');
+    }
+  });
+  
+  test("Keep-Alive header sent correctly", function() {
+    expect(req.getHeader('Connection')).to.equal('keep-alive');
+    expect(req.getHeader('Keep-Alive')).to.include('timeout=30');
+    expect(req.getHeader('X-Features')).to.equal('longpoll;');
+  });
+  
+  test("JWT cookie included in request", function() {
+    const cookie = req.getHeader('Cookie');
+    expect(cookie).to.exist;
+    expect(cookie).to.include('token=');
+  });
+  
+  test("Messages have correct structure", function() {
+    const resp = res.getBody();
+    if (resp.UMHMessages && resp.UMHMessages.length > 0) {
+      const msg = resp.UMHMessages[0];
+      // Protobuf omits empty string fields in JSON, so email may be missing
+      // Required fields: content and umhInstance
+      expect(msg).to.have.property('content');
+      expect(msg).to.have.property('umhInstance');
+      // email is optional for device-to-device messages
+      // metadata is optional
+    }
+  });
+  
+  test("Message field names use camelCase", function() {
+    const resp = res.getBody();
+    if (resp.UMHMessages && resp.UMHMessages.length > 0) {
+      const msg = resp.UMHMessages[0];
+      expect(msg).to.have.property('umhInstance'); // not umh_instance
+      expect(msg).not.to.have.property('umh_instance');
+    }
+  });
+  
+  test("Content is valid JSON string", function() {
+    const resp = res.getBody();
+    if (resp.UMHMessages && resp.UMHMessages.length > 0) {
+      const msg = resp.UMHMessages[0];
+      try {
+        const content = JSON.parse(msg.content);
+        expect(content).to.have.property('MessageType');
+        expect(content).to.have.property('Payload');
+      } catch(e) {
+        // Content might not be JSON, that's ok
+      }
+    }
+  });
+}

@@ -1,0 +1,8 @@
+services:
+  ui-service:
+    build: .
+    image: ${DOCKER_REGISTRY:-taksa-registry.local}/ui-service:${DOCKER_LABEL:-dev}
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production

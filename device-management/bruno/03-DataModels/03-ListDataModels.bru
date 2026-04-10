@@ -1,0 +1,125 @@
+meta {
+  name: List Data Models
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/data-models
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  List all data models for a device (synchronous database query).
+  
+  This endpoint returns a paginated list of data models stored in the local database.
+  Unlike other data model operations, this is a synchronous call that queries the database
+  directly, not an asynchronous action.
+  
+  Query Parameters (optional):
+  - page_size: Number of results per page (default: 20, max: 100)
+  - page_token: Pagination cursor for fetching next page
+  - name_filter: Filter by name (substring match)
+  - version_filter: Filter by version (exact match)
+  
+  Response:
+  - models: Array of DataModelSummary objects
+  - next_page_token: Token for fetching next page (empty if no more pages)
+  
+  DataModelSummary fields:
+  - name: Model name
+  - version: Version number (e.g., "1", "2", "3")
+  - description: Model description
+  
+  Status codes:
+  - 200: List retrieved successfully
+  - 400: Invalid pagination token or filters
+  - 404: Device not found
+  - 500: Server error
+  
+  Pagination example:
+  1. First request: GET .../data-models?page_size=10
+  2. If response has next_page_token, fetch next page:
+     GET .../data-models?page_size=10&page_token={token}
+  3. Continue until next_page_token is empty
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  // Check both camelCase and snake_case (API may return either format)
+  const models = resp.models || resp.items || [];
+  
+  if (models.length > 0) {
+    console.log("✓ Retrieved " + models.length + " data models");
+    
+    models.forEach((model, idx) => {
+      console.log(`  [${idx + 1}] ${model.name} v${model.version}`);
+      if (model.description) {
+        console.log(`      Description: ${model.description}`);
+      }
+    });
+    
+    const nextToken = resp.next_page_token || resp.nextPageToken;
+    if (nextToken) {
+      bru.setEnvVar('next_page_token', nextToken);
+      console.log("  ➜ More pages available (next_page_token saved)");
+    } else {
+      console.log("  ➜ No more pages");
+    }
+  } else {
+    console.log("✓ No data models found for this device");
+  }
+}
+
+tests {
+  test("List retrieved successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response structure is valid", function() {
+    const resp = res.getBody();
+    // Accept empty response or models array
+    expect(resp).to.be.an('object');
+  });
+  
+  test("Models array is valid when present", function() {
+    const resp = res.getBody();
+    if (resp.models) {
+      expect(resp.models).to.be.an('array');
+    }
+  });
+  
+  test("Each model has required fields", function() {
+    const resp = res.getBody();
+    const models = resp.models || resp.items || [];
+    if (models.length > 0) {
+      models.forEach((model) => {
+        expect(model).to.have.property('name');
+        expect(model).to.have.property('version');
+      });
+    }
+  });
+  
+  test("Version format is string", function() {
+    const resp = res.getBody();
+    const models = resp.models || resp.items || [];
+    
+    models.forEach((model) => {
+      expect(model.version).to.be.a('string');
+    });
+  });
+  
+  test("Name format is string", function() {
+    const resp = res.getBody();
+    const models = resp.models || resp.items || [];
+    
+    models.forEach((model) => {
+      expect(model.name).to.be.a('string');
+      expect(model.name).to.not.be.empty;
+    });
+  });
+}

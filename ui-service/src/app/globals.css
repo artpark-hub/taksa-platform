@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+:root {
+    --background: #ffffff;
+    --foreground: #171717;
+    /* Using these variables everywhere instead of hardcoded px/rem.
+       Each scales smoothly between min and max as the viewport grows.
+
+       Formula: clamp(MIN, PREFERRED, MAX)
+         MIN       → value on smallest screens (~320px)
+         PREFERRED → fluid middle value using vw
+         MAX       → value on largest screens (~1440px) */
+
+    --space-xs:  clamp(0.25rem, 0.2rem  + 0.25vw, 0.5rem);    /*  4px → 8px   */
+    --space-sm:  clamp(0.5rem,  0.4rem  + 0.5vw,  0.75rem);   /*  8px → 12px  */
+    --space-md:  clamp(0.75rem, 0.6rem  + 0.75vw, 1.25rem);   /* 12px → 20px  */
+    --space-lg:  clamp(1rem,    0.8rem  + 1vw,    1.5rem);    /* 16px → 24px  */
+    --space-xl:  clamp(1.25rem, 1rem    + 1.5vw,  2.5rem);    /* 20px → 40px  */
+    --space-2xl: clamp(1.5rem,  1.2rem  + 2vw,    3.5rem);    /* 24px → 56px  */
+    --space-3xl: clamp(2rem,    1.5rem  + 3vw,    5rem);      /* 32px → 80px  */
+
+    /* Using these for all font-size declarations. */
+
+    --text-sm:   clamp(0.75rem,  0.7rem  + 0.25vw, 0.875rem); /* 12px → 14px  */
+    --text-base: clamp(0.875rem, 0.8rem  + 0.4vw,  1rem);     /* 14px → 16px  */
+    --text-lg:   clamp(1rem,     0.9rem  + 0.5vw,  1.25rem);  /* 16px → 20px  */
+    --text-xl:   clamp(1.125rem, 1rem    + 0.75vw, 1.5rem);   /* 18px → 24px  */
+    --text-2xl:  clamp(1.25rem,  1rem    + 1.5vw,  2rem);     /* 20px → 32px  */
+    --text-3xl:  clamp(1.5rem,   1.2rem  + 2vw,    3rem);     /* 24px → 48px  */
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background: #0a0a0a;
+        --foreground: #ededed;
+    }
+}
+
+html {
+    box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: inherit;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;         
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+body {
+    min-height: 100vh;     
+    background: var(--background);
+    color: var(--foreground);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: var(--text-base);
+    line-height: 1.5;
+}

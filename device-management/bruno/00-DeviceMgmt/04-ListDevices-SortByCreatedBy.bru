@@ -1,0 +1,82 @@
+meta {
+  name: List Devices - Sort by CreatedBy
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices
+}
+
+params:query {
+  page_size: 10
+  sort_by: 4
+  sort_desc: false
+}
+
+docs {
+  Sort devices by createdBy (owner/tenant UUID) in ascending order.
+  
+  This endpoint returns all devices sorted alphabetically by their owner UUID.
+  
+  Query Parameters:
+  - sort_by: 4 (CREATED_BY enum value)
+    Valid values:
+    - 1 = NAME
+    - 2 = CREATED_AT (default)
+    - 3 = LAST_SEEN
+    - 4 = CREATED_BY
+  - sort_desc: false for ascending, true for descending
+  - page_size: Maximum results per page
+  
+  Response includes:
+  - devices: Array of DeviceSummary objects sorted by createdBy (ascending)
+  - next_page_token: Token for pagination if more results exist
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.devices && resp.devices.length > 1) {
+    console.log("✓ Retrieved " + resp.devices.length + " devices sorted by owner");
+    console.log("  Devices sorted by createdBy (ascending):");
+    
+    resp.devices.slice(0, 3).forEach((device, idx) => {
+      console.log("    " + (idx + 1) + ". " + device.name + " (owner: " + device.createdBy + ")");
+    });
+  }
+}
+
+tests {
+  test("Sort successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has devices array", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('devices');
+    expect(resp.devices).to.be.an('array');
+  });
+  
+  test("Devices are sorted by createdBy in ascending order", function() {
+    const resp = res.getBody();
+    
+    if (resp.devices && resp.devices.length > 1) {
+      for (let i = 0; i < resp.devices.length - 1; i++) {
+        const current = resp.devices[i].createdBy || "";
+        const next = resp.devices[i + 1].createdBy || "";
+        // Should be in ascending order (current <= next)
+        expect(current.localeCompare(next) <= 0).to.be.true;
+      }
+    }
+  });
+  
+  test("Devices have createdBy field", function() {
+    const resp = res.getBody();
+    if (resp.devices && resp.devices.length > 0) {
+      resp.devices.forEach(device => {
+        expect(device).to.have.property('createdBy');
+      });
+    }
+  });
+}

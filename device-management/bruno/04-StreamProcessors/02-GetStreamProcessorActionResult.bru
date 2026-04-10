@@ -1,0 +1,65 @@
+meta {
+  name: Get Stream Processor Action Result
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors/{{action_id_stream_processor}}/result
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Poll the result of a stream processor action.
+  
+  Use after DeployStreamProcessor, EditStreamProcessor, etc. to get the result.
+  Returns the stream processor object once the action completes.
+  
+  Status values:
+  - QUEUED: Action waiting to be processed
+  - DELIVERED: Action sent to device, awaiting execution
+  - PROCESSING: Device is executing the action
+  - COMPLETED: Action finished successfully, result populated
+  - FAILED: Action failed, error_message populated
+  
+  Note: For DELETE actions, result field is empty when status=COMPLETED
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.status) {
+    console.log("✓ Action status: " + resp.status);
+    
+    if (resp.result) {
+      console.log("  Processor UUID: " + resp.result.uuid);
+      console.log("  Processor name: " + resp.result.name);
+      if (resp.result.model) {
+        console.log("  Model: " + resp.result.model.name + " v" + resp.result.model.version);
+      }
+    }
+    
+    if (resp.errorMessage) {
+      console.log("  Error: " + resp.errorMessage);
+    }
+    
+    if (resp.status === "COMPLETED") {
+      console.log("  ✓ Action completed successfully");
+      if (resp.result && resp.result.uuid) {
+        bru.setEnvVar('stream_processor_uuid', resp.result.uuid);
+        console.log("  Processor UUID saved: {{stream_processor_uuid}}");
+      }
+    }
+  }
+}
+
+tests {
+  test("Response contains status", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+    expect(['QUEUED', 'DELIVERED', 'PROCESSING', 'COMPLETED', 'FAILED']).to.include(resp.status);
+  });
+}

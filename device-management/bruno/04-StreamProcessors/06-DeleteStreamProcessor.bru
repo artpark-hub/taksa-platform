@@ -1,0 +1,42 @@
+meta {
+  name: Delete Stream Processor
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors/{{stream_processor_uuid}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Delete a stream processor from the device.
+  
+  Queues an asynchronous action to remove the stream processor.
+  When the action completes (status=COMPLETED), the processor is deleted
+  from both the device and the local database cache.
+  
+  Note: The result field will be empty for successful deletes.
+  
+  Returns action_id for polling.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_stream_processor', resp.actionId);
+    console.log("✓ Delete stream processor action queued");
+    console.log("  Action ID: " + resp.actionId);
+    console.log("  Poll GetStreamProcessorActionResult - status=COMPLETED means deleted");
+  }
+}
+
+tests {
+  test("Delete action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

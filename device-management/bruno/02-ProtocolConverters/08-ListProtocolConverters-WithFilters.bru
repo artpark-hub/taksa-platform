@@ -1,0 +1,85 @@
+meta {
+  name: List Protocol Converters With Filters
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters?name_filter=bridge&deployment_status_filter=ACTIVE
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  List protocol converters with filtering.
+  
+  This example demonstrates how to filter protocol converters using multiple filters.
+  
+  Available Filters (all optional):
+  - uuid_filter: Exact UUID match
+  - name_filter: Substring search in converter name
+  - type_filter: Exact match by protocol type
+  - deployment_status_filter: Status: PENDING, ACTIVE, or FAILED
+  - connection_uuid_filter: Filter by connection UUID
+  - health_status_filter: Status: ONLINE, OFFLINE, or UNKNOWN
+  
+  Filters can be combined (AND logic).
+  
+  Example Query (name contains "bridge" AND status is ACTIVE):
+  ?name_filter=bridge&deployment_status_filter=ACTIVE
+  
+  All filters are optional. Empty = no filter applied.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.converters) {
+    console.log("✓ Retrieved " + resp.converters.length + " filtered converters");
+    
+    const types = new Set();
+    const statuses = new Set();
+    
+    resp.converters.forEach((converter) => {
+      types.add(converter.type);
+      statuses.add(converter.deploymentStatus);
+    });
+    
+    console.log("  Types: " + Array.from(types).join(", "));
+    console.log("  Statuses: " + Array.from(statuses).join(", "));
+  }
+}
+
+tests {
+  test("Filtered list retrieved successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response structure is valid", function() {
+    const resp = res.getBody();
+    // Proto3 omits empty fields, so response might be {} if no results
+    if (resp.converters) {
+      expect(resp.converters).to.be.an('array');
+    }
+  });
+  
+  test("All converters match name filter (contains 'bridge')", function() {
+    const resp = res.getBody();
+    if (resp.converters && resp.converters.length > 0) {
+      resp.converters.forEach((converter) => {
+        expect(converter.name.toLowerCase()).to.include('bridge');
+      });
+    }
+  });
+  
+  test("All converters match deployment status filter (ACTIVE)", function() {
+    const resp = res.getBody();
+    if (resp.converters && resp.converters.length > 0) {
+      resp.converters.forEach((converter) => {
+        expect(converter.deploymentStatus).to.equal('ACTIVE');
+      });
+    }
+  });
+}

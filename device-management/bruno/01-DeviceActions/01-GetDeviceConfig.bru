@@ -1,0 +1,55 @@
+meta {
+  name: Get Device Config
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/config
+}
+
+docs {
+  Queue action to retrieve device configuration file (config.yaml).
+  
+  Asynchronous pattern:
+  1. Returns action_id immediately (ActionQueuedResponse)
+  2. Client polls GetDeviceConfigActionResponse to get result
+  
+  Supported by umh-core GetConfigFile action.
+  
+  Returns:
+  - action_id: Unique identifier to poll for result
+  - timestamp: When action was queued
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_config', resp.actionId);
+    console.log("✓ Config retrieval action queued: " + resp.actionId);
+    console.log("  Poll GetDeviceConfigActionResponse to get result");
+  }
+}
+
+tests {
+  test("Action queued successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+  });
+  
+  test("Response has createdAt", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('createdAt');
+  });
+  
+  test("Response has expiresAt", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('expiresAt');
+  });
+}

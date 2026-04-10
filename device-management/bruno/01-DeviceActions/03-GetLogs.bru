@@ -1,0 +1,94 @@
+meta {
+  name: Get Logs
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/logs
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "payload": {
+      "type": "agent",
+      "startTime": {{start_time_ms}}
+    }
+  }
+}
+
+docs {
+  Queue action to retrieve device logs.
+  
+  Asynchronous pattern:
+  1. Returns action_id immediately (ActionQueuedResponse)
+  2. Client polls GetLogsActionResponse to get result
+  
+  Supported by umh-core GetLogs action.
+  
+  Log types:
+  - agent: Device agent logs
+  - dfc: Data flow component logs
+  - protocol-converter-read/write: Protocol converter logs
+  - redpanda: Message broker logs
+  - topic-browser: Topic catalog logs
+  - stream-processor: Stream processor logs
+  
+  Request Parameters (in payload):
+  - type: Log type (required) - one of: agent, redpanda, topic-browser, dfc, protocol-converter-read, protocol-converter-write, stream-processor
+  - startTime: Unix timestamp in milliseconds (must be > 0 and in past)
+  - uuid: Required for: dfc, protocol-converter-read, protocol-converter-write, stream-processor
+  
+  Response:
+  - action_id: Unique action identifier for polling results
+  - created_at: When action was queued
+  - expires_at: When action result will expire
+  
+  Next step: Poll GetLogsActionResponse with action_id to retrieve result
+  - Endpoint: GET /api/v1/devicemgmt/devices/{device_id}/logs/{action_id}/result
+  - Result payload: Automatically decompressed JSON array of log strings
+}
+
+script:pre-request {
+  // Set start time to 1 hour ago if not already set
+  if (!bru.getEnvVar('start_time_ms')) {
+    const now = Date.now();
+    const oneHourAgo = now - (60 * 60 * 1000);
+    bru.setEnvVar('start_time_ms', oneHourAgo.toString());
+  }
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_logs', resp.actionId);
+    console.log("✓ Logs retrieval action queued: " + resp.actionId);
+  }
+}
+
+tests {
+  test("Action queued successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+  });
+  
+  test("Response has createdAt", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('createdAt');
+  });
+  
+  test("Response has expiresAt", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('expiresAt');
+  });
+}

@@ -1,0 +1,97 @@
+meta {
+  name: Get Device
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}
+}
+
+docs {
+  Retrieve a single device by ID.
+  
+  Returns full device object with all details:
+  - Device metadata (hardware, OS, firmware, network info)
+  - Location hierarchy (ISA-95 7-level)
+  - Device certificate (PEM format)
+  - Status and timestamps
+  
+  Certificate Details:
+  - Returns X.509 certificate in PEM format
+  - Either auto-generated or provided during registration
+  - Used for device identification and future mTLS
+  - Private key NOT included (device-side only)
+  
+  Requires: device_id from RegisterDevice response
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.id) {
+    console.log("✓ Device retrieved: " + resp.name);
+    console.log("  Status: " + resp.status);
+    console.log("  Created: " + (resp.createdAt || "N/A"));
+    console.log("  Last seen: " + (resp.lastSeen || "N/A"));
+  }
+}
+
+tests {
+  test("Get successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response is Device object", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('id');
+    expect(resp).to.have.property('name');
+  });
+  
+  test("Device has all required fields", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('metadata');
+    expect(resp).to.have.property('location');
+    expect(resp).to.have.property('status');
+    expect(resp).to.have.property('createdAt');
+  });
+  
+  test("Device has certificate field", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('certificate');
+    expect(resp.certificate).to.be.a('string');
+    expect(resp.certificate).to.not.be.empty;
+  });
+  
+  test("Certificate is valid PEM format", function() {
+    const resp = res.getBody();
+    if (resp.certificate && resp.certificate.length > 0) {
+      expect(resp.certificate).to.include('BEGIN CERTIFICATE');
+      expect(resp.certificate).to.include('END CERTIFICATE');
+    }
+  });
+  
+  test("Certificate does NOT contain private key", function() {
+    const resp = res.getBody();
+    // Verify private key material is not returned
+    expect(resp.certificate).to.not.include('PRIVATE KEY');
+    expect(resp.certificate).to.not.include('ENCRYPTED PRIVATE KEY');
+  });
+  
+  test("Device has location field", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('location');
+    // Location can be empty object for newly created devices
+    expect(resp.location).to.be.an('object');
+  });
+  
+  
+  test("Device status is valid enum string", function() {
+    const resp = res.getBody();
+    // Proto enums are marshaled as strings: PENDING, ACTIVE, INACTIVE, SUSPENDED, DECOMMISSIONED
+    const validStatuses = ["PENDING", "ACTIVE", "INACTIVE", "SUSPENDED", "DECOMMISSIONED"];
+    if (resp.status) {
+      expect(validStatuses).to.include(resp.status);
+    }
+  });
+}

@@ -1,0 +1,138 @@
+meta {
+  name: List Protocol Converters
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  List all protocol converters for a device.
+  
+  This endpoint returns a paginated list of protocol converters for a device,
+  including their deployment status, health status, and last synchronization time.
+  
+  Query Parameters (optional):
+  - page_size: Number of results per page (default: 20, max: 100)
+  - page_token: Pagination cursor for fetching next page (base64 encoded)
+  - type_filter: Filter by protocol type (e.g., "generic-generate")
+  - deployment_status_filter: Filter by status (PENDING, ACTIVE, or FAILED)
+  
+  Response:
+  - converters: Array of ProtocolConverterSummary objects
+  - next_page_token: Token for fetching next page (empty if no more pages)
+  
+  ProtocolConverterSummary fields:
+  - uuid: Unique identifier
+  - name: Display name
+  - type: Protocol type
+  - connectionUUID: Associated connection UUID
+  - deployment_status: PENDING, ACTIVE, or FAILED
+  - health_status: ONLINE, OFFLINE, or UNKNOWN
+  - last_sync_time: RFC3339 timestamp of last StatusMessage sync
+  - error_message: Error details (only if FAILED)
+  
+  Status codes:
+  - 200: List retrieved successfully
+  - 400: Invalid pagination token
+  - 404: Device not found
+  - 500: Server error
+  
+  Pagination example:
+  1. First request: GET .../protocol-converters?page_size=10
+  2. If response has next_page_token, fetch next page:
+     GET .../protocol-converters?page_size=10&page_token={token}
+  3. Continue until next_page_token is empty
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  // API returns camelCase field names in JSON
+  const converters = resp.converters || [];
+  
+  if (converters.length > 0) {
+    console.log("✓ Retrieved " + converters.length + " protocol converters");
+    
+    converters.forEach((converter, idx) => {
+      console.log(`  [${idx + 1}] ${converter.name} (${converter.uuid})`);
+      console.log(`      Type: ${converter.type}`);
+      console.log(`      Status: ${converter.deploymentStatus} / ${converter.healthStatus}`);
+      if (converter.lastSyncTime) {
+        console.log(`      Last Sync: ${converter.lastSyncTime}`);
+      }
+    });
+    
+    if (resp.nextPageToken) {
+      bru.setEnvVar('next_page_token', resp.nextPageToken);
+      console.log("  ➜ More pages available (next_page_token saved)");
+    } else {
+      console.log("  ➜ No more pages");
+    }
+  } else {
+    console.log("✓ No protocol converters found for this device");
+  }
+}
+
+tests {
+  test("List retrieved successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response structure is valid", function() {
+    const resp = res.getBody();
+    // Accept empty response or converters array
+    expect(resp).to.be.an('object');
+  });
+  
+  test("Converters array is valid when present", function() {
+    const resp = res.getBody();
+    if (resp.converters) {
+      expect(resp.converters).to.be.an('array');
+    }
+  });
+  
+  test("Each converter has required fields", function() {
+    const resp = res.getBody();
+    const converters = resp.converters || [];
+    if (converters.length > 0) {
+      converters.forEach((converter) => {
+        expect(converter).to.have.property('uuid');
+        expect(converter).to.have.property('name');
+        expect(converter).to.have.property('type');
+      });
+    }
+  });
+  
+  test("Status values are valid when present", function() {
+    const resp = res.getBody();
+    const validDeploymentStatus = ['PENDING', 'ACTIVE', 'FAILED'];
+    const validHealthStatus = ['ONLINE', 'OFFLINE', 'UNKNOWN'];
+    const converters = resp.converters || [];
+    
+    converters.forEach((converter) => {
+      if (converter.deploymentStatus) {
+        expect(validDeploymentStatus).to.include(converter.deploymentStatus);
+      }
+      if (converter.healthStatus) {
+        expect(validHealthStatus).to.include(converter.healthStatus);
+      }
+    });
+  });
+  
+  test("UUID format is valid", function() {
+    const resp = res.getBody();
+    const uuidRegex = /^[0-9a-f-]{36}$|^[a-zA-Z0-9_-]{8,}$/;
+    const converters = resp.converters || [];
+    
+    converters.forEach((converter) => {
+      expect(converter.uuid).to.match(uuidRegex);
+    });
+  });
+}

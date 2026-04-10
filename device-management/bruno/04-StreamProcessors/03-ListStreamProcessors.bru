@@ -1,0 +1,58 @@
+meta {
+  name: List Stream Processors
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  List all stream processors for a device.
+  
+  Returns paginated list of stream processors with their metadata.
+  Results from local database cache (synchronized from device actions).
+  
+  Query parameters (optional):
+  - page_size: Results per page (default 20, max 100)
+  - page_token: Pagination token from previous response
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.processors) {
+    console.log("✓ Found " + resp.processors.length + " stream processor(s)");
+    
+    resp.processors.forEach(function(sp, index) {
+      console.log((index + 1) + ". " + sp.name);
+      console.log("   UUID: " + sp.uuid);
+      if (sp.model) {
+        console.log("   Model: " + sp.model.name + " v" + sp.model.version);
+      }
+    });
+    
+    if (resp.nextPageToken) {
+      console.log("  More results available - use page_token: " + resp.nextPageToken);
+    }
+  } else {
+    console.log("✓ No stream processors found");
+  }
+}
+
+tests {
+  test("Response is successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has processors array", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('processors');
+    expect(resp.processors).to.be.an('array');
+  });
+}

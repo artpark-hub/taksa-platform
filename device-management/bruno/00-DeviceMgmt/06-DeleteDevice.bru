@@ -1,0 +1,35 @@
+meta {
+  name: Delete Device
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}
+}
+
+docs {
+  Decommission/delete a device.
+  
+  Removes device from management system:
+  - Deletes device record
+  - Invalidates auth tokens
+  - Removes associated data
+  
+  WARNING: This operation cannot be undone.
+  
+  Returns empty response on success.
+}
+
+script:post-response {
+  console.log("✓ Device deleted: " + bru.getEnvVar('device_id'));
+  
+  // Clear the device_id from environment
+  bru.setEnvVar('device_id', '');
+}
+
+tests {
+  test("Delete successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

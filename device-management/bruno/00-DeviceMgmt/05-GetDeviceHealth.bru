@@ -1,0 +1,84 @@
+meta {
+  name: Get Device Health
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/health
+}
+
+docs {
+  Retrieve device health metrics (stored from Push API).
+  
+  Returns health status and metrics:
+  - Device connectivity status
+  - Component health (agent, container, dfcs)
+  - Resource utilization (CPU, memory, disk)
+  - Latency metrics
+  
+  Updated via device Push API when device sends status messages.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp) {
+    console.log("✓ Health retrieved for device: " + resp.deviceId);
+    if (resp.lastUpdated) {
+      console.log("  Last updated: " + resp.lastUpdated);
+    } else {
+      console.log("  Last updated: No health data received yet (new device)");
+    }
+    
+    if (resp.status) {
+      console.log("  Status: Available");
+      if (resp.status.core && resp.status.core.health) {
+        console.log("  Health: " + resp.status.core.health.state);
+      }
+    } else {
+      console.log("  Status: No health data available yet");
+    }
+  }
+}
+
+tests {
+  test("Health retrieval successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has deviceId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('deviceId');
+    expect(resp.deviceId).to.be.a('string');
+  });
+  
+  test("Device health response is valid", function() {
+    const resp = res.getBody();
+    // For newly created devices, health may be minimal
+    // Just verify the response is an object with deviceId
+    expect(resp).to.be.an('object');
+    expect(resp.deviceId).to.exist;
+  });
+  
+  test("If status exists, it has core information", function() {
+    const resp = res.getBody();
+    if (resp.status) {
+      expect(resp.status).to.have.property('core');
+    }
+  });
+  
+  test("If core exists, it has health", function() {
+    const resp = res.getBody();
+    if (resp.status && resp.status.core) {
+      expect(resp.status.core).to.have.property('health');
+    }
+  });
+  
+  test("If health exists, it has state", function() {
+    const resp = res.getBody();
+    if (resp.status && resp.status.core && resp.status.core.health) {
+      expect(resp.status.core.health).to.have.property('state');
+    }
+  });
+}

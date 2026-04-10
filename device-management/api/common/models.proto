@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package api.common;
+
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/common;common";
+option java_multiple_files = true;
+option java_package = "api.common";
+option java_outer_classname = "ModelsProto";
+
+// MessageMetadata for distributed tracing
+// Shared between instance-facing (umh-core) and management console APIs
+// MUST match umh-core's MessageMetadata exactly (pkg/models/action_models.go:60-62)
+message MessageMetadata {
+  string traceId = 1;  // UUID as string - distributed tracing ID for this message
+}
+
+// ============================================================================
+// License & Company Models - Wire Protocol (Shared)
+// ============================================================================
+// These are the canonical wire protocol definitions used by umh-core.
+// MUST match umh-core's CompanyDetails and LicenseStatus from LoginResponse
+// Source: umh-core/backend_api_structs/backend_api_struct.go:119-125
+// ============================================================================
+
+// LicenseStatus tracks device licensing information
+// Wire protocol version - matches umh-core exactly
+// CRITICAL: validTo is a STRING in wire format (date format: "2006-01-02")
+message LicenseStatus {
+  string validTo = 1; // Format: "2006-01-02" - license expiry date (required)
+  string description = 2; // License description
+  bool isActive = 3; // License active status
+}
+
+// CompanyDetails contains company/organization information
+// Wire protocol version - matches umh-core exactly
+// This is what umh-core sends in LoginResponse
+// CRITICAL: Must use these field names and types for wire protocol compatibility
+message CompanyDetails {
+  optional string owner = 1; // Contact email (optional)
+  optional string certificate = 2; // Company certificate PEM (optional)
+  optional string encryptedPrivateKey = 3; // Company encrypted private key (optional)
+  string name = 4; // Company name (required)
+  LicenseStatus licenseStatus = 5; // License information (required)
+  int64 userCount = 6; // User count as integer (required)
+}

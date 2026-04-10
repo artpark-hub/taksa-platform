@@ -1,0 +1,74 @@
+meta {
+  name: Set Device Config
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/config
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "payload": {
+      "content": "# Device Configuration\nversion: 1.0\nlogging:\n  level: info\ndatasources:\n  - name: default\n    enabled: true",
+      "lastModifiedTime": "2025-02-20T00:00:00Z"
+    }
+  }
+}
+
+docs {
+  Queue action to set device configuration file (complete overwrite).
+  
+  WARNING: This completely overwrites the configuration file.
+  It is NOT a partial update - the entire config is replaced.
+  
+  Asynchronous pattern:
+  1. Returns action_id immediately (ActionQueuedResponse)
+  2. Client polls GetDeviceConfigActionResponse to get result
+  
+  Supported by umh-core SetConfigFile action.
+  
+  Parameters:
+  - content: Complete file content as YAML string
+  - lastModifiedTime: ISO 8601 timestamp (used for optimistic concurrency control)
+  
+  Returns:
+  - action_id: Unique identifier to poll for result
+  - timestamp: When action was queued
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_config_set', resp.actionId);
+    console.log("✓ Config update action queued: " + resp.actionId);
+  }
+}
+
+tests {
+  test("Action queued successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+  });
+  
+  test("Response has createdAt", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('createdAt');
+  });
+  
+  test("Response has expiresAt", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('expiresAt');
+  });
+}
