@@ -786,12 +786,12 @@ message DeployStreamProcessorRequest {
 message EditStreamProcessorRequest {
   string                      device_id = 1;
   string                      uuid = 2; // Stream processor UUID to edit (path parameter, required)
-  string                      name = 3; // Optional: new name
-  google.protobuf.Struct      config = 4; // Optional: new config (JSON)
-  string                      model_name = 5; // Optional: update model name
-  string                      model_version = 6; // Optional: update model version
+  string                      name = 3; // Required: name of the stream processor
+  google.protobuf.Struct      config = 4; // Required: new config (JSON)
+  string                      model_name = 5; // Required: model name (must match a DataModel)
+  string                      model_version = 6; // Required: model version (must match a DataModel version)
   map<int32, string>          location = 7; // Optional: update location
-  bool                        ignore_health_check = 8;
+  bool                        ignore_health_check = 8; // Optional: ignore health check
 }
 
 message DeleteStreamProcessorRequest {

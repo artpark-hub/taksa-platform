@@ -1808,31 +1808,37 @@ func (s *DeviceMgmtService) EditStreamProcessor(ctx context.Context, req *v1.Edi
 		return nil, status.Error(codes.InvalidArgument, "uuid is required (path parameter)")
 	}
 
-	// Encode config if provided
-	encodedConfig := ""
-	if req.Config != nil {
-		var err error
-		encodedConfig, err = encodeStreamProcessorConfig(req.Config)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to encode config: %v", err))
-		}
+	// Validate required fields (umh-core requires these to always be present)
+	if req.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "name is required")
+	}
+	if req.Config == nil {
+		return nil, status.Error(codes.InvalidArgument, "config is required")
+	}
+	if req.ModelName == "" {
+		return nil, status.Error(codes.InvalidArgument, "model_name is required")
+	}
+	if req.ModelVersion == "" {
+		return nil, status.Error(codes.InvalidArgument, "model_version is required")
 	}
 
-	// Build payload with provided fields (sparse update)
+	// Encode config (always required)
+	encodedConfig, err := encodeStreamProcessorConfig(req.Config)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to encode config: %v", err))
+	}
+
+	// Build complete payload (all required fields must be present for umh-core validation)
 	editPayload := &v2.StreamProcessor{
 		Uuid:              req.Uuid,
 		Name:              req.Name,
 		EncodedConfig:     encodedConfig,
 		IgnoreHealthCheck: req.IgnoreHealthCheck,
 		Location:          req.Location,
-	}
-
-	// Set model reference if provided
-	if req.ModelName != "" && req.ModelVersion != "" {
-		editPayload.Model = &v2.StreamProcessorModelRef{
+		Model: &v2.StreamProcessorModelRef{
 			Name:    req.ModelName,
 			Version: req.ModelVersion,
-		}
+		},
 	}
 
 	payload, err := convertRequestToAny(editPayload)
