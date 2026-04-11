@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-Monorepo for the **Taksa Platform** — a microservices-based IoT/device management platform with three services:
+Monorepo for the **Taksa Platform** — a microservices-based IoT/device management platform with four services:
 
 - `device-management/` — Device registration, telemetry, and action distribution (Go/Kratos, HTTP :8000, gRPC :9000, SQLite or PostgreSQL)
 - `user-management/` — User CRUD, JWT tokens, Ory Kratos identity integration (Go/Kratos, HTTP :8083, external PostgreSQL via Kratos)
+- `nats-data-collector/` — NATS JetStream consumer that persists UNS messages to TimescaleDB/PostgreSQL (Go/Kratos, HTTP :8000, gRPC :9000)
 - `ui-service/` — Web dashboard and auth flows (Next.js 16 / React 19 / TypeScript 5, port :3000)
 
 There is a top-level Makefile at the repository root that serves as the shared build entrypoint for repo-level workflows. Individual services also have their own Makefiles and can be built independently from their respective directories.
@@ -16,7 +17,7 @@ There is a top-level Makefile at the repository root that serves as the shared b
 
 Use the repository-root `Makefile` for top-level workflows. Use each service's own `Makefile` from that service directory for service-specific targets documented below.
 
-### device-management (Go 1.24)
+### device-management (Go 1.26)
 
 ```bash
 # One-time setup
@@ -49,7 +50,7 @@ go test ./internal/storage/sqlite/...    # Storage tests (uses in-memory SQLite)
 go test -run TestName ./internal/biz/... # Single test
 ```
 
-### user-management (Go 1.22)
+### user-management (Go 1.26)
 
 ```bash
 make init       # Install proto tools
@@ -64,6 +65,19 @@ go test ./...   # Run tests
 ```
 
 **Key difference from device-management:** No `make wire` target. Wire generation is handled via `go generate` within the `make generate` step.
+
+### nats-data-collector (Go 1.26)
+
+```bash
+make init       # Install proto tools and wire CLI
+make api        # Regenerate API proto stubs (skipped if no api/ protos found)
+make config     # Regenerate config proto
+make generate   # Run go generate + go mod tidy
+make wire       # Regenerate Wire dependency injection (wire_gen.go)
+make build      # api + config + generate + wire, then build binary to ./bin/
+```
+
+Connects to NATS JetStream (subject `uns.v1.>`) and writes to TimescaleDB via PostgreSQL. Config via envsubst from `configs/config_docker.yaml` (`TSDB_PG_*`, `TAKSA_NATS_*`, `NATS_SUBJECT`, `NATS_STREAM`, `NATS_DLQ` env vars).
 
 ### ui-service (Node 20)
 

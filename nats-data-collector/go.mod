@@ -1,8 +1,6 @@
 module nats-data-collector
 
-go 1.23.0
-
-toolchain go1.24.6
+go 1.26.1
 
 require (
 	github.com/go-kratos/kratos/v2 v2.8.0
