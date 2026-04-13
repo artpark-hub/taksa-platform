@@ -1983,6 +1983,19 @@ func (s *DeviceMgmtService) GetStreamProcessorActionResponse(ctx context.Context
 							}
 						}
 					}
+					
+					// Extract model reference
+					if result.Model != nil {
+						resp.Model = &v1.StreamProcessorModelRef{
+							Name:    result.Model.Name,
+							Version: result.Model.Version,
+						}
+					}
+					
+					// Extract location
+					if result.Location != nil {
+						resp.Location = result.Location
+					}
 				}
 			}
 		}

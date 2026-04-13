@@ -1673,6 +1673,19 @@ components:
                     type: string
                 config:
                     type: object
+                model:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.StreamProcessorModelRef'
+                location:
+                    type: object
+                    additionalProperties:
+                        type: string
+        api.devicemgmt.v1.StreamProcessorModelRef:
+            type: object
+            properties:
+                name:
+                    type: string
+                version:
+                    type: string
         api.devicemgmt.v1.StreamProcessorSummary:
             type: object
             properties:

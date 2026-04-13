@@ -14,6 +14,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gopkg.in/yaml.v3"
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
@@ -1629,43 +1630,109 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 		return nil
 	}
 
-	// Extract common fields for deploy and edit
-	name, _ := streamProcessor["name"].(string)
+	// Handle based on action type
+	switch actionType {
+	case "deploy":
+		// Deploy returns full StreamProcessor: UUID, name, model, config, location, etc.
+		// Extract all fields from response
+		name, _ := streamProcessor["name"].(string)
 
-	// Extract model reference
-	var modelName, modelVersion string
-	if model, ok := streamProcessor["model"].(map[string]interface{}); ok {
-		modelName, _ = model["name"].(string)
-		modelVersion, _ = model["version"].(string)
-	}
-
-	// Extract encoded config
-	encodedConfig, _ := streamProcessor["encodedConfig"].(string)
-
-	// Extract location and metadata as JSON strings
-	var locationJSON, metadataJSON string
-	if location, ok := streamProcessor["location_json"].(map[string]interface{}); ok {
-		if b, err := json.Marshal(location); err == nil {
-			locationJSON = string(b)
+		var modelName, modelVersion string
+		if model, ok := streamProcessor["model"].(map[string]interface{}); ok {
+			modelName, _ = model["name"].(string)
+			modelVersion, _ = model["version"].(string)
 		}
-	}
-	if metadata, ok := streamProcessor["metadata_json"].(map[string]interface{}); ok {
-		if b, err := json.Marshal(metadata); err == nil {
-			metadataJSON = string(b)
+
+		encodedConfig, _ := streamProcessor["encodedConfig"].(string)
+
+		var locationJSON, metadataJSON string
+		if location, ok := streamProcessor["location_json"].(map[string]interface{}); ok {
+			if b, err := json.Marshal(location); err == nil {
+				locationJSON = string(b)
+			}
 		}
-	}
+		if metadata, ok := streamProcessor["metadata_json"].(map[string]interface{}); ok {
+			if b, err := json.Marshal(metadata); err == nil {
+				metadataJSON = string(b)
+			}
+		}
 
-	ignoreHealthCheck := false
-	if val, ok := streamProcessor["ignoreHealthCheck"].(bool); ok {
-		ignoreHealthCheck = val
-	}
+		ignoreHealthCheck := false
+		if val, ok := streamProcessor["ignoreHealthCheck"].(bool); ok {
+			ignoreHealthCheck = val
+		}
 
-	// Sync deploy and edit operations via Upsert
-	// Both operations update the DB with the device's final state
-	if actionType == "deploy" || actionType == "edit" {
+		// Upsert with full response data
 		err := uc.streamProcessorRepo.Upsert(ctx, action.DeviceId, uuid, name, modelName, modelVersion, encodedConfig, ignoreHealthCheck, locationJSON, metadataJSON)
 		if err != nil {
-			fmt.Printf("Warning: Failed to upsert stream processor (action=%s): %v\n", actionType, err)
+			fmt.Printf("Warning: Failed to upsert stream processor (deploy): %v\n", err)
+		}
+
+	case "edit":
+		// Edit returns only UUID from response
+		// Must extract name, model, config from REQUEST payload since response doesn't have them
+		var name, modelName, modelVersion, encodedConfig string
+		var locationJSON string
+
+		if action.Payload != nil && action.Payload.Value != nil {
+			var editRequest map[string]interface{}
+			if err := json.Unmarshal(action.Payload.Value, &editRequest); err == nil {
+				// Debug: Log what we got
+				fmt.Printf("DEBUG: Edit sync - editRequest keys: %v\n", func() []string {
+					keys := make([]string, 0, len(editRequest))
+					for k := range editRequest {
+						keys = append(keys, k)
+					}
+					return keys
+				}())
+
+				// Extract name from request
+				name, _ = editRequest["name"].(string)
+
+				// Extract model from request (v2.StreamProcessor uses Model as nested object)
+				if modelObj, ok := editRequest["model"].(map[string]interface{}); ok {
+					if modelName_, ok := modelObj["name"].(string); ok {
+						modelName = modelName_
+					}
+					if modelVersion_, ok := modelObj["version"].(string); ok {
+						modelVersion = modelVersion_
+					}
+				}
+				// Fallback: Try top-level fields (if request was original API format)
+				if modelName == "" {
+					if modelObj, ok := editRequest["modelName"].(string); ok {
+						modelName = modelObj
+					}
+				}
+				if modelVersion == "" {
+					if versionObj, ok := editRequest["modelVersion"].(string); ok {
+						modelVersion = versionObj
+					}
+				}
+				
+				fmt.Printf("DEBUG: Edit sync extracted - name: %s, modelName: %s, modelVersion: %s\n", name, modelName, modelVersion)
+
+				// Extract and encode config from request
+				if configObj, ok := editRequest["config"].(map[string]interface{}); ok {
+					configYAML, err := yaml.Marshal(configObj)
+					if err == nil {
+						encodedConfig = base64.StdEncoding.EncodeToString(configYAML)
+					}
+				}
+
+				// Extract location from request
+				if locationObj, ok := editRequest["location"].(map[string]interface{}); ok {
+					if b, err := json.Marshal(locationObj); err == nil {
+						locationJSON = string(b)
+					}
+				}
+			}
+		}
+
+		// Upsert with data from request payload (editor has confirmed the edit succeeded via UUID response)
+		err := uc.streamProcessorRepo.Upsert(ctx, action.DeviceId, uuid, name, modelName, modelVersion, encodedConfig, false, locationJSON, "")
+		if err != nil {
+			fmt.Printf("Warning: Failed to upsert stream processor (edit): %v\n", err)
 		}
 	}
 

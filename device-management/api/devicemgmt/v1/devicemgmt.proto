@@ -812,6 +812,13 @@ message StreamProcessorActionResponse {
   string                    uuid          = 5; // Stream processor UUID (populated on success)
   string                    name          = 6; // Stream processor name (populated on success)
   google.protobuf.Struct    config        = 7; // Decoded config (sources and mappings)
+  StreamProcessorModelRef   model         = 8; // Data model reference (name and version)
+  map<int32, string>        location      = 9; // Location hierarchy (populated on success)
+}
+
+message StreamProcessorModelRef {
+  string name    = 1; // Data model name
+  string version = 2; // Data model version
 }
 
 message ListStreamProcessorsRequest {
