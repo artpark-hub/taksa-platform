@@ -15,8 +15,8 @@ services:
       - TAKSA_DM_LOG_FILE=${TAKSA_DM_LOG_FILE:-/data/taksa-device-management.log}
       - TAKSA_DM_HTTP_PORT=${TAKSA_DM_HTTP_PORT:-8000}
       - TAKSA_DM_GRPC_PORT=${TAKSA_DM_GRPC_PORT:-9000}
-      - TAKSA_DM_DATABASE_SOURCE=${TAKSA_DM_DATABASE_SOURCE:-/data/taksa_platform_dm.db}
-      - TAKSA_DM_DATABASE_DRIVER=${TAKSA_DM_DATABASE_DRIVER:-sqlite3}
+      - TAKSA_DM_DATABASE_SOURCE=${TAKSA_DM_DATABASE_SOURCE:-postgres://user:password@localhost/taksa_platform_dm?sslmode=disable}
+      - TAKSA_DM_DATABASE_DRIVER=${TAKSA_DM_DATABASE_DRIVER:-postgres}
       - TAKSA_DM_BASE_URL=${TAKSA_DM_BASE_URL:-http://localhost:8000}
       - TAKSA_DM_UMH_CORE_DOCKER_IMAGE=${TAKSA_DM_UMH_CORE_DOCKER_IMAGE:-management.umh.app/oci/united-manufacturing-hub/umh-core:v0.43.17}
     volumes:
