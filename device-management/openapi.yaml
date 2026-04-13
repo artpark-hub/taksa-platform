@@ -884,6 +884,27 @@ paths:
                   in: query
                   schema:
                     type: string
+                - name: uuidFilter
+                  in: query
+                  description: Optional filters
+                  schema:
+                    type: string
+                - name: nameFilter
+                  in: query
+                  schema:
+                    type: string
+                - name: deploymentStatusFilter
+                  in: query
+                  schema:
+                    type: string
+                - name: healthStatusFilter
+                  in: query
+                  schema:
+                    type: string
+                - name: modelNameFilter
+                  in: query
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -1695,6 +1716,14 @@ components:
                     type: string
                 model:
                     $ref: '#/components/schemas/api.umh_core.v2.StreamProcessorModelRef'
+                deploymentStatus:
+                    type: string
+                healthStatus:
+                    type: string
+                lastSyncTime:
+                    type: string
+                errorMessage:
+                    type: string
         api.devicemgmt.v1.UpdateDeviceRequest:
             type: object
             properties:

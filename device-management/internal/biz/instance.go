@@ -503,10 +503,14 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 		// Record device activity
 		_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
 
+		// Track message types for summary
+		messageTypeCount := make(map[string]int)
+		
 		// Persist each message and handle correlation
 		for _, msg := range protoMsgs {
 			// Extract MessageType from content JSON
 			msgType := extractMessageType(msg.Content)
+			messageTypeCount[msgType]++
 
 			// DEBUG: Log incoming messages
 			fmt.Printf("DEBUG: Push received message - Type: %s, Content (first 200 chars): %.200s\n", msgType, msg.Content)
@@ -563,11 +567,19 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 				}
 			}
 
-			// TASK 2: Sync protocol converters from StatusMessage
+			// TASK 2: Sync protocol converters and stream processors from StatusMessage
 			if msgType == "status-message" || msgType == "StatusMessage" {
 				_ = uc.syncProtocolConvertersFromStatusMessage(ctx, deviceID, msg.Content)
+				_ = uc.syncStreamProcessorsFromStatusMessage(ctx, deviceID, msg.Content)
 			}
 		}
+		
+		// Log summary of message types received in this push batch
+		fmt.Printf("DEBUG: Push batch summary - Total messages: %d, Type breakdown: %v\n", len(protoMsgs), messageTypeCount)
+		if messageTypeCount["status-message"] == 0 && messageTypeCount["StatusMessage"] == 0 {
+			fmt.Printf("WARNING: No StatusMessage in push batch. Device must send StatusMessage (1-second heartbeat) to update health_status. Message types: %v\n", messageTypeCount)
+		}
+		
 		return nil
 	}
 
@@ -1734,6 +1746,69 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 		if err != nil {
 			fmt.Printf("Warning: Failed to upsert stream processor (edit): %v\n", err)
 		}
+
+	case "get":
+		// Get returns full StreamProcessor with current state/status from device
+		// Extract name, model, config, and status information
+		name, _ := streamProcessor["name"].(string)
+
+		var modelName, modelVersion string
+		if model, ok := streamProcessor["model"].(map[string]interface{}); ok {
+			modelName, _ = model["name"].(string)
+			modelVersion, _ = model["version"].(string)
+		}
+
+		encodedConfig, _ := streamProcessor["encodedConfig"].(string)
+
+		var locationJSON, metadataJSON string
+		if location, ok := streamProcessor["location"].(map[string]interface{}); ok {
+			if b, err := json.Marshal(location); err == nil {
+				locationJSON = string(b)
+			}
+		}
+		if metadata, ok := streamProcessor["metadata"].(map[string]interface{}); ok {
+			if b, err := json.Marshal(metadata); err == nil {
+				metadataJSON = string(b)
+			}
+		}
+
+		ignoreHealthCheck := false
+		if val, ok := streamProcessor["ignoreHealthCheck"].(bool); ok {
+			ignoreHealthCheck = val
+		}
+
+		// Upsert basic processor info
+		err := uc.streamProcessorRepo.Upsert(ctx, action.DeviceId, uuid, name, modelName, modelVersion, encodedConfig, ignoreHealthCheck, locationJSON, metadataJSON)
+		if err != nil {
+			fmt.Printf("Warning: Failed to upsert stream processor (get): %v\n", err)
+		}
+
+		// Extract and update status from Get response
+		// GetStreamProcessor returns configuration (uuid, name, model, config, location, etc.)
+		// It does NOT include runtime health state information.
+		// 
+		// What we CAN infer from a successful Get:
+		// - Processor EXISTS on device (can be retrieved) → deployment_status = "ACTIVE"
+		// 
+		// What we CANNOT infer without StatusMessage:
+		// - Processor's actual runtime state (running, stopped, failed, etc.)
+		// - Processor's health condition (healthy, degraded, offline, etc.)
+		// 
+		// Therefore:
+		// - Set deployment_status = "ACTIVE" (exists and is deployed)
+		// - Keep health_status = "UNKNOWN" (wait for StatusMessage with actual Health.Category)
+		// 
+		// StatusMessage (from device's 1-second heartbeat) will provide the actual health via:
+		//   Health.State → deployment_status mapping
+		//   Health.Category → health_status mapping (active/healthy → ONLINE, degraded/neutral → OFFLINE)
+		
+		deploymentStatus := "ACTIVE"   // Get succeeded = processor exists and is deployed
+		healthStatus := "UNKNOWN"      // Wait for StatusMessage with actual Health.Category
+		errorMessage := ""
+
+		// Update status and mark as synced
+		_ = uc.streamProcessorRepo.UpdateStatus(ctx, action.DeviceId, uuid, deploymentStatus, healthStatus, errorMessage)
+		_ = uc.streamProcessorRepo.MarkSynced(ctx, action.DeviceId, uuid)
 	}
 
 	return nil
@@ -1886,6 +1961,185 @@ type ConverterInfo struct {
 	Type           string
 	ConnectionUUID string
 	Health         *v2.Health
+}
+
+// syncStreamProcessorsFromStatusMessage syncs stream processors from device's StatusMessage
+// Implements "eventual consistency" - device state wins, reconciles DB with actual device state
+// Called periodically via device heartbeat StatusMessage
+func (uc *InstanceUsecase) syncStreamProcessorsFromStatusMessage(ctx context.Context, deviceID, messageContent string) error {
+	if uc.streamProcessorRepo == nil {
+		return nil // Skip if repo unavailable
+	}
+
+	// Decode message content if base64 encoded
+	decodedContent := messageContent
+	if messageContent != "" {
+		decoded, err := base64.StdEncoding.DecodeString(messageContent)
+		if err == nil {
+			decodedContent = string(decoded)
+		}
+	}
+
+	// Parse JSON to extract StatusMessage structure
+	var messageData map[string]interface{}
+	if err := json.Unmarshal([]byte(decodedContent), &messageData); err != nil {
+		fmt.Printf("Warning: Failed to parse StatusMessage JSON: %v\n", err)
+		return nil
+	}
+
+	// Try to unmarshal as protobuf StatusMessage
+	var statusMsg *v2.StatusMessage
+	if msgBytes := []byte(decodedContent); len(msgBytes) > 0 {
+		statusMsg = &v2.StatusMessage{}
+		// Try to unmarshal from JSON (if that fails, we'll use map fallback)
+		_ = proto.UnmarshalOptions{AllowPartial: true}.Unmarshal(msgBytes, statusMsg)
+	}
+
+	// Extract DFCs from status message to find stream processors
+	var discoveredProcessors []*StreamProcessorStatusInfo
+	if statusMsg != nil && statusMsg.Core != nil {
+		// Stream processors are DFCs with dfcType == "stream-processor"
+		for _, dfc := range statusMsg.Core.Dfcs {
+			if dfc.DfcType == "stream-processor" {
+				discoveredProcessors = append(discoveredProcessors, &StreamProcessorStatusInfo{
+					UUID:   dfc.Uuid,
+					Name:   dfc.Name,
+					Type:   dfc.DfcType,
+					Health: dfc.Health,
+				})
+			}
+		}
+	}
+
+	// Fallback: Try to extract from JSON map if proto unmarshal didn't work
+	if len(discoveredProcessors) == 0 && messageData != nil {
+		// Check if message has a Core structure with DFCs
+		if coreData, ok := messageData["Core"].(map[string]interface{}); ok {
+			if dfcs, ok := coreData["dfcs"].([]interface{}); ok {
+				for _, dfc := range dfcs {
+					if dfcMap, ok := dfc.(map[string]interface{}); ok {
+						dfcType, _ := dfcMap["dfcType"].(string)
+						if dfcType == "stream-processor" {
+							processor := &StreamProcessorStatusInfo{
+								UUID: extractStringField(dfcMap, "uuid"),
+								Name: extractStringField(dfcMap, "name"),
+								Type: dfcType,
+							}
+							
+							// Extract Health from JSON
+							if healthMap, ok := dfcMap["health"].(map[string]interface{}); ok {
+								processor.Health = &v2.Health{
+									Message:    extractStringField(healthMap, "message"),
+									State:      extractStringField(healthMap, "state"),
+									DesiredState: extractStringField(healthMap, "desiredState"),
+									Category:   extractStringField(healthMap, "category"),
+								}
+							}
+							
+							if processor.UUID != "" && processor.Name != "" {
+								discoveredProcessors = append(discoveredProcessors, processor)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Step 1: Update status for discovered stream processors
+	for _, processor := range discoveredProcessors {
+		if processor.UUID == "" {
+			continue // Skip if no UUID
+		}
+
+		// Map health state to deployment/health status
+		deploymentStatus := "PENDING"
+		healthStatus := "UNKNOWN"
+
+		if processor.Health != nil {
+			// Determine deployment status from health state
+			// Common states: "active", "idle", "pending", "starting", "error", etc.
+			state := processor.Health.State
+			category := processor.Health.Category
+
+			if state == "active" || state == "idle" {
+				deploymentStatus = "ACTIVE"
+			} else if state == "error" || state == "failed" {
+				deploymentStatus = "FAILED"
+			} else if state == "pending" || state == "starting" {
+				deploymentStatus = "PENDING"
+			}
+
+			// Determine health status from category
+			if category == "active" || category == "healthy" {
+				healthStatus = "ONLINE"
+			} else if category == "degraded" || category == "neutral" {
+				healthStatus = "OFFLINE"
+			}
+		}
+
+		// Update status in database
+		err := uc.streamProcessorRepo.UpdateStatus(ctx,
+			deviceID,
+			processor.UUID,
+			deploymentStatus,
+			healthStatus,
+			"", // Clear error message on success
+		)
+		if err != nil {
+			fmt.Printf("Warning: Failed to update stream processor status %s: %v\n", processor.UUID, err)
+		}
+
+		// Mark as synced
+		_ = uc.streamProcessorRepo.MarkSynced(ctx, deviceID, processor.UUID)
+	}
+
+	// Step 2: Mark stream processors as OFFLINE if they were ACTIVE but are no longer in device status
+	// This reconciles DB with device state when processors are removed
+	allProcessors, err := uc.streamProcessorRepo.List(ctx, &data.StreamProcessorListQuery{
+		DeviceID: deviceID,
+		Limit:    1000,
+	})
+	if err != nil {
+		fmt.Printf("Warning: Failed to list existing stream processors: %v\n", err)
+		return nil
+	}
+
+	// Check which processors in DB are no longer in device state
+	for _, dbProcessor := range allProcessors {
+		found := false
+		for _, statusProcessor := range discoveredProcessors {
+			if statusProcessor.UUID == dbProcessor.UUID {
+				found = true
+				break
+			}
+		}
+
+		// If processor was ACTIVE in DB but not in StatusMessage, mark as OFFLINE
+		deploymentStatus := dbProcessor.DeploymentStatus.String
+		if !found && deploymentStatus == "ACTIVE" {
+			err := uc.streamProcessorRepo.UpdateStatus(ctx,
+				deviceID,
+				dbProcessor.UUID,
+				deploymentStatus,
+				"OFFLINE", // Mark health as offline
+				"",        // Clear error message
+			)
+			if err != nil {
+				fmt.Printf("Warning: Failed to mark stream processor %s as offline: %v\n", dbProcessor.UUID, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// StreamProcessorStatusInfo holds minimal stream processor information extracted from StatusMessage
+type StreamProcessorStatusInfo struct {
+	UUID   string
+	Name   string
+	Type   string
+	Health *v2.Health
 }
 
 // extractStringField safely extracts a string field from a map

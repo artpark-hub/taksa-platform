@@ -1,0 +1,84 @@
+meta {
+  name: List Stream Processors Filter by Model Name
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors?model_name_filter=model
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Filter stream processors by model name (substring search).
+  
+  This is useful to find processors using specific stream processor models.
+  
+  Query Parameter:
+  - model_name_filter: Substring to search for in model names (case-sensitive)
+  
+  Returns:
+  - All processors whose model names contain the substring
+  - Empty result if no matches
+  
+  Examples:
+  - model_name_filter=model (find all processors with "model" in model name)
+  - model_name_filter=v1 (find processors using v1 models)
+  - model_name_filter=custom (find processors using custom models)
+  
+  Note: Model information comes from StreamProcessorModelRef which includes:
+  - name: Name of the stream processor model
+  - version: Version of the model
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.processors) {
+    console.log("✓ Found " + resp.processors.length + " processor(s) matching model name filter");
+    
+    const models = new Set();
+    resp.processors.forEach((sp) => {
+      if (sp.model) {
+        const modelStr = `${sp.model.name}:${sp.model.version}`;
+        models.add(modelStr);
+        console.log(`  - ${sp.name} using ${modelStr}`);
+      }
+    });
+    
+    console.log("  Unique models: " + Array.from(models).join(", "));
+  } else {
+    console.log("✓ No processors match the model name filter");
+  }
+}
+
+tests {
+  test("Model name filter request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("All results match model name filter (contain 'model')", function() {
+    const resp = res.getBody();
+    if (resp.processors) {
+      resp.processors.forEach((sp) => {
+        if (sp.model && sp.model.name) {
+          expect(sp.model.name.toLowerCase()).to.include('model');
+        }
+      });
+    }
+  });
+  
+  test("All processors have model information", function() {
+    const resp = res.getBody();
+    if (resp.processors && resp.processors.length > 0) {
+      resp.processors.forEach((sp) => {
+        expect(sp.model).to.exist;
+        expect(sp.model.name).to.exist;
+        expect(sp.model.version).to.exist;
+      });
+    }
+  });
+}

@@ -1084,7 +1084,7 @@ func (s *DeviceMgmtService) ListProtocolConverters(ctx context.Context, req *v1.
 		ConnectionUUIDFilter:   req.ConnectionUuidFilter,
 		HealthStatusFilter:     req.HealthStatusFilter,
 		Offset:                offset,
-		Limit:                 int64(pageSize),
+		Limit:                 int64(pageSize) + 1, // Fetch one extra to detect if more pages exist
 	}
 
 	// Query the database
@@ -1699,7 +1699,7 @@ func (s *DeviceMgmtService) ListDataModels(ctx context.Context, req *v1.ListData
 		NameFilter:    req.NameFilter,
 		VersionFilter: req.VersionFilter,
 		Offset:        offset,
-		Limit:         int64(pageSize),
+		Limit:         int64(pageSize) + 1, // Fetch one extra to detect if more pages exist
 	}
 
 	// Query the database
@@ -2030,10 +2030,14 @@ func (s *DeviceMgmtService) ListStreamProcessors(ctx context.Context, req *v1.Li
 	}
 
 	query := &data.StreamProcessorListQuery{
-		DeviceID:   req.DeviceId,
-		NameFilter: "", // No filter for basic list
-		Offset:     int64(offset),
-		Limit:      int64(pageSize),
+		DeviceID:              req.DeviceId,
+		UUIDFilter:            req.UuidFilter,
+		NameFilter:            req.NameFilter,
+		DeploymentStatusFilter: req.DeploymentStatusFilter,
+		HealthStatusFilter:     req.HealthStatusFilter,
+		ModelNameFilter:        req.ModelNameFilter,
+		Offset:                int64(offset),
+		Limit:                 int64(pageSize) + 1, // Fetch one extra to detect if more pages exist
 	}
 
 	models, err := s.streamProcessorRepo.List(ctx, query)

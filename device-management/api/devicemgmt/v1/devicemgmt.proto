@@ -823,8 +823,15 @@ message StreamProcessorModelRef {
 
 message ListStreamProcessorsRequest {
   string device_id  = 1;
-  int32  page_size  = 2; // Maximum number of results per page (0 = default)
+  int32  page_size  = 2; // Maximum number of results per page (0 = default 20, max 100)
   string page_token = 3; // Token from previous response for pagination
+  
+  // Optional filters
+  string uuid_filter = 4; // Filter by exact UUID match
+  string name_filter = 5; // Filter by name (substring match)
+  string deployment_status_filter = 6; // Filter: "PENDING", "ACTIVE", "FAILED". Empty = all statuses
+  string health_status_filter = 7; // Filter by health status: "ONLINE", "OFFLINE", "UNKNOWN". Empty = all
+  string model_name_filter = 8; // Filter by model name (substring match)
 }
 
 message ListStreamProcessorsResponse {
@@ -833,9 +840,13 @@ message ListStreamProcessorsResponse {
 }
 
 message StreamProcessorSummary {
-  string                                  uuid  = 1;
-  string                                  name  = 2;
-  api.umh_core.v2.StreamProcessorModelRef model = 3;
+  string                                  uuid              = 1;
+  string                                  name              = 2;
+  api.umh_core.v2.StreamProcessorModelRef model             = 3;
+  string                                  deployment_status = 4; // "PENDING", "ACTIVE", or "FAILED"
+  string                                  health_status     = 5; // "ONLINE", "OFFLINE", or "UNKNOWN"
+  string                                  last_sync_time    = 6; // RFC3339 timestamp of last StatusMessage sync
+  string                                  error_message     = 7; // Only populated if deployment_status="FAILED"
 }
 
 // ============================================================================

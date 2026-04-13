@@ -349,6 +349,13 @@ CREATE TABLE IF NOT EXISTS stream_processors (
   location_json TEXT,           -- JSON map of location levels
   ignore_health_check BOOLEAN DEFAULT false,
   metadata_json TEXT,           -- JSON map of metadata
+  
+  -- Status tracking
+  deployment_status TEXT DEFAULT 'PENDING',  -- PENDING, ACTIVE, FAILED
+  health_status TEXT DEFAULT 'UNKNOWN',      -- ONLINE, OFFLINE, UNKNOWN
+  error_message TEXT,
+  last_synced TIMESTAMP WITH TIME ZONE,     -- From latest StatusMessage
+  
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   
@@ -366,3 +373,9 @@ CREATE INDEX IF NOT EXISTS idx_stream_processors_uuid
 
 CREATE INDEX IF NOT EXISTS idx_stream_processors_device_created_at 
   ON stream_processors(device_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_stream_processors_deployment_status 
+  ON stream_processors(device_id, deployment_status);
+
+CREATE INDEX IF NOT EXISTS idx_stream_processors_last_synced 
+  ON stream_processors(last_synced);

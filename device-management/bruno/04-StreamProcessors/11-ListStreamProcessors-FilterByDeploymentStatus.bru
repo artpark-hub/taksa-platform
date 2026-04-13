@@ -1,0 +1,81 @@
+meta {
+  name: List Stream Processors Filter by Deployment Status
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors?deployment_status_filter=ACTIVE
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Filter stream processors by deployment status.
+  
+  This is useful to find processors in specific deployment states.
+  
+  Query Parameter:
+  - deployment_status_filter: Deployment status - PENDING, ACTIVE, or FAILED
+  
+  Returns:
+  - All processors matching the deployment status
+  - Empty result if no matches
+  
+  Deployment Status Values (from device Health.State):
+  - PENDING: Processor is starting or in pending state
+  - ACTIVE: Processor is actively running
+  - FAILED: Processor has encountered an error or failed
+  
+  Common Use Cases:
+  - Find failed processors: deployment_status_filter=FAILED
+  - Find active processors: deployment_status_filter=ACTIVE
+  - Find pending processors: deployment_status_filter=PENDING
+  
+  When a processor fails, check errorMessage field for details.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.processors) {
+    console.log("✓ Found " + resp.processors.length + " processor(s) with ACTIVE deployment status");
+    
+    resp.processors.forEach((sp) => {
+      console.log(`  - ${sp.name}`);
+      if (sp.errorMessage) {
+        console.log(`    Error: ${sp.errorMessage}`);
+      }
+    });
+  } else {
+    console.log("✓ No processors found with specified deployment status");
+  }
+}
+
+tests {
+  test("Deployment status filter request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("All results match deployment status filter (ACTIVE)", function() {
+    const resp = res.getBody();
+    if (resp.processors) {
+      resp.processors.forEach((sp) => {
+        expect(sp.deploymentStatus).to.equal('ACTIVE');
+      });
+    }
+  });
+  
+  test("Failed processors should have error message", function() {
+    const resp = res.getBody();
+    if (resp.processors) {
+      resp.processors.forEach((sp) => {
+        if (sp.deploymentStatus === 'FAILED') {
+          expect(sp.errorMessage).to.exist;
+        }
+      });
+    }
+  });
+}

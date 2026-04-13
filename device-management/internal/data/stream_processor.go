@@ -27,18 +27,22 @@ type StreamProcessorRepo struct {
 
 // StreamProcessorModel represents a stream processor in the database
 type StreamProcessorModel struct {
-	ID                string
-	DeviceID          string
-	UUID              string
-	Name              string
-	ModelName         sql.NullString
-	ModelVersion      sql.NullString
-	EncodedConfig     sql.NullString
-	LocationJSON      sql.NullString // JSON map of location levels
-	IgnoreHealthCheck bool
-	MetadataJSON      sql.NullString // JSON map of metadata
-	CreatedAt         sql.NullString // Store as TEXT for SQLite compatibility
-	UpdatedAt         sql.NullString // Store as TEXT for SQLite compatibility
+	ID                 string
+	DeviceID           string
+	UUID               string
+	Name               string
+	ModelName          sql.NullString
+	ModelVersion       sql.NullString
+	EncodedConfig      sql.NullString
+	LocationJSON       sql.NullString // JSON map of location levels
+	IgnoreHealthCheck  bool
+	MetadataJSON       sql.NullString // JSON map of metadata
+	DeploymentStatus   sql.NullString // PENDING, ACTIVE, FAILED
+	HealthStatus       sql.NullString // ONLINE, OFFLINE, UNKNOWN
+	ErrorMessage       sql.NullString
+	LastSynced         sql.NullTime // Timestamp of last sync from StatusMessage
+	CreatedAt          sql.NullString // Store as TEXT for SQLite compatibility
+	UpdatedAt          sql.NullString // Store as TEXT for SQLite compatibility
 }
 
 // Insert creates a new stream processor record
@@ -104,6 +108,7 @@ func (r *StreamProcessorRepo) GetByUUID(ctx context.Context, deviceID, uuid stri
 	query := `
 		SELECT id, device_id, uuid, name, model_name, model_version,
 		       encoded_config, location_json, ignore_health_check, metadata_json,
+		       deployment_status, health_status, error_message, last_synced,
 		       created_at, updated_at
 		FROM stream_processors
 		WHERE device_id = ? AND uuid = ?
@@ -119,6 +124,7 @@ func (r *StreamProcessorRepo) GetByUUID(ctx context.Context, deviceID, uuid stri
 	err := row.Scan(
 		&sp.ID, &sp.DeviceID, &sp.UUID, &sp.Name, &sp.ModelName, &sp.ModelVersion,
 		&sp.EncodedConfig, &sp.LocationJSON, &ignoreHealthCheck, &sp.MetadataJSON,
+		&sp.DeploymentStatus, &sp.HealthStatus, &sp.ErrorMessage, &sp.LastSynced,
 		&sp.CreatedAt, &sp.UpdatedAt,
 	)
 
@@ -134,12 +140,16 @@ func (r *StreamProcessorRepo) GetByUUID(ctx context.Context, deviceID, uuid stri
 	return &sp, nil
 }
 
-// ListQuery represents query parameters for listing stream processors
+// StreamProcessorListQuery represents query parameters for listing stream processors
 type StreamProcessorListQuery struct {
-	DeviceID   string
-	NameFilter string // Substring match
-	Offset     int64
-	Limit      int64
+	DeviceID              string
+	UUIDFilter            string // Exact UUID match
+	NameFilter            string // Substring match on name
+	DeploymentStatusFilter string // Filter: "PENDING", "ACTIVE", "FAILED"
+	HealthStatusFilter     string // Filter: "ONLINE", "OFFLINE", "UNKNOWN"
+	ModelNameFilter        string // Substring match on model name
+	Offset                int64
+	Limit                 int64
 }
 
 // List retrieves stream processors with optional filtering and pagination
@@ -147,6 +157,7 @@ func (r *StreamProcessorRepo) List(ctx context.Context, query *StreamProcessorLi
 	sqlQuery := `
 		SELECT id, device_id, uuid, name, model_name, model_version,
 		       encoded_config, location_json, ignore_health_check, metadata_json,
+		       deployment_status, health_status, error_message, last_synced,
 		       created_at, updated_at
 		FROM stream_processors
 		WHERE device_id = ?
@@ -155,9 +166,29 @@ func (r *StreamProcessorRepo) List(ctx context.Context, query *StreamProcessorLi
 	args := []interface{}{query.DeviceID}
 
 	// Add optional filters
+	if query.UUIDFilter != "" {
+		sqlQuery += " AND uuid = ?"
+		args = append(args, query.UUIDFilter)
+	}
+
 	if query.NameFilter != "" {
 		sqlQuery += " AND name LIKE ?"
 		args = append(args, "%"+query.NameFilter+"%")
+	}
+
+	if query.DeploymentStatusFilter != "" {
+		sqlQuery += " AND deployment_status = ?"
+		args = append(args, query.DeploymentStatusFilter)
+	}
+
+	if query.HealthStatusFilter != "" {
+		sqlQuery += " AND health_status = ?"
+		args = append(args, query.HealthStatusFilter)
+	}
+
+	if query.ModelNameFilter != "" {
+		sqlQuery += " AND model_name LIKE ?"
+		args = append(args, "%"+query.ModelNameFilter+"%")
 	}
 
 	// Order and paginate
@@ -181,6 +212,7 @@ func (r *StreamProcessorRepo) List(ctx context.Context, query *StreamProcessorLi
 		err := rows.Scan(
 			&sp.ID, &sp.DeviceID, &sp.UUID, &sp.Name, &sp.ModelName, &sp.ModelVersion,
 			&sp.EncodedConfig, &sp.LocationJSON, &ignoreHealthCheck, &sp.MetadataJSON,
+			&sp.DeploymentStatus, &sp.HealthStatus, &sp.ErrorMessage, &sp.LastSynced,
 			&sp.CreatedAt, &sp.UpdatedAt,
 		)
 		if err != nil {
@@ -268,5 +300,21 @@ func (r *StreamProcessorRepo) Upsert(ctx context.Context, deviceID, uuid, name, 
 		"ignore_health_check":   ignoreHealthCheckInt,
 		"location_json":         locationJSON,
 		"metadata_json":         metadataJSON,
+	})
+}
+
+// UpdateStatus updates deployment and health status of a stream processor
+func (r *StreamProcessorRepo) UpdateStatus(ctx context.Context, deviceID, uuid, deploymentStatus, healthStatus, errorMessage string) error {
+	return r.Update(ctx, deviceID, uuid, map[string]interface{}{
+		"deployment_status": deploymentStatus,
+		"health_status":     healthStatus,
+		"error_message":     errorMessage,
+	})
+}
+
+// MarkSynced updates the last_synced timestamp for a stream processor
+func (r *StreamProcessorRepo) MarkSynced(ctx context.Context, deviceID, uuid string) error {
+	return r.Update(ctx, deviceID, uuid, map[string]interface{}{
+		"last_synced": time.Now(),
 	})
 }

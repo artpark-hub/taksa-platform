@@ -1,0 +1,85 @@
+meta {
+  name: List Stream Processors Filter by Health Status
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors?health_status_filter=ONLINE
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Filter stream processors by health status.
+  
+  This is useful to find processors in specific health states.
+  
+  Query Parameter:
+  - health_status_filter: Health status - ONLINE, OFFLINE, or UNKNOWN
+  
+  Returns:
+  - All processors matching the health status
+  - Empty result if no matches
+  
+  Health Status Values (from device Health.Category):
+  - ONLINE: Processor is actively communicating and healthy
+  - OFFLINE: Processor is not responding or degraded
+  - UNKNOWN: Health status not yet determined (new processors)
+  
+  Status Update Sequence:
+  1. Initially: health_status = UNKNOWN (no heartbeat yet)
+  2. After GetStreamProcessor action succeeds: deployment_status = ACTIVE, health_status = UNKNOWN
+  3. After StatusMessage heartbeat received: health_status updated to ONLINE or OFFLINE
+  
+  Common Use Cases:
+  - Find unhealthy processors: health_status_filter=OFFLINE
+  - Find healthy processors: health_status_filter=ONLINE
+  - Find uninitialized processors: health_status_filter=UNKNOWN
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.processors) {
+    console.log("✓ Found " + resp.processors.length + " processor(s) with ONLINE health status");
+    
+    resp.processors.forEach((sp) => {
+      console.log(`  - ${sp.name} (${sp.healthStatus})`);
+      if (sp.lastSyncTime) {
+        console.log(`    Last synced: ${sp.lastSyncTime}`);
+      }
+    });
+  } else {
+    console.log("✓ No processors found with specified health status");
+  }
+}
+
+tests {
+  test("Health status filter request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("All results match health status filter (ONLINE)", function() {
+    const resp = res.getBody();
+    if (resp.processors) {
+      resp.processors.forEach((sp) => {
+        expect(sp.healthStatus).to.equal('ONLINE');
+      });
+    }
+  });
+  
+  test("Processors have last_sync_time populated", function() {
+    const resp = res.getBody();
+    if (resp.processors && resp.processors.length > 0) {
+      resp.processors.forEach((sp) => {
+        // health_status should only be populated if synced
+        if (sp.healthStatus && sp.healthStatus !== 'UNKNOWN') {
+          expect(sp.lastSyncTime).to.exist;
+        }
+      });
+    }
+  });
+}
