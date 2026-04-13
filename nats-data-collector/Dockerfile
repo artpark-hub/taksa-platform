@@ -1,24 +1,20 @@
-FROM golang:1.24 AS builder
-
-COPY . /src
-WORKDIR /src
-
-RUN make init && make config && make build
-
 FROM debian:stable-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-		ca-certificates  \
+        ca-certificates \
         netbase \
-        && rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /src/bin/nats-data-collector /app/nats-data-collector
-COPY --from=builder /src/configs /app/configs
+        gettext-base \
+        && rm -rf /var/lib/apt/lists/ \
+        && apt-get autoremove -y && apt-get autoclean -y
 
 WORKDIR /app
+
+# Binary and configs are pre-built by 'make build' before docker build
+COPY bin/nats-data-collector /app/nats-data-collector
+COPY configs /app/configs
 
 EXPOSE 8000
 EXPOSE 9000
 VOLUME /app/configs
 
-CMD ["./nats-data-collector", "-conf", "/app/configs/config_docker.yaml"]
+CMD ["sh", "-c", "envsubst < /app/configs/config.yaml > /tmp/config_resolved.yaml && /app/nats-data-collector -conf /tmp/config_resolved.yaml"]

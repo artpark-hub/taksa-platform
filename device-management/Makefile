@@ -1,5 +1,4 @@
 GOHOSTOS:=$(shell go env GOHOSTOS)
-GOPATH:=$(shell go env GOPATH)
 VERSION=$(shell git describe --tags --always)
 
 ifeq ($(GOHOSTOS), windows)
@@ -47,7 +46,7 @@ api:
 .PHONY: build
 # build
 build: api config generate wire
-	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/device-management ./cmd/device-management
+	mkdir -p bin/ && CGO_ENABLED=0 go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/device-management ./cmd/device-management
 
 .PHONY: wire
 # generate wire

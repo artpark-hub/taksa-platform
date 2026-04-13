@@ -1,12 +1,10 @@
 module nats-data-collector
 
-go 1.23.0
-
-toolchain go1.24.6
+go 1.26.1
 
 require (
 	github.com/go-kratos/kratos/v2 v2.8.0
-	github.com/google/wire v0.6.0
+	github.com/google/wire v0.7.0
 	github.com/nats-io/nats.go v1.37.0
 	go.uber.org/automaxprocs v1.5.1
 	google.golang.org/protobuf v1.34.1

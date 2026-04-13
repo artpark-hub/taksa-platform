@@ -1,5 +1,4 @@
 GOHOSTOS:=$(shell go env GOHOSTOS)
-GOPATH:=$(shell go env GOPATH)
 VERSION=$(shell git describe --tags --always)
 
 ifeq ($(GOHOSTOS), windows)
@@ -41,9 +40,15 @@ api:
 			   $(API_PROTO_FILES); \
 	fi
 
+.PHONY: wire
+# generate wire
+wire:
+	cd ./cmd/nats-data-collector && wire
+
 .PHONY: build
-build:
-	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/nats-data-collector ./cmd/nats-data-collector
+# build
+build: api config generate wire
+	mkdir -p bin/ && CGO_ENABLED=0 go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/nats-data-collector ./cmd/nats-data-collector
 
 .PHONY: generate
 generate:
