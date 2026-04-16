@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
@@ -16,23 +17,23 @@ type MessageStore struct {
 	db *sql.DB
 }
 
-// Save persists a message to storage
-func (s *MessageStore) Save(ctx context.Context, message *models.Message) error {
-	if message == nil || message.DeviceID == "" {
+// Save persists a message to storage with tenant isolation
+func (s *MessageStore) Save(ctx context.Context, tenantID string, message *models.Message) error {
+	if message == nil || message.DeviceID == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
 	query := `
 	INSERT INTO messages (
-		id, device_id, message_type, content,
+		id, device_id, tenant_id, message_type, content,
 		trace_id, request_id, correlation_id, direction,
 		created_at, expires_at
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
 	directionValue := int32(message.Direction)
 	_, err := s.db.ExecContext(ctx, query,
-		message.ID, message.DeviceID, message.Type,
+		message.ID, message.DeviceID, tenantID, message.Type,
 		message.Content,
 		"", "", "", directionValue,
 		message.CreatedAt.Format(time.RFC3339),
@@ -49,18 +50,27 @@ func (s *MessageStore) Save(ctx context.Context, message *models.Message) error 
 	return nil
 }
 
-// GetByID retrieves a message by its ID
+// GetByID retrieves a message by its ID with tenant isolation
 func (s *MessageStore) GetByID(ctx context.Context, id string) (*models.Message, error) {
 	if id == "" {
 		return nil, ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+
 	message := &models.Message{}
 	var createdAt, expiresAt sql.NullString
 
-	row := s.db.QueryRowContext(ctx,
-		`SELECT id, device_id, message_type, content, created_at, expires_at
-		 FROM messages WHERE id = $1`, id)
+	var row *sql.Row
+	if tenantID != "" {
+		row = s.db.QueryRowContext(ctx,
+			`SELECT id, device_id, message_type, content, created_at, expires_at
+			 FROM messages WHERE id = $1 AND tenant_id = $2`, id, tenantID)
+	} else {
+		row = s.db.QueryRowContext(ctx,
+			`SELECT id, device_id, message_type, content, created_at, expires_at
+			 FROM messages WHERE id = $1`, id)
+	}
 
 	err := row.Scan(
 		&message.ID, &message.DeviceID, &message.Type,
@@ -93,25 +103,37 @@ func (s *MessageStore) GetByID(ctx context.Context, id string) (*models.Message,
 	return message, nil
 }
 
-// GetByDeviceID retrieves all messages for a device
+// GetByDeviceID retrieves all messages for a device with tenant isolation
 func (s *MessageStore) GetByDeviceID(ctx context.Context, deviceID string) ([]*models.Message, error) {
 	if deviceID == "" {
 		return nil, ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID != "" {
+		return s.listMessages(ctx,
+			"WHERE device_id = $1 AND tenant_id = $2 ORDER BY created_at DESC", deviceID, tenantID)
+	}
 	return s.listMessages(ctx,
 		"WHERE device_id = $1 ORDER BY created_at DESC", deviceID)
 }
 
-// ListHistory retrieves message history with filtering and pagination
+// ListHistory retrieves message history with filtering and pagination with tenant isolation
 func (s *MessageStore) ListHistory(ctx context.Context, filters *storage.MessageListFilter) ([]*models.Message, int32, error) {
 	if filters == nil || filters.DeviceID == "" {
 		return nil, 0, ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+
 	whereClause := "WHERE device_id = $1"
 	args := []interface{}{filters.DeviceID}
 	argIndex := 2
+	if tenantID != "" {
+		whereClause += fmt.Sprintf(" AND tenant_id = $%d", argIndex)
+		args = append(args, tenantID)
+		argIndex++
+	}
 
 	// Add message type filter
 	if filters.MessageType != "" {
@@ -198,7 +220,7 @@ func (s *MessageStore) ListHistory(ctx context.Context, filters *storage.Message
 	return messages, total, nil
 }
 
-// GetRecentByDevice retrieves recent messages for a device
+// GetRecentByDevice retrieves recent messages for a device with tenant isolation
 func (s *MessageStore) GetRecentByDevice(ctx context.Context, deviceID string, limit int32) ([]*models.Message, error) {
 	if deviceID == "" {
 		return nil, ErrInvalidInput
@@ -208,18 +230,30 @@ func (s *MessageStore) GetRecentByDevice(ctx context.Context, deviceID string, l
 		limit = 10
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID != "" {
+		return s.listMessages(ctx,
+			"WHERE device_id = $1 AND tenant_id = $2 ORDER BY created_at DESC LIMIT $3",
+			deviceID, tenantID, limit)
+	}
 	return s.listMessages(ctx,
 		"WHERE device_id = $1 ORDER BY created_at DESC LIMIT $2",
 		deviceID, limit)
 }
 
-// Delete removes a message by ID
+// Delete removes a message by ID with tenant isolation
 func (s *MessageStore) Delete(ctx context.Context, id string) error {
 	if id == "" {
 		return ErrInvalidInput
 	}
 
-	result, err := s.db.ExecContext(ctx, "DELETE FROM messages WHERE id = $1", id)
+	query := "DELETE FROM messages WHERE id = $1"
+	args := []interface{}{id}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "DELETE FROM messages WHERE id = $1 AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete message: %w", err)
 	}
@@ -232,13 +266,19 @@ func (s *MessageStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// DeleteByDeviceID removes all messages for a device
+// DeleteByDeviceID removes all messages for a device with tenant isolation
 func (s *MessageStore) DeleteByDeviceID(ctx context.Context, deviceID string) error {
 	if deviceID == "" {
 		return ErrInvalidInput
 	}
 
-	_, err := s.db.ExecContext(ctx, "DELETE FROM messages WHERE device_id = $1", deviceID)
+	query := "DELETE FROM messages WHERE device_id = $1"
+	args := []interface{}{deviceID}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "DELETE FROM messages WHERE device_id = $1 AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
+	_, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete messages for device: %w", err)
 	}
@@ -269,15 +309,20 @@ func (s *MessageStore) CleanupExpired(ctx context.Context) error {
 	return nil
 }
 
-// CountByDevice returns the number of messages for a device
+// CountByDevice returns the number of messages for a device with tenant isolation
 func (s *MessageStore) CountByDevice(ctx context.Context, deviceID string) (int32, error) {
 	if deviceID == "" {
 		return 0, ErrInvalidInput
 	}
 
+	query := "SELECT COUNT(*) FROM messages WHERE device_id = $1"
+	args := []interface{}{deviceID}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "SELECT COUNT(*) FROM messages WHERE device_id = $1 AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
 	var count int32
-	err := s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM messages WHERE device_id = $1", deviceID).Scan(&count)
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count messages: %w", err)
 	}
@@ -285,16 +330,20 @@ func (s *MessageStore) CountByDevice(ctx context.Context, deviceID string) (int3
 	return count, nil
 }
 
-// CountByDeviceAndDirection returns the number of messages by direction
+// CountByDeviceAndDirection returns the number of messages by direction with tenant isolation
 func (s *MessageStore) CountByDeviceAndDirection(ctx context.Context, deviceID string, direction int32) (int32, error) {
 	if deviceID == "" {
 		return 0, ErrInvalidInput
 	}
 
+	query := "SELECT COUNT(*) FROM messages WHERE device_id = $1 AND direction = $2"
+	args := []interface{}{deviceID, direction}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "SELECT COUNT(*) FROM messages WHERE device_id = $1 AND tenant_id = $2 AND direction = $3"
+		args = []interface{}{deviceID, tenantID, direction}
+	}
 	var count int32
-	err := s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM messages WHERE device_id = $1 AND direction = $2",
-		deviceID, direction).Scan(&count)
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count messages: %w", err)
 	}
@@ -353,11 +402,13 @@ func (s *MessageStore) listMessages(ctx context.Context, whereClause string, arg
 	return messages, nil
 }
 
-// GetByTraceID retrieves messages by trace ID
+// GetByTraceID retrieves messages by trace ID with tenant isolation
 func (s *MessageStore) GetByTraceID(ctx context.Context, traceID string) ([]*models.Message, error) {
 	if traceID == "" {
 		return nil, ErrInvalidInput
 	}
+
+	tenantID := middleware.GetTenantID(ctx)
 
 	query := `
 	SELECT id, device_id, message_type, content,
@@ -365,10 +416,21 @@ func (s *MessageStore) GetByTraceID(ctx context.Context, traceID string) ([]*mod
 	       created_at, expires_at
 	FROM messages
 	WHERE trace_id = $1
-	ORDER BY created_at DESC
 	`
+	args := []interface{}{traceID}
+	if tenantID != "" {
+		query = `
+		SELECT id, device_id, message_type, content,
+		       trace_id, request_id, correlation_id, direction,
+		       created_at, expires_at
+		FROM messages
+		WHERE trace_id = $1 AND tenant_id = $2
+		`
+		args = append(args, tenantID)
+	}
+	query += " ORDER BY created_at DESC"
 
-	rows, err := s.db.QueryContext(ctx, query, traceID)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query messages by trace_id: %w", err)
 	}

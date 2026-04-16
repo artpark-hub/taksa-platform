@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
@@ -29,44 +30,54 @@ func NewAuthUsecase(store storage.Store) *AuthUsecase {
 	}
 }
 
-// ValidateAuthToken validates a token hash by iterating stored tokens and hashing them
-// CRITICAL: Used by Login endpoint
-// Flow: Client sends SHA3(SHA3(rawToken)) → iterate all tokens, hash each → compare → return device_id & token
-// This matches umh-mock-console's approach for compatibility
-// Returns: (deviceID, rawToken, error) - rawToken is needed to update expiry on successful login
-func (uc *AuthUsecase) ValidateAuthToken(ctx context.Context, clientHash string) (string, string, error) {
+// ValidateAuthToken validates a token hash by iterating stored tokens and hashing them (SYSTEM-WIDE SEARCH)
+// CRITICAL: Used by Login endpoint (device API, which doesn't have tenant context)
+// Flow: Client sends SHA3(SHA3(rawToken)) → iterate all tokens, hash each → compare
+// Returns: (deviceID, tenantID, rawToken, error)
+// Both deviceID and tenantID are resolved from the auth_tokens table in one lookup.
+func (uc *AuthUsecase) ValidateAuthToken(ctx context.Context, clientHash string) (string, string, string, error) {
 	if clientHash == "" {
-		return "", "", fmt.Errorf("token hash is empty")
+		return "", "", "", fmt.Errorf("token hash is empty")
 	}
 
-	// Get all valid tokens from storage (raw tokens)
-	validTokens, err := uc.store.AuthTokens().GetAllValidAuthTokens(ctx)
+	// Get all valid tokens across all tenants (system-wide search)
+	// Safe because tokens are cryptographically unique; only ONE matching token can exist
+	validTokens, err := uc.store.AuthTokens().GetAllValidAuthTokensSystemWide(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to retrieve tokens: %w", err)
+		return "", "", "", fmt.Errorf("failed to retrieve tokens: %w", err)
 	}
 
 	// Iterate through all tokens and hash them to find a match
 	// This is how we validate: client sends hash(hash(rawToken)), we hash the raw token and compare
-	for rawToken, deviceID := range validTokens {
+	for rawToken, info := range validTokens {
 		computedHash := hashToken(rawToken)
 		if computedHash == clientHash {
-			return deviceID, rawToken, nil
+			return info.DeviceID, info.TenantID, rawToken, nil
 		}
 	}
 
-	return "", "", fmt.Errorf("invalid token: no matching token found")
+	return "", "", "", fmt.Errorf("invalid token: no matching token found")
 }
 
 // GenerateJWT generates a JWT token for a device
-func (uc *AuthUsecase) GenerateJWT(device *v1.Device) (string, error) {
+// Includes tenant_id from context so all device APIs can enforce tenant isolation
+func (uc *AuthUsecase) GenerateJWT(ctx context.Context, device *v1.Device) (string, error) {
 	if device == nil || device.Id == "" {
 		return "", fmt.Errorf("device is nil or has no ID")
 	}
 
-	// Create JWT claims
+	// Multi-tenancy: extract tenant_id from JWT context (set by middleware or during device registration)
+	// This is required for all device API calls to be tenant-isolated
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return "", fmt.Errorf("tenant_id not found in context - cannot generate JWT without tenant isolation")
+	}
+
+	// Create JWT claims with tenant_id for device API isolation
 	claims := jwt.MapClaims{
 		"device_id":   device.Id,
 		"device_name": device.Name,
+		"tenant_id":   tenantID,  // Multi-tenancy: device APIs use this to enforce tenant isolation
 		"exp":         time.Now().Add(1 * time.Hour).Unix(),
 		"iat":         time.Now().Unix(),
 	}
@@ -120,9 +131,10 @@ func (uc *AuthUsecase) ExtractDeviceIDFromJWT(tokenString string) (string, error
 // Returns: raw token (shown to user and stored in DB)
 // The raw token will be hashed during login validation to match client-sent double hash
 // Tokens are valid for 50 years from registration with no automatic renewal
-func (uc *AuthUsecase) CreateAuthToken(ctx context.Context, deviceID string, expiryDays int) (token string, err error) {
-	if deviceID == "" {
-		return "", fmt.Errorf("device ID is empty")
+// tenantID is required for multi-tenancy isolation
+func (uc *AuthUsecase) CreateAuthToken(ctx context.Context, tenantID, deviceID string, expiryDays int) (token string, err error) {
+	if tenantID == "" || deviceID == "" {
+		return "", fmt.Errorf("tenant ID or device ID is empty")
 	}
 
 	// Generate random token (32 bytes = 64 hex chars)
@@ -136,9 +148,9 @@ func (uc *AuthUsecase) CreateAuthToken(ctx context.Context, deviceID string, exp
 		CreatedAt: time.Now(),
 	}
 
-	// Save raw token to storage (not hashed)
+	// Save raw token to storage (not hashed) with tenant isolation
 	// During login, we'll retrieve all tokens and hash them to compare with client-sent hash
-	err = uc.store.AuthTokens().Save(ctx, authToken, token)
+	err = uc.store.AuthTokens().Save(ctx, tenantID, authToken, token)
 	if err != nil {
 		return "", fmt.Errorf("failed to save auth token: %w", err)
 	}
@@ -148,14 +160,15 @@ func (uc *AuthUsecase) CreateAuthToken(ctx context.Context, deviceID string, exp
 
 // RenewAuthToken extends an auth token's expiry by another 50 years (called on successful login)
 // This ensures active devices never expire as long as they login at least once every 50 years
-func (uc *AuthUsecase) RenewAuthToken(ctx context.Context, token string) error {
-	if token == "" {
-		return fmt.Errorf("token is empty")
+// tenantID is required for multi-tenancy isolation
+func (uc *AuthUsecase) RenewAuthToken(ctx context.Context, tenantID, token string) error {
+	if tenantID == "" || token == "" {
+		return fmt.Errorf("tenant ID or token is empty")
 	}
 
-	// Update expiry to 50 years from now
+	// Update expiry to 50 years from now with tenant isolation
 	newExpiryTime := time.Now().AddDate(50, 0, 0)
-	err := uc.store.AuthTokens().UpdateExpiry(ctx, token, newExpiryTime)
+	err := uc.store.AuthTokens().UpdateExpiry(ctx, tenantID, token, newExpiryTime)
 	if err != nil {
 		return fmt.Errorf("failed to update auth token expiry: %w", err)
 	}

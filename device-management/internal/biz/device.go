@@ -11,6 +11,7 @@ import (
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/pkg/cert"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
@@ -83,18 +84,24 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 	// Update device with certificate (private key is device-side, not stored)
 	device.Certificate = deviceCert.Certificate
 
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, fmt.Errorf("tenant_id not found in context")
+	}
+
 	// Save device FIRST (before certificate/token creation so FK constraints are satisfied)
 	if err := uc.store.Devices().Save(ctx, device); err != nil {
 		return nil, fmt.Errorf("failed to save device: %w", err)
 	}
 
-	// Save device certificate AFTER device exists
-	if err := uc.store.Certificates().DeviceStore().SaveDevice(ctx, device.Id, deviceCert); err != nil {
+	// Save device certificate AFTER device exists with tenant isolation
+	if err := uc.store.Certificates().DeviceStore().SaveDevice(ctx, tenantID, device.Id, deviceCert); err != nil {
 		return nil, fmt.Errorf("failed to create device certificate: %w", err)
 	}
 
-	// Create auth token AFTER device is saved
-	token, err := uc.authUc.CreateAuthToken(ctx, device.Id, 7)
+	// Create auth token AFTER device is saved with tenant isolation
+	token, err := uc.authUc.CreateAuthToken(ctx, tenantID, device.Id, 7)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auth token: %w", err)
 	}
@@ -282,8 +289,15 @@ func (uc *DeviceUsecase) DeleteDevice(ctx context.Context, deviceID string) erro
 		return fmt.Errorf("device ID is empty")
 	}
 
-	// Delete associated data
-	_ = uc.store.Actions().DeleteByDeviceID(ctx, deviceID)
+	// Multi-tenancy: extract tenant_id from context for deletion queries
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return fmt.Errorf("tenant_id not found in context")
+	}
+
+	// Delete associated data with tenant isolation
+	_ = uc.store.Actions().DeleteByDeviceID(ctx, tenantID, deviceID)
+	_ = uc.store.AuthTokens().DeleteByDeviceID(ctx, tenantID, deviceID)
 	_ = uc.store.Messages().DeleteByDeviceID(ctx, deviceID)
 	_ = uc.store.Certificates().DeleteByDevice(ctx, deviceID)
 

@@ -9,8 +9,9 @@ import (
 
 // MessageStore defines the interface for message storage operations
 type MessageStore interface {
-	// Save persists a message to storage
-	Save(ctx context.Context, message *models.Message) error
+	// Save persists a message to storage with tenant isolation
+	// tenantID is required for multi-tenancy isolation
+	Save(ctx context.Context, tenantID string, message *models.Message) error
 
 	// GetByID retrieves a message by its ID
 	GetByID(ctx context.Context, id string) (*models.Message, error)

@@ -46,12 +46,12 @@ type StreamProcessorModel struct {
 }
 
 // Insert creates a new stream processor record
-func (r *StreamProcessorRepo) Insert(ctx context.Context, deviceID, uuid, name string) error {
+func (r *StreamProcessorRepo) Insert(ctx context.Context, tenantID, deviceID, uuid, name string) error {
 	query := `
 		INSERT INTO stream_processors (
-			id, device_id, uuid, name,
+			id, tenant_id, device_id, uuid, name,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 
 	id := uuidgen.New().String()
@@ -61,7 +61,7 @@ func (r *StreamProcessorRepo) Insert(ctx context.Context, deviceID, uuid, name s
 	query = convertPlaceholdersSP(query)
 
 	_, err := r.data.db.ExecContext(ctx, query,
-		id, deviceID, uuid, name, now, now)
+		id, tenantID, deviceID, uuid, name, now, now)
 	if err != nil {
 		return fmt.Errorf("failed to insert stream processor: %w", err)
 	}
@@ -70,7 +70,7 @@ func (r *StreamProcessorRepo) Insert(ctx context.Context, deviceID, uuid, name s
 }
 
 // Update updates an existing stream processor record
-func (r *StreamProcessorRepo) Update(ctx context.Context, deviceID, uuid string, updates map[string]interface{}) error {
+func (r *StreamProcessorRepo) Update(ctx context.Context, tenantID, deviceID, uuid string, updates map[string]interface{}) error {
 	if len(updates) == 0 {
 		return nil
 	}
@@ -84,12 +84,12 @@ func (r *StreamProcessorRepo) Update(ctx context.Context, deviceID, uuid string,
 		args = append(args, val)
 	}
 
-	args = append(args, deviceID, uuid)
+	args = append(args, tenantID, deviceID, uuid)
 
 	query := fmt.Sprintf(`
 		UPDATE stream_processors 
 		SET %s
-		WHERE device_id = ? AND uuid = ?
+		WHERE tenant_id = ? AND device_id = ? AND uuid = ?
 	`, updateClause)
 
 	// Convert placeholders for PostgreSQL compatibility
@@ -104,20 +104,20 @@ func (r *StreamProcessorRepo) Update(ctx context.Context, deviceID, uuid string,
 }
 
 // GetByUUID retrieves a stream processor by UUID
-func (r *StreamProcessorRepo) GetByUUID(ctx context.Context, deviceID, uuid string) (*StreamProcessorModel, error) {
+func (r *StreamProcessorRepo) GetByUUID(ctx context.Context, tenantID, deviceID, uuid string) (*StreamProcessorModel, error) {
 	query := `
 		SELECT id, device_id, uuid, name, model_name, model_version,
 		       encoded_config, location_json, ignore_health_check, metadata_json,
 		       deployment_status, health_status, error_message, last_synced,
 		       created_at, updated_at
 		FROM stream_processors
-		WHERE device_id = ? AND uuid = ?
+		WHERE tenant_id = ? AND device_id = ? AND uuid = ?
 	`
 
 	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholdersSP(query)
 
-	row := r.data.db.QueryRowContext(ctx, query, deviceID, uuid)
+	row := r.data.db.QueryRowContext(ctx, query, tenantID, deviceID, uuid)
 
 	var sp StreamProcessorModel
 	var ignoreHealthCheck sql.NullBool // Handle both SQLite INT and PostgreSQL BOOLEAN
@@ -153,17 +153,17 @@ type StreamProcessorListQuery struct {
 }
 
 // List retrieves stream processors with optional filtering and pagination
-func (r *StreamProcessorRepo) List(ctx context.Context, query *StreamProcessorListQuery) ([]*StreamProcessorModel, error) {
+func (r *StreamProcessorRepo) List(ctx context.Context, tenantID string, query *StreamProcessorListQuery) ([]*StreamProcessorModel, error) {
 	sqlQuery := `
 		SELECT id, device_id, uuid, name, model_name, model_version,
 		       encoded_config, location_json, ignore_health_check, metadata_json,
 		       deployment_status, health_status, error_message, last_synced,
 		       created_at, updated_at
 		FROM stream_processors
-		WHERE device_id = ?
+		WHERE tenant_id = ? AND device_id = ?
 	`
 
-	args := []interface{}{query.DeviceID}
+	args := []interface{}{tenantID, query.DeviceID}
 
 	// Add optional filters
 	if query.UUIDFilter != "" {
@@ -231,13 +231,13 @@ func (r *StreamProcessorRepo) List(ctx context.Context, query *StreamProcessorLi
 }
 
 // Delete removes a stream processor record
-func (r *StreamProcessorRepo) Delete(ctx context.Context, deviceID, uuid string) error {
-	query := `DELETE FROM stream_processors WHERE device_id = ? AND uuid = ?`
+func (r *StreamProcessorRepo) Delete(ctx context.Context, tenantID, deviceID, uuid string) error {
+	query := `DELETE FROM stream_processors WHERE tenant_id = ? AND device_id = ? AND uuid = ?`
 
 	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholdersSP(query)
 
-	_, err := r.data.db.ExecContext(ctx, query, deviceID, uuid)
+	_, err := r.data.db.ExecContext(ctx, query, tenantID, deviceID, uuid)
 	if err != nil {
 		return fmt.Errorf("failed to delete stream processor: %w", err)
 	}
@@ -246,13 +246,13 @@ func (r *StreamProcessorRepo) Delete(ctx context.Context, deviceID, uuid string)
 }
 
 // DeleteByDevice removes all stream processors for a device
-func (r *StreamProcessorRepo) DeleteByDevice(ctx context.Context, deviceID string) error {
-	query := `DELETE FROM stream_processors WHERE device_id = ?`
+func (r *StreamProcessorRepo) DeleteByDevice(ctx context.Context, tenantID, deviceID string) error {
+	query := `DELETE FROM stream_processors WHERE tenant_id = ? AND device_id = ?`
 
 	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholdersSP(query)
 
-	_, err := r.data.db.ExecContext(ctx, query, deviceID)
+	_, err := r.data.db.ExecContext(ctx, query, tenantID, deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete stream processors for device: %w", err)
 	}
@@ -261,9 +261,9 @@ func (r *StreamProcessorRepo) DeleteByDevice(ctx context.Context, deviceID strin
 }
 
 // Upsert creates or updates a stream processor (for sync operations)
-func (r *StreamProcessorRepo) Upsert(ctx context.Context, deviceID, uuid, name, modelName, modelVersion, encodedConfig string, ignoreHealthCheck bool, locationJSON, metadataJSON string) error {
+func (r *StreamProcessorRepo) Upsert(ctx context.Context, tenantID, deviceID, uuid, name, modelName, modelVersion, encodedConfig string, ignoreHealthCheck bool, locationJSON, metadataJSON string) error {
 	// Check if exists
-	existing, err := r.GetByUUID(ctx, deviceID, uuid)
+	existing, err := r.GetByUUID(ctx, tenantID, deviceID, uuid)
 	if err != nil {
 		return err
 	}
@@ -276,7 +276,7 @@ func (r *StreamProcessorRepo) Upsert(ctx context.Context, deviceID, uuid, name, 
 
 	if existing != nil {
 		// Update existing
-		return r.Update(ctx, deviceID, uuid, map[string]interface{}{
+		return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 			"name":                  name,
 			"model_name":            modelName,
 			"model_version":         modelVersion,
@@ -288,12 +288,12 @@ func (r *StreamProcessorRepo) Upsert(ctx context.Context, deviceID, uuid, name, 
 	}
 
 	// Insert new
-	if err := r.Insert(ctx, deviceID, uuid, name); err != nil {
+	if err := r.Insert(ctx, tenantID, deviceID, uuid, name); err != nil {
 		return err
 	}
 
 	// Update with full details
-	return r.Update(ctx, deviceID, uuid, map[string]interface{}{
+	return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 		"model_name":            modelName,
 		"model_version":         modelVersion,
 		"encoded_config":        encodedConfig,
@@ -304,8 +304,8 @@ func (r *StreamProcessorRepo) Upsert(ctx context.Context, deviceID, uuid, name, 
 }
 
 // UpdateStatus updates deployment and health status of a stream processor
-func (r *StreamProcessorRepo) UpdateStatus(ctx context.Context, deviceID, uuid, deploymentStatus, healthStatus, errorMessage string) error {
-	return r.Update(ctx, deviceID, uuid, map[string]interface{}{
+func (r *StreamProcessorRepo) UpdateStatus(ctx context.Context, tenantID, deviceID, uuid, deploymentStatus, healthStatus, errorMessage string) error {
+	return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 		"deployment_status": deploymentStatus,
 		"health_status":     healthStatus,
 		"error_message":     errorMessage,
@@ -313,8 +313,8 @@ func (r *StreamProcessorRepo) UpdateStatus(ctx context.Context, deviceID, uuid, 
 }
 
 // MarkSynced updates the last_synced timestamp for a stream processor
-func (r *StreamProcessorRepo) MarkSynced(ctx context.Context, deviceID, uuid string) error {
-	return r.Update(ctx, deviceID, uuid, map[string]interface{}{
+func (r *StreamProcessorRepo) MarkSynced(ctx context.Context, tenantID, deviceID, uuid string) error {
+	return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 		"last_synced": time.Now(),
 	})
 }
