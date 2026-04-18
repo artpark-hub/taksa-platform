@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"
 	httptransport "github.com/go-kratos/kratos/v2/transport/http"
+	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -76,6 +76,9 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 				// Cookie JWT was issued by us — verify signature
 				claims = jwt.MapClaims{}
 				token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+					if token.Method != jwt.SigningMethodHS256 {
+						return nil, jwt.ErrTokenSignatureInvalid
+					}
 					return []byte(jwtSecret), nil
 				})
 				if err != nil || !token.Valid {

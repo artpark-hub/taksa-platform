@@ -114,9 +114,13 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 func (s *InstanceService) Pull(ctx context.Context, req *emptypb.Empty) (*v2.PullResponse, error) {
 	s.logger.Debug("Pull API called")
 
-	// Extract device_id and tenant_id from context (set by middleware)
+	// Extract device_id and tenant_id from context (set by middleware from JWT)
 	deviceID := middleware.GetDeviceID(ctx)
 	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" || deviceID == "" {
+		s.logger.Warn("Pull failed: missing tenant_id or device_id in context")
+		return nil, status.Error(codes.Unauthenticated, "missing tenant_id or device_id in token")
+	}
 	
 	s.logger.Debug("Pull API device context",
 		zap.String("device_id", deviceID),
@@ -193,9 +197,13 @@ func (s *InstanceService) Push(ctx context.Context, req *v2.PushRequest) (*empty
 		return nil, status.Error(codes.InvalidArgument, "messages are required")
 	}
 
-	// Extract device_id and tenant_id from context (set by middleware)
+	// Extract device_id and tenant_id from context (set by middleware from JWT)
 	deviceID := middleware.GetDeviceID(ctx)
 	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" || deviceID == "" {
+		s.logger.Warn("Push failed: missing tenant_id or device_id in context")
+		return nil, status.Error(codes.Unauthenticated, "missing tenant_id or device_id in token")
+	}
 	
 	s.logger.Debug("Processing push messages",
 		zap.Int("message_count", len(req.UMHMessages)),

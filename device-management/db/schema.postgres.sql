@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS certificates (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   expires_at TIMESTAMP WITH TIME ZONE,
   
-  UNIQUE(device_id, user_email),
+  UNIQUE(tenant_id, device_id, user_email),
   FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
@@ -189,7 +189,7 @@ CREATE INDEX IF NOT EXISTS idx_device_certificates_tenant_id ON device_certifica
 CREATE INDEX IF NOT EXISTS idx_device_certificates_expires_at ON device_certificates(expires_at);
 
 -- User certificates: Stores user-specific certificates for individual users on a device
--- Multiple certificates per device, one per user email
+-- Multiple certificates per device, one per user email per tenant
 CREATE TABLE IF NOT EXISTS user_certificates (
   id TEXT PRIMARY KEY,
   tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS user_certificates (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   expires_at TIMESTAMP WITH TIME ZONE,
   
-  UNIQUE(device_id, user_email),
+  UNIQUE(tenant_id, device_id, user_email),
   FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 

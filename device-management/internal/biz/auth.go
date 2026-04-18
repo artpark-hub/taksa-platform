@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
@@ -21,13 +22,19 @@ type AuthUsecase struct {
 	jwtSecret string
 }
 
-// NewAuthUsecase creates a new auth use case
-func NewAuthUsecase(store storage.Store) *AuthUsecase {
-	// TODO: Load JWT secret from config
+// NewAuthUsecase creates a new auth use case.
+// JWT secret is sourced from server config (TAKSA_DM_JWT_SECRET / server.jwt_secret).
+func NewAuthUsecase(store storage.Store, serverConf *conf.Server) *AuthUsecase {
 	return &AuthUsecase{
 		store:     store,
-		jwtSecret: "your-secret-key-change-in-production",
+		jwtSecret: serverConf.JwtSecret,
 	}
+}
+
+// JWTSecret returns the signing secret so callers (e.g., middleware) can
+// verify tokens signed by this service without duplicating the source.
+func (uc *AuthUsecase) JWTSecret() string {
+	return uc.jwtSecret
 }
 
 // ValidateAuthToken validates a token hash by iterating stored tokens and hashing them (SYSTEM-WIDE SEARCH)

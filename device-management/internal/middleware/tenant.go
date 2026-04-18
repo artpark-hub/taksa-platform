@@ -12,11 +12,15 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// ctxKey is an unexported type for context keys to avoid collisions across packages.
+// All access goes through the exported Get/Set helpers.
+type ctxKey string
+
 const (
-	AuthorizationHeader = "authorization"
-	TenantIDContextKey  = "tenant_id"
-	DeviceIDContextKey  = "device_id"
-	BearerScheme        = "Bearer"
+	AuthorizationHeader        = "authorization"
+	TenantIDContextKey  ctxKey = "tenant_id"
+	DeviceIDContextKey  ctxKey = "device_id"
+	BearerScheme               = "Bearer"
 )
 
 // ExtractClaimsFromJWT extracts tenant_id and device_id from JWT claims in Authorization header

@@ -64,7 +64,7 @@ func NewHTTPServer(
 	var opts = []khttp.ServerOption{
 		khttp.Middleware(
 			recovery.Recovery(),
-			middleware.HTTPTenantMiddleware(zapLogger, "your-secret-key-change-in-production"),
+			middleware.HTTPTenantMiddleware(zapLogger, c.JwtSecret),
 			service.AuthMiddleware(zapLogger),
 			service.ExtractJWTTokenMiddleware(zapLogger),
 		),

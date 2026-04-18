@@ -19,6 +19,7 @@ services:
       - TAKSA_DM_DATABASE_DRIVER=${TAKSA_DM_DATABASE_DRIVER:-postgres}
       - TAKSA_DM_BASE_URL=${TAKSA_DM_BASE_URL:-http://localhost:8000}
       - TAKSA_DM_UMH_CORE_DOCKER_IMAGE=${TAKSA_DM_UMH_CORE_DOCKER_IMAGE:-management.umh.app/oci/united-manufacturing-hub/umh-core:v0.43.17}
+      - TAKSA_DM_JWT_SECRET=${TAKSA_DM_JWT_SECRET:-change-me-in-production}
     volumes:
       - ${TAKSA_DM_DATA_DIR:-./data}:/data
     networks:
