@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
-	"io"
 	"testing"
 
 	"github.com/klauspost/compress/zstd"

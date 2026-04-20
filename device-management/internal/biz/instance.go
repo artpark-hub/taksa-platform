@@ -549,8 +549,17 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 				CreatedAt: time.Now(),
 			}
 
-			_ = uc.store.Messages().Save(ctx, tenantID, message)
-
+			if tenantID == "" {
+				fmt.Printf("ERROR: missing tenant ID in context; skipping persistence for message %s on device %s\n", message.ID, deviceID)
+				continue
+			}
+			if err := uc.store.Messages().Save(ctx, tenantID, message); err != nil {
+				fmt.Printf("ERROR: failed to persist message %s for tenant %s on device %s: %v\n", message.ID, tenantID, deviceID, err)
+				continue
+			}
+			
+			fmt.Printf("INFO: successfully persisted message %s for tenant %s on device %s\n", message.ID, tenantID, deviceID)
+			
 			// TRACEABILITY: Correlate response to original action request
 			if msgType == "action-result" || msgType == "action-reply" {
 				// Extract action reply state to determine if this is an intermediate or terminal update
@@ -633,7 +642,7 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 		return fmt.Errorf("device instance UUID is empty: not found in message umhInstance or JWT token")
 	}
 
-	// Get device to extract tenant_id for multi-tenancy isolation
+	// Verify device exists
 	device, err := uc.store.Devices().GetByID(ctx, deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to get device %s: %w", deviceID, err)
@@ -641,7 +650,7 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 	if device == nil {
 		return fmt.Errorf("device %s not found", deviceID)
 	}
-	tenantID := device.CreatedBy // tenant_id is stored in created_by field
+	tenantID := middleware.GetTenantID(ctx)
 
 	// Record device activity
 	_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
@@ -817,12 +826,11 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 		return fmt.Errorf("device mismatch: tracking device %s vs request device %s", track.DeviceID, deviceID)
 	}
 
-	// 2b. Get device to extract tenant ID for multi-tenancy isolation
-	device, err := uc.store.Devices().GetByID(ctx, deviceID)
-	if err != nil {
+	// 2b. Verify device exists (GetByID applies tenant scoping when JWT tenant is present)
+	if _, err := uc.store.Devices().GetByID(ctx, deviceID); err != nil {
 		return fmt.Errorf("device not found: %w", err)
 	}
-	tenantID := device.CreatedBy
+	tenantID := middleware.GetTenantID(ctx)
 
 	// 3. Get the action to check its type and payload (for protocol converter sync)
 	action, err := uc.store.Actions().GetByID(ctx, tenantID, track.ActionID)
@@ -1452,17 +1460,10 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 // Extracts version from umh-core action response and updates local database
 func (uc *InstanceUsecase) syncDataModelActionResult(ctx context.Context, action *models.Action, payload []byte) error {
 	if uc.dataModelRepo == nil {
-		// Skip if repo is not available
 		return nil
 	}
 
-	// Get device to extract tenant_id for multi-tenancy isolation
-	device, err := uc.store.Devices().GetByID(ctx, action.DeviceId)
-	if err != nil || device == nil {
-		// If device lookup fails, skip sync (it will be reconciled later via StatusMessage)
-		return nil
-	}
-	tenantID := device.CreatedBy
+	tenantID := middleware.GetTenantID(ctx)
 
 	// Determine action type and corresponding operation
 	var actionType string
@@ -1630,6 +1631,28 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 		return nil
 	}
 
+	// Successful delete operations commonly return an empty result payload.
+	// In that case, we must delete based on the ORIGINAL queued action payload.
+	if actionType == "delete" && len(payload) == 0 {
+		if action.Payload != nil && len(action.Payload.Value) > 0 {
+			var origPayload map[string]interface{}
+			if err := json.Unmarshal(action.Payload.Value, &origPayload); err == nil {
+				// The queued payload is JSON-serialized from the proto request.
+				// Keys are expected to be "uuid" (and "device_id").
+				uuid := ""
+				if u, ok := origPayload["uuid"].(string); ok && u != "" {
+					uuid = u
+				} else if u, ok := origPayload["Uuid"].(string); ok && u != "" {
+					uuid = u
+				}
+				if uuid != "" {
+					_ = uc.streamProcessorRepo.Delete(ctx, tenantID, action.DeviceId, uuid)
+				}
+			}
+		}
+		return nil
+	}
+
 	// Decode and decompress payload
 	decodedPayload := payload
 	if decoded, err := base64.StdEncoding.DecodeString(string(payload)); err == nil {
@@ -1665,6 +1688,28 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 	if errorMsg, ok := streamProcessor["error"].(string); ok && errorMsg != "" {
 		fmt.Printf("Warning: Stream processor action (%s) failed on device: %s\n", actionType, errorMsg)
 		return nil
+	}
+
+	// Delete actions often return a minimal success payload (e.g. { "deleted_name": "..." })
+	// with no uuid field. For delete, always fall back to the ORIGINAL queued action payload
+	// to determine which record to remove from the DB.
+	if actionType == "delete" {
+		// Try to extract UUID from the action request payload first (canonical for delete).
+		if action.Payload != nil && len(action.Payload.Value) > 0 {
+			var origPayload map[string]interface{}
+			if err := json.Unmarshal(action.Payload.Value, &origPayload); err == nil {
+				uuid := ""
+				if u, ok := origPayload["uuid"].(string); ok && u != "" {
+					uuid = u
+				} else if u, ok := origPayload["Uuid"].(string); ok && u != "" {
+					uuid = u
+				}
+				if uuid != "" {
+					_ = uc.streamProcessorRepo.Delete(ctx, tenantID, action.DeviceId, uuid)
+					return nil
+				}
+			}
+		}
 	}
 
 	// Handle delete with empty result (successful deletion returns no data)

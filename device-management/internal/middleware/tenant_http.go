@@ -16,9 +16,26 @@ import (
 // isPublicPath returns true for endpoints that don't require JWT authentication.
 // - /health: service health check
 // - /instance/login: device login (authenticates via auth token, not JWT)
-func isPublicPath(path string) bool {
-	return strings.Contains(path, "/health") ||
-		strings.Contains(path, "/instance/login")
+func isPublicPath(urlPath string) bool {
+	// IMPORTANT:
+	// - Only match against the parsed URL path (no query string).
+	// - Do NOT use substring matching (strings.Contains), as that can accidentally
+	//   exempt protected endpoints like "/api/v2/instance/loginSomething".
+	//
+	// Normalize a trailing slash so "/health/" behaves like "/health".
+	path := strings.TrimRight(urlPath, "/")
+	if path == "" {
+		path = "/"
+	}
+
+	switch path {
+	case "/health":
+		return true
+	case "/api/v2/instance/login":
+		return true
+	default:
+		return false
+	}
 }
 
 // HTTPTenantMiddleware is a Kratos HTTP middleware that extracts tenant_id and device_id
@@ -46,7 +63,7 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 			request := httpTr.Request()
 
 			// Public paths don't require JWT
-			if isPublicPath(request.RequestURI) {
+			if isPublicPath(request.URL.Path) {
 				return handler(ctx, req)
 			}
 

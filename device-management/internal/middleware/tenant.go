@@ -61,8 +61,11 @@ func ExtractClaimsFromJWT(ctx context.Context) (tenantID, deviceID string, err e
 
 	// Extract device_id claim
 	deviceID, ok = claims["device_id"].(string)
-	if !ok || deviceID == "" {
-		return "", "", status.Error(codes.PermissionDenied, "missing or invalid device_id in JWT claims")
+	// NOTE: device_id is optional for console/user JWTs (e.g., DeviceMgmtService),
+	// but required for instance/device JWTs (InstanceService). Enforcement is done
+	// in the gRPC interceptors based on the called method.
+	if !ok {
+		deviceID = ""
 	}
 
 	return tenantID, deviceID, nil
@@ -91,9 +94,20 @@ func UnaryInterceptor() grpc.UnaryServerInterceptor {
 			return nil, err
 		}
 
-		// Add both tenant_id and device_id to context
+		// Enforce device_id only for InstanceService calls.
+		// DeviceMgmtService calls require tenant_id but not device_id (device_id is provided
+		// in request/path params and must be tenant-scoped by handlers/repos).
+		if strings.HasPrefix(info.FullMethod, "/api.umh_core.v2.InstanceService/") {
+			if deviceID == "" {
+				return nil, status.Error(codes.PermissionDenied, "missing or invalid device_id in JWT claims")
+			}
+		}
+
+		// Add tenant_id and (optionally) device_id to context
 		ctx = context.WithValue(ctx, TenantIDContextKey, tenantID)
-		ctx = context.WithValue(ctx, DeviceIDContextKey, deviceID)
+		if deviceID != "" {
+			ctx = context.WithValue(ctx, DeviceIDContextKey, deviceID)
+		}
 
 		// Call handler with enriched context
 		return handler(ctx, req)
@@ -115,9 +129,18 @@ func StreamInterceptor() grpc.StreamServerInterceptor {
 			return err
 		}
 
-		// Add both tenant_id and device_id to context
+		// Enforce device_id only for InstanceService calls.
+		if strings.HasPrefix(info.FullMethod, "/api.umh_core.v2.InstanceService/") {
+			if deviceID == "" {
+				return status.Error(codes.PermissionDenied, "missing or invalid device_id in JWT claims")
+			}
+		}
+
+		// Add tenant_id and (optionally) device_id to context
 		ctx := context.WithValue(ss.Context(), TenantIDContextKey, tenantID)
-		ctx = context.WithValue(ctx, DeviceIDContextKey, deviceID)
+		if deviceID != "" {
+			ctx = context.WithValue(ctx, DeviceIDContextKey, deviceID)
+		}
 
 		// Wrap the stream to use the enriched context
 		wrappedStream := &wrappedServerStream{ServerStream: ss, ctx: ctx}

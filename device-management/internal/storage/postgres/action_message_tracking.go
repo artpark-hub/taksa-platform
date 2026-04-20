@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
@@ -25,15 +26,18 @@ func (s *ActionMessageTrackingStore) Create(ctx context.Context, track *storage.
 		return ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+
 	query := `
 	INSERT INTO action_message_tracking (
-		id, action_id, device_id, trace_id, trace_generated_at,
+		id, tenant_id, action_id, device_id, trace_id, trace_generated_at,
 		response_message_id, correlation_status, created_at
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
 		track.ID,
+		tenantID,
 		track.ActionID,
 		track.DeviceID,
 		track.TraceID,
@@ -63,10 +67,15 @@ func (s *ActionMessageTrackingStore) GetByTraceID(ctx context.Context, traceID s
 		created_at, completed_at
 	FROM action_message_tracking
 	WHERE trace_id = $1
-	LIMIT 1
 	`
+	args := []interface{}{traceID}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query += " AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
+	query += " LIMIT 1"
 
-	row := s.db.QueryRowContext(ctx, query, traceID)
+	row := s.db.QueryRowContext(ctx, query, args...)
 	return s.scanActionMessageTracking(row)
 }
 
@@ -83,10 +92,15 @@ func (s *ActionMessageTrackingStore) GetByActionID(ctx context.Context, actionID
 		created_at, completed_at
 	FROM action_message_tracking
 	WHERE action_id = $1
-	LIMIT 1
 	`
+	args := []interface{}{actionID}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query += " AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
+	query += " LIMIT 1"
 
-	row := s.db.QueryRowContext(ctx, query, actionID)
+	row := s.db.QueryRowContext(ctx, query, args...)
 	return s.scanActionMessageTracking(row)
 }
 
@@ -102,13 +116,17 @@ func (s *ActionMessageTrackingStore) UpdateResponse(ctx context.Context, id stri
 	SET response_trace_id = $1, response_received_at = $2, correlation_status = $3
 	WHERE id = $4
 	`
+	args := []interface{}{responseTraceID, time.Now().Format(time.RFC3339), correlationStatus, id}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = `
+		UPDATE action_message_tracking
+		SET response_trace_id = $1, response_received_at = $2, correlation_status = $3
+		WHERE id = $4 AND tenant_id = $5
+		`
+		args = append(args, tenantID)
+	}
 
-	result, err := s.db.ExecContext(ctx, query,
-		responseTraceID,
-		time.Now().Format(time.RFC3339),
-		correlationStatus,
-		id,
-	)
+	result, err := s.db.ExecContext(ctx, query, args...)
 
 	if err != nil {
 		return fmt.Errorf("failed to update response: %w", err)
@@ -138,13 +156,17 @@ func (s *ActionMessageTrackingStore) UpdateResponseWithMessageID(ctx context.Con
 	SET response_message_id = $1, response_received_at = $2, correlation_status = $3
 	WHERE id = $4
 	`
+	args := []interface{}{messageID, time.Now().Format(time.RFC3339), correlationStatus, id}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = `
+		UPDATE action_message_tracking
+		SET response_message_id = $1, response_received_at = $2, correlation_status = $3
+		WHERE id = $4 AND tenant_id = $5
+		`
+		args = append(args, tenantID)
+	}
 
-	result, err := s.db.ExecContext(ctx, query,
-		messageID,
-		time.Now().Format(time.RFC3339),
-		correlationStatus,
-		id,
-	)
+	result, err := s.db.ExecContext(ctx, query, args...)
 
 	if err != nil {
 		return fmt.Errorf("failed to update response with message_id: %w", err)
@@ -173,8 +195,17 @@ func (s *ActionMessageTrackingStore) UpdateCompleted(ctx context.Context, id str
 	SET completed_at = $1, correlation_status = 4
 	WHERE id = $2
 	`
+	args := []interface{}{time.Now().Format(time.RFC3339), id}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = `
+		UPDATE action_message_tracking
+		SET completed_at = $1, correlation_status = 4
+		WHERE id = $2 AND tenant_id = $3
+		`
+		args = append(args, tenantID)
+	}
 
-	result, err := s.db.ExecContext(ctx, query, time.Now().Format(time.RFC3339), id)
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to mark completed: %w", err)
 	}
@@ -205,10 +236,15 @@ func (s *ActionMessageTrackingStore) ListPendingCorrelations(ctx context.Context
 		created_at, completed_at
 	FROM action_message_tracking
 	WHERE device_id = $1 AND correlation_status < 3
-	ORDER BY created_at ASC
 	`
+	args := []interface{}{deviceID}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query += " AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
+	query += " ORDER BY created_at ASC"
 
-	rows, err := s.db.QueryContext(ctx, query, deviceID)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pending correlations: %w", err)
 	}
@@ -244,10 +280,15 @@ func (s *ActionMessageTrackingStore) ListByDevice(ctx context.Context, deviceID 
 		created_at, completed_at
 	FROM action_message_tracking
 	WHERE device_id = $1
-	ORDER BY created_at DESC
 	`
+	args := []interface{}{deviceID}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query += " AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
+	query += " ORDER BY created_at DESC"
 
-	rows, err := s.db.QueryContext(ctx, query, deviceID)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query by device: %w", err)
 	}
