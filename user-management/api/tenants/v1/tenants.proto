@@ -44,6 +44,12 @@ service UserManagementService {
       get: "/api/v1/um/token"
     };
   }
+
+  rpc GenerateOrganizationID (GenerateOrganizationIDRequest) returns (GenerateOrganizationIDResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/um/generate_organization_id"
+    };
+  }
 }
 
 message CreateSubUserRequest {
@@ -89,6 +95,7 @@ message UpdateUserProfileResponse {
 message UserData {
   string identity_id = 1;
   string organization_name = 2;
+  string organization_id = 3;
 }
 
 message UserSummary {
@@ -98,6 +105,7 @@ message UserSummary {
   string last_name = 4;
   string organization_name = 5;
   string role = 6;
+  string organization_id = 7;
 }
 
 message UserInfo {
@@ -106,6 +114,7 @@ message UserInfo {
   string last_name = 3;
   string organization_name = 4;
   string role = 5;
+  string organization_id = 6;
 }
 
 message GetJWTTokenRequest {}
@@ -116,4 +125,10 @@ message GetJWTTokenResponse {
 
 message TokenData {
   string jwt_token = 1;
+}
+
+message GenerateOrganizationIDRequest {}
+
+message GenerateOrganizationIDResponse {
+  string organization_id = 1;
 }
