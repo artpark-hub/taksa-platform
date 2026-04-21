@@ -47,7 +47,8 @@ service UserManagementService {
 
   rpc GenerateOrganizationID (GenerateOrganizationIDRequest) returns (GenerateOrganizationIDResponse) {
     option (google.api.http) = {
-      get: "/api/v1/um/generate_organization_id"
+      post: "/api/v1/um/generate_organization_id"
+      body: "*"
     };
   }
 }
