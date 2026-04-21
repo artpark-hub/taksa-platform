@@ -38,24 +38,24 @@ const Instances = () => {
         <div className="instances-container">
             <div className="instances-header-container">
                 <div>
-                    <h1 className="instances-title">Edge Devices</h1>
+                    <h1 className="instances-title">Data Collecting Devices</h1>
                     <p className="instances-subtitle">
-                        Set up, manage, and oversee all your edge devices. Adding a new edge device is the first step in establishing your Unified Namespace.
+                        Set up, manage, and oversee all your data collecting devices. Adding a new device is the first step in establishing your Unified Namespace.
                     </p>
                 </div>
                 {instances.length > 0 && (
                     <Link href="/dashboard/Edge-devices/add" style={{ textDecoration: 'none' }}>
-                        <button className="btn-black header-add-btn">Add Edge Device</button>
+                        <button className="btn-black header-add-btn">Add DCD</button>
                     </Link>
                 )}
             </div>
 
             {instances.length === 0 ? (
                 <div className="instances-empty-state">
-                    <h3 className="empty-state-bold">No Edge Devices Available</h3>
-                    <p className="empty-state-sub">Welcome! Let's get started by setting up your first edge device.</p>
+                    <h3 className="empty-state-bold">No Data Collecting Devices Available</h3>
+                    <p className="empty-state-sub">Welcome! Let's get started by setting up your first data collecting device.</p>
                     <Link href="/dashboard/Edge-devices/add" style={{ textDecoration: 'none' }}>
-                        <button className="btn-black">Add Your First Edge Device</button>
+                        <button className="btn-black">Add Your First DCD</button>
                     </Link>
                 </div>
             ) : (
@@ -64,7 +64,7 @@ const Instances = () => {
                         <thead>
                             <tr>
                                 <th className="serial-col">Serial</th>
-                                <th>Edge Device Name</th>
+                                <th>DCD Name</th>
                                 <th>Type</th>
                                 <th>Version</th>
                                 <th>Data Flows</th>

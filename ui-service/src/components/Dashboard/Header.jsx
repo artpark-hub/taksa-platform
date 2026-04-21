@@ -31,15 +31,6 @@ const Header = ({ isCollapsed }) => {
                     </div>
                 )}
             </div>
-            <div className="header-actions">
-                <div style={{ position: 'relative', cursor: 'pointer' }}>
-                    <Bell size={24} color="#555" />
-                    <span className="notification-dot" style={{
-                        position: 'absolute', top: 0, right: 2, width: 8, height: 8,
-                        backgroundColor: '#ef4444', borderRadius: '50%', border: '1px solid white'
-                    }}></span>
-                </div>
-            </div>
         </header>
     );
 };

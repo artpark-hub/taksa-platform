@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-    Boxes, Settings, Menu, ChevronUp, Users, LogOut, LayoutDashboard, FolderKanban, Bot
+    Boxes, Settings, Menu, ChevronUp, Users, LogOut, House, LayoutDashboard, Workflow, FileCog, FileText, BookOpen, Compass,FolderKanban, Bot
 } from 'lucide-react';
 
 const Sidebar = ({ isCollapsed, toggleSidebar }) => {
@@ -14,6 +14,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
 
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [showDashboardSubmenu, setShowDashboardSubmenu] = useState(false);
     const menuRef = useRef(null);
 
     useEffect(() => {
@@ -61,6 +62,14 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        if (pathname.startsWith('/dashboard/explore')) {
+            setShowDashboardSubmenu(true);
+        } else {
+            setShowDashboardSubmenu(false);
+        }
+    }, [pathname]);
 
     const handleLogout = async () => {
         if (isLoggingOut) return;
@@ -126,11 +135,78 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
 
     const firstLetter = user.firstName ? user.firstName.charAt(0).toUpperCase() : 'U';
 
-    const navItems = [
-        { name: 'Edge Devices', href: '/dashboard/Edge-devices', icon: Boxes },
-        { name: 'Dashboard', href: '/dashboard/grafana', icon: LayoutDashboard },
-        { name: 'Applications',href: '/dashboard/applications', icon: FolderKanban },
-        { name: 'Copilot', href: '/dashboard/copilot', icon: Bot },
+    const navSections = [
+        {
+            title: '',
+            items: [
+                {
+                    name: 'Home',
+                    href: '/dashboard/home',
+                    icon: House,
+                    matchPaths: ['/dashboard/home']
+                }
+            ]
+        },
+        {
+            title: 'Apps',
+            items: [
+                {
+                    name: 'Dashboard',
+                    href: '/dashboard/grafana',
+                    icon: LayoutDashboard,
+                    matchPaths: ['/dashboard/grafana', '/dashboard/explore'],
+                    children: [
+                        {
+                            name: 'Explore',
+                            href: '/dashboard/explore',
+                            icon: Compass,
+                            matchPaths: ['/dashboard/explore']
+                        }
+                    ]
+                },
+                {
+                    name: 'Copilot',
+                    href: '/dashboard/copilot',
+                    icon: Bot,
+                    matchPaths: ['/dashboard/copilot']
+                },
+                {
+                    name: 'Topic Browser',
+                    href: '/dashboard/topic-browser',
+                    icon: BookOpen,
+                    matchPaths: ['/dashboard/topic-browser']
+                }
+            ]
+        },
+        {
+            title: 'Setup',
+            items: [
+                {
+                    name: 'DCD',
+                    href: '/dashboard/Edge-devices',
+                    icon: Boxes,
+                    matchPaths: ['/dashboard/Edge-devices', '/dashboard/instances']
+                },
+                {
+                    name: 'Data Flows',
+                    href: '/dashboard/data-flows',
+                    icon: Workflow,
+                    matchPaths: ['/dashboard/data-flows']
+                },
+                {
+                    name: 'Models',
+                    href: '/dashboard/models',
+                    icon: FileCog,
+                    matchPaths: ['/dashboard/models']
+                },
+                {
+                    name: 'Contracts',
+                    href: '/dashboard/contracts',
+                    icon: FileText,
+                    matchPaths: ['/dashboard/contracts']
+                }
+            ]
+        }
     ];
 
     const isUserSectionActive = pathname.startsWith('/dashboard/users') || pathname.startsWith('/dashboard/settings');
@@ -146,21 +222,125 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
                 )}
             </div>
             <nav className="sidebar-nav">
-                {navItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname.startsWith(item.href);
-                    return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={`sidebar-link ${isActive ? 'active' : ''}`}
-                            title={isCollapsed ? item.name : ''}
-                        >
-                            <Icon className="sidebar-icon" size={20} />
-                            <span className="link-text">{item.name}</span>
-                        </Link>
-                    );
-                })}
+                {navSections.map((section, sectionIndex) => (
+                    <div
+                        key={`section-${sectionIndex}`}
+                        className={`sidebar-section ${!section.title ? 'sidebar-section-no-title' : ''}`}
+                    >
+                        {section.title && (
+                            <div className="sidebar-section-title">{section.title}</div>
+                        )}
+
+                        <div className="sidebar-section-links">
+                            {section.items.map((item) => {
+                                const Icon = item.icon;
+                                const isActive = item.matchPaths.some((path) => pathname.startsWith(path));
+
+                                if (item.children) {
+                                    const isParentRouteActive = item.href ? pathname.startsWith(item.href) : false;
+                                    const isChildRouteActive = item.children.some((child) =>
+                                        child.matchPaths.some((path) => pathname.startsWith(path))
+                                    );
+                                    const parentLinkClass = isChildRouteActive
+                                        ? 'dashboard-parent-active'
+                                        : isParentRouteActive
+                                        ? 'active'
+                                        : '';
+                                    const toggleClass = parentLinkClass === 'active'
+                                        ? 'dashboard-toggle-active'
+                                        : parentLinkClass === 'dashboard-parent-active'
+                                        ? 'dashboard-toggle-muted'
+                                        : '';
+
+                                    return (
+                                        <div key={item.name}>
+                                            <div className={`dashboard-parent-wrap ${isCollapsed ? 'dashboard-parent-wrap-collapsed' : ''}`}>
+                                                <Link
+                                                    href={item.href}
+                                                    className={`sidebar-link dashboard-parent-link-row ${parentLinkClass}`}
+                                                    title={isCollapsed ? item.name : ''}
+                                                    onClick={(e) => { e.stopPropagation(); }}
+                                                >
+                                                    <Icon className="sidebar-icon" size={20} />
+                                                    <span className="link-text">{item.name}</span>
+                                                </Link>
+
+                                                {!isCollapsed && (
+                                                    <button
+                                                        type="button"
+                                                        className={`dashboard-toggle-btn ${toggleClass}`}
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setShowDashboardSubmenu(!showDashboardSubmenu);
+                                                        }}
+                                                        aria-label="Toggle dashboard submenu"
+                                                        aria-expanded={showDashboardSubmenu}
+                                                    >
+                                                        <ChevronUp
+                                                            size={16}
+                                                            color="currentColor"
+                                                            style={{
+                                                                transform: showDashboardSubmenu ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                                transition: 'transform 0.2s',
+                                                                flexShrink: 0
+                                                            }}
+                                                        />
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {!isCollapsed && showDashboardSubmenu && (
+                                                <div
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: 'var(--space-xs)',
+                                                        marginTop: '0.2rem'
+                                                    }}
+                                                >
+                                                    {item.children.map((child) => {
+                                                        const ChildIcon = child.icon;
+                                                        const isChildActive = child.matchPaths.some((path) => pathname.startsWith(path));
+
+                                                        return (
+                                                            <Link
+                                                                key={child.href}
+                                                                href={child.href}
+                                                                className={`sidebar-link ${isChildActive ? 'active' : ''}`}
+                                                                style={{
+                                                                    marginLeft: '1.75rem',
+                                                                    width: 'calc(100% - 1.75rem)',
+                                                                    paddingTop: '0.6rem',
+                                                                    paddingBottom: '0.6rem'
+                                                                }}
+                                                            >
+                                                                <ChildIcon className="sidebar-icon" size={18} />
+                                                                <span className="link-text">{child.name}</span>
+                                                            </Link>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className={`sidebar-link ${isActive ? 'active' : ''}`}
+                                        title={isCollapsed ? item.name : ''}
+                                    >
+                                        <Icon className="sidebar-icon" size={20} />
+                                        <span className="link-text">{item.name}</span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
             </nav>
             <div className="sidebar-footer" ref={menuRef}>
                 {showUserMenu && (
@@ -221,7 +401,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
                                 <span className="user-name">{user.firstName} {user.lastName}</span>
                                 <span className="user-email" title={user.email}>{user.email}</span>
                             </div>
-                            <ChevronUp size={16} color={isUserSectionActive ? "#ffffff" : "#666"} style={{ transform: showUserMenu ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s' }} />
+                            <ChevronUp size={16} color={isUserSectionActive ? "#ffffff" : "#666"} style={{ transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                         </>
                     )}
                 </div>

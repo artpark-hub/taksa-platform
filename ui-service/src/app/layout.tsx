@@ -4,6 +4,7 @@ import "./globals.css";
 import "../components/Login.css";
 import "../components/Register.css";
 import "../components/ForgotPassword.css";
+import "../components/LegalDocuments.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
