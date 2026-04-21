@@ -10,7 +10,7 @@ const LegalDocumentBody = ({ documentKey }) => {
   return (
     <>
       <div className="legal-document-header-block">
-        <h2 className="legal-document-title">{document.title}</h2>
+        <h2 id={`legal-title-${documentKey}`} className="legal-document-title">{document.title}</h2>
       </div>
 
       <div className="legal-document-content">

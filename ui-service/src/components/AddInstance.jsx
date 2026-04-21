@@ -102,7 +102,7 @@ const AddInstance = () => {
             const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                throw new Error(getErrorMessage(data, 'Failed to create edge device.'));
+                throw new Error(getErrorMessage(data, 'Failed to create Data Collecting Device (DCD).'));
             }
 
             if (!data?.device) {
@@ -112,8 +112,8 @@ const AddInstance = () => {
             setCreatedDeviceResponse(data);
             setShowModal(true);
         } catch (error) {
-            console.error('Failed to create edge device:', error);
-            setFormError(error.message || 'Failed to create edge device. Please try again.');
+            console.error('Failed to create Data Collecting Device (DCD):', error);
+            setFormError(error.message || 'Failed to create Data Collecting Device (DCD). Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -178,8 +178,8 @@ const AddInstance = () => {
                 localStorage.setItem('taksa_demo_instances', JSON.stringify(existingInstances));
                 router.push('/dashboard/Edge-devices');
             } catch (error) {
-                console.error('Failed to save edge device:', error);
-                setCopyError('Failed to save edge device. Please try again.');
+                console.error('Failed to save Data Collecting Device (DCD):', error);
+                setCopyError('Failed to save Data Collecting Device (DCD). Please try again.');
             }
         }
     };
@@ -228,7 +228,7 @@ const AddInstance = () => {
                     </div>
 
                     <div className="form-row">
-                        <div className="label-col">Creating By</div>
+                        <div className="label-col">Created By</div>
                         <div style={{ flex: 1 }}>
                             <input
                                 type="text"

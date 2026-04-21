@@ -58,37 +58,63 @@ const Register = () => {
         return csrfNode?.attributes?.value || '';
     };
 
-    const getNodeValue = (flow, name) => {
-        const nodes = flow?.ui?.nodes || [];
-        const node = nodes.find((n) => n?.attributes?.name === name);
-        return node?.attributes?.value || '';
-    };
-
     const storeUserInLocalStorage = (identity) => {
         const traits = identity?.traits || {};
 
         localStorage.setItem('taksa_user', JSON.stringify({
-            identityId: identity.id,
+            identity_id: identity.id,
             email: traits.email || '',
+            first_name: traits.name?.first || '',
+            last_name: traits.name?.last || '',
+            role: traits.role || '',
+            organization_name: traits.organization_name || '',
+            organization_id: traits.organization_id || '',
+            identityId: identity.id,
             firstName: traits.name?.first || '',
             lastName: traits.name?.last || '',
-            role: traits.role || '',
             organizationName: traits.organization_name || '',
             organizationId: traits.organization_id || ''
         }));
     };
 
-    const fetchSessionIdentity = async () => {
-        const response = await fetch('/sessions/whoami', {
+    const setSecurePendingGoogleRegistration = async (pendingContext) => {
+        const response = await fetch('/api/auth/google-register-context', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(pendingContext)
+        });
+
+        return response.ok;
+    };
+
+    const getSecurePendingGoogleRegistration = async () => {
+        const response = await fetch('/api/auth/google-register-context', {
             method: 'GET',
             headers: { Accept: 'application/json' },
             credentials: 'include'
         });
 
-        if (!response.ok) return null;
+        if (!response.ok) {
+            return null;
+        }
 
         const data = await response.json().catch(() => ({}));
-        return data?.identity || null;
+        return data?.pending || null;
+    };
+
+    const clearSecurePendingGoogleRegistration = async () => {
+        try {
+            await fetch('/api/auth/google-register-context', {
+                method: 'DELETE',
+                headers: { Accept: 'application/json' },
+                credentials: 'include'
+            });
+        } catch {
+        }
     };
 
     const handleChange = (e) => {
@@ -154,14 +180,20 @@ const Register = () => {
         return organizationId;
     };
 
-    const storePendingGoogleRegistration = ({ organizationName, organizationId }) => {
-        sessionStorage.setItem(GOOGLE_REGISTER_CONTEXT_KEY, JSON.stringify({
+    const storePendingGoogleRegistration = async ({ organizationName, organizationId }) => {
+        const pendingContext = {
             organization_name: organizationName,
             organization_id: organizationId,
             role: 'master',
             source: 'google',
             created_at: Date.now()
-        }));
+        };
+
+        try {
+            await setSecurePendingGoogleRegistration(pendingContext);
+        } catch {
+        }
+        sessionStorage.setItem(GOOGLE_REGISTER_CONTEXT_KEY, JSON.stringify(pendingContext));
     };
 
     const startGoogleOidcRegistration = async () => {
@@ -267,7 +299,7 @@ const Register = () => {
         try {
             const organizationId = await fetchOrganizationId();
 
-            storePendingGoogleRegistration({
+            await storePendingGoogleRegistration({
                 organizationName: trimmedOrgName,
                 organizationId
             });
@@ -283,37 +315,51 @@ const Register = () => {
     useEffect(() => {
         if (!flowId) return;
 
-        const pendingRaw = sessionStorage.getItem(GOOGLE_REGISTER_CONTEXT_KEY);
-        const loginAttemptTs = Number(sessionStorage.getItem(GOOGLE_LOGIN_ATTEMPT_KEY) || 0);
-        const isRecentGoogleLoginAttempt = loginAttemptTs > 0 && (Date.now() - loginAttemptTs) < 10 * 60 * 1000;
-
-        if (!pendingRaw && isRecentGoogleLoginAttempt) {
-            sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
-            sessionStorage.setItem(
-                GOOGLE_LOGIN_ERROR_KEY,
-                'Google sign-in could not be completed. This account is either new or not yet linked—please register first, or sign in with email/password and link Google later.'
-            );
-            router.replace('/');
-            return;
-        }
-
-        if (!pendingRaw) return;
-
-        let pending;
-        try {
-            pending = JSON.parse(pendingRaw);
-        } catch {
-            return;
-        }
-
-        if (!pending?.source || Date.now() - (pending.created_at || 0) > 10 * 60 * 1000) {
-            sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
-            return;
-        }
-
         let cancelled = false;
 
         const completeOidcRegistration = async () => {
+            const loginAttemptTs = Number(sessionStorage.getItem(GOOGLE_LOGIN_ATTEMPT_KEY) || 0);
+            const isRecentGoogleLoginAttempt = loginAttemptTs > 0 && (Date.now() - loginAttemptTs) < 10 * 60 * 1000;
+
+            let pending = null;
+
+            try {
+                pending = await getSecurePendingGoogleRegistration();
+            } catch {
+                pending = null;
+            }
+
+            if (!pending) {
+                const pendingRaw = sessionStorage.getItem(GOOGLE_REGISTER_CONTEXT_KEY);
+                if (pendingRaw) {
+                    try {
+                        pending = JSON.parse(pendingRaw);
+                    } catch {
+                        pending = null;
+                    }
+                }
+            }
+
+            if (!pending && isRecentGoogleLoginAttempt) {
+                sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
+                sessionStorage.setItem(
+                    GOOGLE_LOGIN_ERROR_KEY,
+                    'Google sign-in could not be completed. This account is either new or not yet linked—please register first, or sign in with email/password and link Google later.'
+                );
+                router.replace('/');
+                return;
+            }
+
+            if (!pending) return;
+
+            if (!pending?.source || Date.now() - (pending.created_at || 0) > 10 * 60 * 1000) {
+                await clearSecurePendingGoogleRegistration();
+                sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
+                return;
+            }
+
+            if (cancelled) return;
+
             setIsLoading(true);
             setFormError('');
 
@@ -388,17 +434,23 @@ const Register = () => {
                     addedNames.add('provider');
                 }
 
+                await clearSecurePendingGoogleRegistration();
                 sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
                 sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
+
+                if (cancelled) return;
 
                 document.body.appendChild(form);
                 form.submit();
             } catch (err) {
                 console.error('OIDC completion error:', err);
+                await clearSecurePendingGoogleRegistration();
                 sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
                 sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
-                setFormError(err.message || 'Google registration failed. Please try again.');
-                setIsLoading(false);
+                if (!cancelled) {
+                    setFormError(err.message || 'Google registration failed. Please try again.');
+                    setIsLoading(false);
+                }
             }
         };
 

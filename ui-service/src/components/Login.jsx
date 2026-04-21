@@ -570,7 +570,7 @@ const Login = () => {
                         type="submit"
                         form="local-login-form"
                         className="login-submit-btn"
-                        disabled={isLoading || !email.trim() || !password.trim() || !agreementChecked}
+                        disabled={openSection !== 'local' || isLoading || !email.trim() || !password.trim() || !agreementChecked}
                     >
                         {isLoading ? 'Signing In...' : 'Sign In'}
                     </button>

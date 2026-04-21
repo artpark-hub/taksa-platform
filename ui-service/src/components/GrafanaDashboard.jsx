@@ -42,8 +42,11 @@ const GrafanaDashboard = ({ deviceId = null }) => {
 
     useEffect(() => {
         let interval = null;
+        let crossOriginBlocked = false;
 
         const syncParentUrlWithIframe = () => {
+            if (crossOriginBlocked) return;
+
             try {
                 const iframeWindow = iframeRef.current?.contentWindow;
                 if (!iframeWindow) return;
@@ -62,8 +65,10 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                     parentUrl.searchParams.set('grafana', currentPath);
                     window.history.replaceState({}, '', parentUrl.toString());
                 }
-            } catch (error) {
-                console.warn('Cannot access iframe URL:', error);
+            } catch {
+                crossOriginBlocked = true;
+                if (interval) clearInterval(interval);
+                interval = null;
             }
         };
 
