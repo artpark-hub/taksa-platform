@@ -34,6 +34,15 @@ func encodeBase64(s string) string {
 	return base64.StdEncoding.EncodeToString([]byte(s))
 }
 
+// redactHash returns a safe preview of a hash for logging (first 6 + last 6 chars with ... in between)
+// Useful for debugging without exposing the full credential
+func redactHash(s string) string {
+	if len(s) <= 12 {
+		return "***REDACTED***"
+	}
+	return s[:6] + "..." + s[len(s)-6:]
+}
+
 // decompressIfNeeded detects and decompresses gzip or zstd compressed data.
 // Returns the decompressed bytes if compression is detected, otherwise returns the original data.
 // Supports:
@@ -104,6 +113,14 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 // Validates the token hash, retrieves device information, and issues a JWT token.
 // Device must send: Authorization: Bearer <SHA3(SHA3(token))>
 // On successful login, renews the auth token's expiry and includes tenant_id in JWT for multi-tenancy isolation.
+//
+// DEVICE RETRY PATTERN:
+// If Pull returns 401 Unauthenticated (expired/invalid JWT), device should:
+//  1. Call Login with stored auth token to refresh JWT
+//  2. Store returned JWT in "token" cookie
+//  3. Retry the failed Pull request
+// This handles service restarts and token expiry gracefully.
+//
 // MULTI-TENANCY FLOW:
 //  1. ValidateAuthToken does system-wide search (tokens are cryptographically unique)
 //  2. Get device to extract tenant_id from device.CreatedBy
@@ -111,11 +128,13 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 //  4. Pass context to RenewAuthToken and GenerateJWT with tenant isolation
 func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginResponse, error) {
 
-	fmt.Printf("DEBUG: Received tokenHash '%s' and length '%d' for login\n", tokenHash, len(tokenHash))
-
 	if tokenHash == "" {
 		return nil, fmt.Errorf("token hash is empty")
 	}
+
+	// Log hash preview (first 6 + last 6 chars) for debugging without exposing full credential
+	hashPreview := redactHash(tokenHash)
+	fmt.Printf("DEBUG: Login attempt with tokenHash (preview: %s, length: %d)\n", hashPreview, len(tokenHash))
 
 	// ValidateAuthToken resolves device_id and tenant_id from the auth token in one lookup
 	deviceID, tenantID, token, err := uc.authUc.ValidateAuthToken(ctx, tokenHash)
@@ -651,6 +670,9 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 		return fmt.Errorf("device %s not found", deviceID)
 	}
 	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return fmt.Errorf("missing tenant ID in context")
+	}
 
 	// Record device activity
 	_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
@@ -682,7 +704,9 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 			CreatedAt: time.Now(),
 		}
 
-		_ = uc.store.Messages().Save(ctx, tenantID, message)
+		if err := uc.store.Messages().Save(ctx, tenantID, message); err != nil {
+			return fmt.Errorf("failed to persist message %s for tenant %s on device %s: %w", message.ID, tenantID, deviceID, err)
+		}
 
 		// TRACEABILITY: Correlate response to original action request
 		if msgType == "action-result" || msgType == "action-reply" {

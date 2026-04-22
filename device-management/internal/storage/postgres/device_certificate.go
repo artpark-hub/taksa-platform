@@ -25,17 +25,16 @@ func (s *DeviceCertificateStore) SaveDevice(ctx context.Context, tenantID, devic
 	INSERT INTO device_certificates (
 		device_id, tenant_id, certificate, private_key, expires_at
 	) VALUES ($1, $2, $3, $4, $5)
-	ON CONFLICT(device_id) DO UPDATE SET
+	ON CONFLICT(device_id, tenant_id) DO UPDATE SET
 		certificate = EXCLUDED.certificate,
 		private_key = EXCLUDED.private_key,
 		expires_at = EXCLUDED.expires_at
-	WHERE device_certificates.tenant_id = $2
 	`
 
 	// Expire in 1 year if not specified
 	expiresAt := time.Now().AddDate(1, 0, 0)
 
-	_, err := s.db.ExecContext(ctx, query,
+	result, err := s.db.ExecContext(ctx, query,
 		deviceID,
 		tenantID,
 		certificate.Certificate,
@@ -45,6 +44,17 @@ func (s *DeviceCertificateStore) SaveDevice(ctx context.Context, tenantID, devic
 
 	if err != nil {
 		return fmt.Errorf("failed to save device certificate: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	// Upsert should always affect exactly 1 row (insert or update)
+	// If rows == 0, it indicates a tenant isolation issue
+	if rows == 0 {
+		return fmt.Errorf("certificate save failed: device may belong to different tenant")
 	}
 
 	return nil

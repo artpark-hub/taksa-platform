@@ -27,6 +27,9 @@ func (s *ActionMessageTrackingStore) Create(ctx context.Context, track *storage.
 	}
 
 	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return ErrInvalidInput // tenant_id is required by schema (NOT NULL)
+	}
 
 	query := `
 	INSERT INTO action_message_tracking (
