@@ -7,6 +7,7 @@ import (
 	devicemgmt "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -63,6 +64,7 @@ func NewHTTPServer(
 	var opts = []khttp.ServerOption{
 		khttp.Middleware(
 			recovery.Recovery(),
+			middleware.HTTPTenantMiddleware(zapLogger, c.JwtSecret),
 			service.AuthMiddleware(zapLogger),
 			service.ExtractJWTTokenMiddleware(zapLogger),
 		),

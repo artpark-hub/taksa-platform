@@ -5,6 +5,7 @@ server:
   grpc:
     addr: 0.0.0.0:9000
     timeout: 1s
+  jwt_secret: ""  # REQUIRED: override via TAKSA_DM_JWT_SECRET env var
 log_level: debug  # Options: debug, info, warn, error, production
 log_file: /data/taksa-device-management.log  # Log file path (logs to both console and file)
 data:

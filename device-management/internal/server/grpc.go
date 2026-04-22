@@ -4,6 +4,7 @@ import (
 	devicemgmt "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	umhcore "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -22,6 +23,9 @@ func NewGRPCServer(
 		grpc.Middleware(
 			recovery.Recovery(),
 		),
+		// Extract tenant_id from JWT and store in context
+		grpc.UnaryInterceptor(middleware.UnaryInterceptor()),
+		grpc.StreamInterceptor(middleware.StreamInterceptor()),
 	}
 	if c.Grpc.Network != "" {
 		opts = append(opts, grpc.Network(c.Grpc.Network))

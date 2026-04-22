@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 )
 
 // UserCertificateStore implements storage.UserCertificateStore for PostgreSQL
@@ -14,33 +15,35 @@ type UserCertificateStore struct {
 	db *sql.DB
 }
 
-// SaveUser persists a user certificate
-// Note: deviceID must be passed separately as the Certificate proto doesn't include it
-func (s *UserCertificateStore) SaveUser(ctx context.Context, certificate *v2.Certificate) error {
-	if certificate == nil || certificate.UserEmail == "" || certificate.Certificate == "" {
+// SaveUser persists a user certificate with tenant isolation
+func (s *UserCertificateStore) SaveUser(ctx context.Context, tenantID string, certificate *v2.Certificate) error {
+	if certificate == nil || certificate.UserEmail == "" || certificate.Certificate == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
-	// For now, we need a separate method that takes deviceID
-	// This is a limitation of using the API proto for storage
-	// A better solution would be to create an internal storage struct
-	return fmt.Errorf("SaveUser requires deviceID - use SaveUserWithDevice instead")
+	deviceID := middleware.GetDeviceID(ctx)
+	if deviceID == "" {
+		return fmt.Errorf("device_id not found in context")
+	}
+
+	return s.SaveUserWithDevice(ctx, tenantID, deviceID, certificate)
 }
 
-// SaveUserWithDevice persists a user certificate with deviceID
-func (s *UserCertificateStore) SaveUserWithDevice(ctx context.Context, deviceID string, certificate *v2.Certificate) error {
-	if deviceID == "" || certificate == nil || certificate.UserEmail == "" || certificate.Certificate == "" {
+// SaveUserWithDevice persists a user certificate with tenantID and deviceID
+func (s *UserCertificateStore) SaveUserWithDevice(ctx context.Context, tenantID, deviceID string, certificate *v2.Certificate) error {
+	if tenantID == "" || deviceID == "" || certificate == nil || certificate.UserEmail == "" || certificate.Certificate == "" {
 		return ErrInvalidInput
 	}
 
 	query := `
 	INSERT INTO user_certificates (
-		id, device_id, user_email, certificate, private_key, expires_at
-	) VALUES ($1, $2, $3, $4, $5, $6)
-	ON CONFLICT(device_id, user_email) DO UPDATE SET
+		id, device_id, tenant_id, user_email, certificate, private_key, expires_at
+	) VALUES ($1, $2, $3, $4, $5, $6, $7)
+	ON CONFLICT(device_id, tenant_id, user_email) DO UPDATE SET
 		certificate = EXCLUDED.certificate,
 		private_key = EXCLUDED.private_key,
 		expires_at = EXCLUDED.expires_at
+	WHERE user_certificates.tenant_id = $3
 	`
 
 	// Expire in 1 year
@@ -49,6 +52,7 @@ func (s *UserCertificateStore) SaveUserWithDevice(ctx context.Context, deviceID 
 	_, err := s.db.ExecContext(ctx, query,
 		deviceID+"_"+certificate.UserEmail, // Simple ID generation
 		deviceID,
+		tenantID,
 		certificate.UserEmail,
 		certificate.Certificate,
 		"", // Empty private key for now
@@ -62,21 +66,29 @@ func (s *UserCertificateStore) SaveUserWithDevice(ctx context.Context, deviceID 
 	return nil
 }
 
-// GetByID retrieves a user certificate by ID
+// GetByID retrieves a user certificate by ID with tenant isolation
 func (s *UserCertificateStore) GetByID(ctx context.Context, id string) (*v2.Certificate, error) {
 	if id == "" {
 		return nil, ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID != "" {
+		return s.getCertificate(ctx, "WHERE id = $1 AND tenant_id = $2", id, tenantID)
+	}
 	return s.getCertificate(ctx, "WHERE id = $1", id)
 }
 
-// GetByDeviceAndEmail retrieves a certificate for a device and user email
+// GetByDeviceAndEmail retrieves a certificate for a device and user email with tenant isolation
 func (s *UserCertificateStore) GetByDeviceAndEmail(ctx context.Context, deviceID, email string) (*v2.Certificate, error) {
 	if deviceID == "" || email == "" {
 		return nil, ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID != "" {
+		return s.getCertificate(ctx, "WHERE device_id = $1 AND tenant_id = $2 AND user_email = $3", deviceID, tenantID, email)
+	}
 	return s.getCertificate(ctx, "WHERE device_id = $1 AND user_email = $2", deviceID, email)
 }
 
@@ -89,31 +101,45 @@ func (s *UserCertificateStore) GetByEmail(ctx context.Context, email string) (*v
 	return s.getCertificate(ctx, "WHERE user_email = $1", email)
 }
 
-// ListByDevice retrieves all user certificates for a device
+// ListByDevice retrieves all user certificates for a device with tenant isolation
 func (s *UserCertificateStore) ListByDevice(ctx context.Context, deviceID string) ([]*v2.Certificate, error) {
 	if deviceID == "" {
 		return nil, ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID != "" {
+		return s.listCertificates(ctx,
+			"WHERE device_id = $1 AND tenant_id = $2 ORDER BY created_at DESC", deviceID, tenantID)
+	}
 	return s.listCertificates(ctx,
 		"WHERE device_id = $1 ORDER BY created_at DESC", deviceID)
 }
 
-// UpdateUser updates a user certificate (requires deviceID and certificate.UserEmail)
-func (s *UserCertificateStore) UpdateUser(ctx context.Context, certificate *v2.Certificate) error {
-	return fmt.Errorf("UpdateUser requires deviceID - use UpdateUserWithDevice instead")
+// UpdateUser updates a user certificate with tenant isolation
+func (s *UserCertificateStore) UpdateUser(ctx context.Context, tenantID string, certificate *v2.Certificate) error {
+	if tenantID == "" || certificate == nil || certificate.UserEmail == "" {
+		return ErrInvalidInput
+	}
+
+	deviceID := middleware.GetDeviceID(ctx)
+	if deviceID == "" {
+		return fmt.Errorf("device_id not found in context")
+	}
+
+	return s.UpdateUserWithDevice(ctx, tenantID, deviceID, certificate)
 }
 
-// UpdateUserWithDevice updates a user certificate with deviceID
-func (s *UserCertificateStore) UpdateUserWithDevice(ctx context.Context, deviceID string, certificate *v2.Certificate) error {
-	if deviceID == "" || certificate == nil || certificate.UserEmail == "" {
+// UpdateUserWithDevice updates a user certificate with tenantID and deviceID
+func (s *UserCertificateStore) UpdateUserWithDevice(ctx context.Context, tenantID, deviceID string, certificate *v2.Certificate) error {
+	if tenantID == "" || deviceID == "" || certificate == nil || certificate.UserEmail == "" {
 		return ErrInvalidInput
 	}
 
 	result, err := s.db.ExecContext(ctx,
-		`UPDATE user_certificates SET certificate = $1 WHERE device_id = $2 AND user_email = $3`,
+		`UPDATE user_certificates SET certificate = $1 WHERE device_id = $2 AND tenant_id = $3 AND user_email = $4`,
 		certificate.Certificate,
-		deviceID, certificate.UserEmail)
+		deviceID, tenantID, certificate.UserEmail)
 
 	if err != nil {
 		return fmt.Errorf("failed to update user certificate: %w", err)
@@ -127,13 +153,19 @@ func (s *UserCertificateStore) UpdateUserWithDevice(ctx context.Context, deviceI
 	return nil
 }
 
-// DeleteByID removes a user certificate by ID
+// DeleteByID removes a user certificate by ID with tenant isolation
 func (s *UserCertificateStore) DeleteByID(ctx context.Context, id string) error {
 	if id == "" {
 		return ErrInvalidInput
 	}
 
-	result, err := s.db.ExecContext(ctx, "DELETE FROM user_certificates WHERE id = $1", id)
+	query := "DELETE FROM user_certificates WHERE id = $1"
+	args := []interface{}{id}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "DELETE FROM user_certificates WHERE id = $1 AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete user certificate: %w", err)
 	}
@@ -146,13 +178,19 @@ func (s *UserCertificateStore) DeleteByID(ctx context.Context, id string) error 
 	return nil
 }
 
-// DeleteByDevice removes all user certificates for a device
+// DeleteByDevice removes all user certificates for a device with tenant isolation
 func (s *UserCertificateStore) DeleteByDevice(ctx context.Context, deviceID string) error {
 	if deviceID == "" {
 		return ErrInvalidInput
 	}
 
-	_, err := s.db.ExecContext(ctx, "DELETE FROM user_certificates WHERE device_id = $1", deviceID)
+	query := "DELETE FROM user_certificates WHERE device_id = $1"
+	args := []interface{}{deviceID}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "DELETE FROM user_certificates WHERE device_id = $1 AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
+	_, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete user certificates for device: %w", err)
 	}
@@ -160,15 +198,19 @@ func (s *UserCertificateStore) DeleteByDevice(ctx context.Context, deviceID stri
 	return nil
 }
 
-// DeleteByDeviceAndEmail removes a specific user certificate
+// DeleteByDeviceAndEmail removes a specific user certificate with tenant isolation
 func (s *UserCertificateStore) DeleteByDeviceAndEmail(ctx context.Context, deviceID, email string) error {
 	if deviceID == "" || email == "" {
 		return ErrInvalidInput
 	}
 
-	result, err := s.db.ExecContext(ctx,
-		"DELETE FROM user_certificates WHERE device_id = $1 AND user_email = $2",
-		deviceID, email)
+	query := "DELETE FROM user_certificates WHERE device_id = $1 AND user_email = $2"
+	args := []interface{}{deviceID, email}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "DELETE FROM user_certificates WHERE device_id = $1 AND tenant_id = $2 AND user_email = $3"
+		args = []interface{}{deviceID, tenantID, email}
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete user certificate: %w", err)
 	}
@@ -198,10 +240,14 @@ func (s *UserCertificateStore) Exists(ctx context.Context, deviceID, email strin
 		return false, ErrInvalidInput
 	}
 
+	query := "SELECT EXISTS(SELECT 1 FROM user_certificates WHERE device_id = $1 AND user_email = $2)"
+	args := []interface{}{deviceID, email}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "SELECT EXISTS(SELECT 1 FROM user_certificates WHERE device_id = $1 AND user_email = $2 AND tenant_id = $3)"
+		args = append(args, tenantID)
+	}
 	var exists bool
-	err := s.db.QueryRowContext(ctx,
-		"SELECT EXISTS(SELECT 1 FROM user_certificates WHERE device_id = $1 AND user_email = $2)",
-		deviceID, email).Scan(&exists)
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(&exists)
 
 	if err != nil {
 		return false, fmt.Errorf("failed to check user certificate existence: %w", err)

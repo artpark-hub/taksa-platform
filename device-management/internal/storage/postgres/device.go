@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
@@ -62,18 +63,24 @@ func (s *DeviceStore) Save(ctx context.Context, device *v1.Device) error {
 		}
 	}
 
+	// Multi-tenancy: extract tenant_id from JWT context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return fmt.Errorf("tenant_id not found in context - ensure JWT middleware is properly configured")
+	}
+
 	query := `
 	INSERT INTO devices (
-		id, uuid, created_by, name,
+		id, uuid, tenant_id, created_by, name,
 		hardware_version, operating_system, manufacturer, firmware_version, ip_address, mac_address,
 		location_company, location_plant, location_area, location_zone, location_line, location_work_cell, location_work_unit,
 		certificate, encrypted_private_key,
 		status, created_at, last_seen, last_login_at, auth_token_expires_at
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
-		device.Id, device.Id, device.CreatedBy, device.Name,
+		device.Id, device.Id, tenantID, device.CreatedBy, device.Name,
 		device.Metadata.HardwareVersion, device.Metadata.OperatingSystem, device.Metadata.Manufacturer,
 		device.Metadata.FirmwareVersion, device.Metadata.IpAddress, device.Metadata.MacAddress,
 		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,  // 7-level location hierarchy
@@ -100,7 +107,13 @@ func (s *DeviceStore) GetByID(ctx context.Context, id string) (*v1.Device, error
 	}
 
 	device := &v1.Device{}
-	err := s.getDevice(ctx, "WHERE id = $1", id, device)
+	tenantID := middleware.GetTenantID(ctx)
+	var err error
+	if tenantID != "" {
+		err = s.getDevice(ctx, "WHERE id = $1 AND tenant_id = $2", []interface{}{id, tenantID}, device)
+	} else {
+		err = s.getDevice(ctx, "WHERE id = $1", id, device)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -114,14 +127,18 @@ func (s *DeviceStore) GetByCreatedByAndName(ctx context.Context, createdBy, name
 	}
 
 	device := &v1.Device{}
-	err := s.getDevice(ctx, "WHERE created_by = $1 AND name = $2", []interface{}{createdBy, name}, device)
+	tenantID := middleware.GetTenantID(ctx)
+	var err error
+	if tenantID != "" {
+		err = s.getDevice(ctx, "WHERE created_by = $1 AND name = $2 AND tenant_id = $3", []interface{}{createdBy, name, tenantID}, device)
+	} else {
+		err = s.getDevice(ctx, "WHERE created_by = $1 AND name = $2", []interface{}{createdBy, name}, device)
+	}
 	if err != nil {
 		return nil, err
 	}
 	return device, nil
 }
-
-
 
 // GetByUUID retrieves a device by UUID
 func (s *DeviceStore) GetByUUID(ctx context.Context, uuid string) (*v1.Device, error) {
@@ -130,7 +147,13 @@ func (s *DeviceStore) GetByUUID(ctx context.Context, uuid string) (*v1.Device, e
 	}
 
 	device := &v1.Device{}
-	err := s.getDevice(ctx, "WHERE uuid = $1", uuid, device)
+	tenantID := middleware.GetTenantID(ctx)
+	var err error
+	if tenantID != "" {
+		err = s.getDevice(ctx, "WHERE uuid = $1 AND tenant_id = $2", []interface{}{uuid, tenantID}, device)
+	} else {
+		err = s.getDevice(ctx, "WHERE uuid = $1", uuid, device)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +170,14 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 	where := []string{}
 	args := []interface{}{}
 	paramCounter := 1
+
+	// Tenant isolation
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID != "" {
+		where = append(where, fmt.Sprintf("tenant_id = $%d", paramCounter))
+		args = append(args, tenantID)
+		paramCounter++
+	}
 
 	if len(filters.StatusFilters) > 0 {
 		placeholders := ""
@@ -314,6 +345,7 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 		}
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
 	query := `
 	UPDATE devices SET
 		name = $1,
@@ -324,17 +356,31 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 		status = $17, last_seen = $18, last_login_at = $19, auth_token_expires_at = $20
 	WHERE id = $21
 	`
-
-	result, err := s.db.ExecContext(ctx, query,
+	args := []interface{}{
 		device.Name,
 		device.Metadata.HardwareVersion, device.Metadata.OperatingSystem, device.Metadata.Manufacturer,
 		device.Metadata.FirmwareVersion, device.Metadata.IpAddress, device.Metadata.MacAddress,
-		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,  // 7-level location hierarchy
+		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,
 		device.Certificate, device.EncryptedPrivateKey,
 		device.Status, device.LastSeen.AsTime().Format(time.RFC3339),
 		optionalTime(device.LastLogin), optionalTime(device.AuthTokenExpiresAt),
 		device.Id,
-	)
+	}
+	if tenantID != "" {
+		query = `
+		UPDATE devices SET
+			name = $1,
+			hardware_version = $2, operating_system = $3, manufacturer = $4, firmware_version = $5,
+			ip_address = $6, mac_address = $7,
+			location_company = $8, location_plant = $9, location_area = $10, location_zone = $11, location_line = $12, location_work_cell = $13, location_work_unit = $14,
+			certificate = $15, encrypted_private_key = $16,
+			status = $17, last_seen = $18, last_login_at = $19, auth_token_expires_at = $20
+		WHERE id = $21 AND tenant_id = $22
+		`
+		args = append(args, tenantID)
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
 
 	if err != nil {
 		return fmt.Errorf("failed to update device: %w", err)
@@ -358,7 +404,13 @@ func (s *DeviceStore) UpdateStatus(ctx context.Context, id string, status v1.Dev
 		return ErrInvalidInput
 	}
 
-	result, err := s.db.ExecContext(ctx, "UPDATE devices SET status = $1 WHERE id = $2", status, id)
+	query := "UPDATE devices SET status = $1 WHERE id = $2"
+	args := []interface{}{status, id}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "UPDATE devices SET status = $1 WHERE id = $2 AND tenant_id = $3"
+		args = append(args, tenantID)
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update device status: %w", err)
 	}
@@ -381,8 +433,13 @@ func (s *DeviceStore) UpdateLastSeen(ctx context.Context, id string, timestamp t
 		return ErrInvalidInput
 	}
 
-	result, err := s.db.ExecContext(ctx, "UPDATE devices SET last_seen = $1 WHERE id = $2",
-		timestamp.Format(time.RFC3339), id)
+	query := "UPDATE devices SET last_seen = $1 WHERE id = $2"
+	args := []interface{}{timestamp.Format(time.RFC3339), id}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "UPDATE devices SET last_seen = $1 WHERE id = $2 AND tenant_id = $3"
+		args = append(args, tenantID)
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update last_seen: %w", err)
 	}
@@ -405,8 +462,13 @@ func (s *DeviceStore) UpdateLastLogin(ctx context.Context, id string, timestamp 
 		return ErrInvalidInput
 	}
 
-	result, err := s.db.ExecContext(ctx, "UPDATE devices SET last_login_at = $1 WHERE id = $2",
-		timestamp.Format(time.RFC3339), id)
+	query := "UPDATE devices SET last_login_at = $1 WHERE id = $2"
+	args := []interface{}{timestamp.Format(time.RFC3339), id}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "UPDATE devices SET last_login_at = $1 WHERE id = $2 AND tenant_id = $3"
+		args = append(args, tenantID)
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update last_login_at: %w", err)
 	}
@@ -429,7 +491,13 @@ func (s *DeviceStore) Delete(ctx context.Context, id string) error {
 		return ErrInvalidInput
 	}
 
-	result, err := s.db.ExecContext(ctx, "DELETE FROM devices WHERE id = $1", id)
+	query := "DELETE FROM devices WHERE id = $1"
+	args := []interface{}{id}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = "DELETE FROM devices WHERE id = $1 AND tenant_id = $2"
+		args = append(args, tenantID)
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete device: %w", err)
 	}

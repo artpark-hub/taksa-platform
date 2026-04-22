@@ -138,6 +138,12 @@ func main() {
 	if dockerImage := os.Getenv("TAKSA_DM_UMH_CORE_DOCKER_IMAGE"); dockerImage != "" {
 		bc.Deployment.UmhCoreDockerImage = dockerImage
 	}
+	if jwtSecret := os.Getenv("TAKSA_DM_JWT_SECRET"); jwtSecret != "" {
+		bc.Server.JwtSecret = jwtSecret
+	}
+	if bc.Server.JwtSecret == "" {
+		panic("TAKSA_DM_JWT_SECRET is required (set in .env, config.yaml server.jwt_secret, or environment)")
+	}
 
 	// Initialize Zap logger based on config log_level and log_file
 	zapLogger, err := newZapLogger(bc.LogLevel, bc.LogFile)

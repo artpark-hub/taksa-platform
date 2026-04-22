@@ -48,35 +48,35 @@ func (s *CertificateStore) Save(ctx context.Context, certificate *v2.Certificate
 }
 
 // Implement DeviceCertificateStore methods
-// SaveDevice persists a device certificate
-func (s *CertificateStore) SaveDevice(ctx context.Context, deviceID string, certificate *v2.Certificate) error {
-	return s.device.SaveDevice(ctx, deviceID, certificate)
+// SaveDevice persists a device certificate with tenant isolation
+func (s *CertificateStore) SaveDevice(ctx context.Context, tenantID, deviceID string, certificate *v2.Certificate) error {
+	return s.device.SaveDevice(ctx, tenantID, deviceID, certificate)
 }
 
-// UpdateDevice updates a device certificate
-func (s *CertificateStore) UpdateDevice(ctx context.Context, deviceID string, certificate *v2.Certificate) error {
-	return s.device.UpdateDevice(ctx, deviceID, certificate)
+// UpdateDevice updates a device certificate with tenant isolation
+func (s *CertificateStore) UpdateDevice(ctx context.Context, tenantID, deviceID string, certificate *v2.Certificate) error {
+	return s.device.UpdateDevice(ctx, tenantID, deviceID, certificate)
 }
 
 // Implement UserCertificateStore methods
-// SaveUser persists a user certificate
-func (s *CertificateStore) SaveUser(ctx context.Context, certificate *v2.Certificate) error {
-	return s.user.SaveUser(ctx, certificate)
+// SaveUser persists a user certificate with tenant isolation
+func (s *CertificateStore) SaveUser(ctx context.Context, tenantID string, certificate *v2.Certificate) error {
+	return s.user.SaveUser(ctx, tenantID, certificate)
 }
 
-// UpdateUser updates a user certificate
-func (s *CertificateStore) UpdateUser(ctx context.Context, certificate *v2.Certificate) error {
-	return s.user.UpdateUser(ctx, certificate)
+// UpdateUser updates a user certificate with tenant isolation
+func (s *CertificateStore) UpdateUser(ctx context.Context, tenantID string, certificate *v2.Certificate) error {
+	return s.user.UpdateUser(ctx, tenantID, certificate)
 }
 
-// SaveUserCert persists a user certificate with deviceID (helper)
-func (s *CertificateStore) SaveUserCert(ctx context.Context, deviceID string, certificate *v2.Certificate) error {
-	return s.user.SaveUserWithDevice(ctx, deviceID, certificate)
+// SaveUserCert persists a user certificate with tenantID and deviceID (helper)
+func (s *CertificateStore) SaveUserCert(ctx context.Context, tenantID, deviceID string, certificate *v2.Certificate) error {
+	return s.user.SaveUserWithDevice(ctx, tenantID, deviceID, certificate)
 }
 
-// SaveDeviceCert persists a device certificate (helper - same as SaveDevice)
-func (s *CertificateStore) SaveDeviceCert(ctx context.Context, deviceID string, certificate *v2.Certificate) error {
-	return s.device.SaveDevice(ctx, deviceID, certificate)
+// SaveDeviceCert persists a device certificate with tenantID and deviceID (helper - same as SaveDevice)
+func (s *CertificateStore) SaveDeviceCert(ctx context.Context, tenantID, deviceID string, certificate *v2.Certificate) error {
+	return s.device.SaveDevice(ctx, tenantID, deviceID, certificate)
 }
 
 // GetByID delegates to user store (device certs don't have IDs)

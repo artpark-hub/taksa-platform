@@ -12,3 +12,10 @@ type AuthToken struct {
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }
+
+// AuthTokenInfo holds device_id and tenant_id resolved from an auth token.
+// Used by system-wide token lookups where tenant context is not yet known (e.g., login).
+type AuthTokenInfo struct {
+	DeviceID string
+	TenantID string
+}

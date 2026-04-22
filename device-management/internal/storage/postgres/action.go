@@ -19,8 +19,8 @@ type ActionStore struct {
 }
 
 // Save persists an action to storage
-func (s *ActionStore) Save(ctx context.Context, action *models.Action) error {
-	if action == nil || action.DeviceId == "" {
+func (s *ActionStore) Save(ctx context.Context, tenantID string, action *models.Action) error {
+	if action == nil || action.DeviceId == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
@@ -33,13 +33,13 @@ func (s *ActionStore) Save(ctx context.Context, action *models.Action) error {
 
 	query := `
 	INSERT INTO actions (
-		id, device_id, action_type, payload_type, payload_data,
+		id, tenant_id, device_id, action_type, payload_type, payload_data,
 		max_retries, retry_count, status, created_at, expires_at
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
 	_, err := s.db.ExecContext(ctx, query,
-		action.Id, action.DeviceId, action.Type,
+		action.Id, tenantID, action.DeviceId, action.Type,
 		payloadType, payloadData,
 		action.MaxRetries, action.RetryCount, int32(action.Status),
 		action.CreatedAt.Format(time.RFC3339),
@@ -57,8 +57,8 @@ func (s *ActionStore) Save(ctx context.Context, action *models.Action) error {
 }
 
 // GetByID retrieves an action by its ID
-func (s *ActionStore) GetByID(ctx context.Context, id string) (*models.Action, error) {
-	if id == "" {
+func (s *ActionStore) GetByID(ctx context.Context, tenantID, id string) (*models.Action, error) {
+	if id == "" || tenantID == "" {
 		return nil, ErrInvalidInput
 	}
 
@@ -71,7 +71,7 @@ func (s *ActionStore) GetByID(ctx context.Context, id string) (*models.Action, e
 		`SELECT id, device_id, action_type, payload_type, payload_data,
 		        max_retries, retry_count, status,
 		        created_at, expires_at, delivered_at, completed_at
-		 FROM actions WHERE id = $1`, id)
+		 FROM actions WHERE tenant_id = $1 AND id = $2`, tenantID, id)
 
 	err := row.Scan(
 		&action.Id, &action.DeviceId, &action.Type,
@@ -120,28 +120,24 @@ func (s *ActionStore) GetByID(ctx context.Context, id string) (*models.Action, e
 }
 
 // GetByDeviceID retrieves all actions for a device
-func (s *ActionStore) GetByDeviceID(ctx context.Context, deviceID string) ([]*models.Action, error) {
-	if deviceID == "" {
+func (s *ActionStore) GetByDeviceID(ctx context.Context, tenantID, deviceID string) ([]*models.Action, error) {
+	if deviceID == "" || tenantID == "" {
 		return nil, ErrInvalidInput
 	}
 
 	return s.listActions(ctx,
-		"WHERE device_id = $1 ORDER BY created_at DESC", deviceID)
+		"WHERE tenant_id = $1 AND device_id = $2 ORDER BY created_at DESC", tenantID, deviceID)
 }
 
 // ListForDevice retrieves actions for a device with filtering
 func (s *ActionStore) ListForDevice(ctx context.Context, deviceID string, filters *storage.ActionListFilter) ([]*models.Action, int32, error) {
-	if deviceID == "" {
+	if deviceID == "" || filters == nil || filters.TenantID == "" {
 		return nil, 0, ErrInvalidInput
 	}
 
-	if filters == nil {
-		filters = &storage.ActionListFilter{Page: 1, PageSize: 50}
-	}
-
-	whereClause := "WHERE device_id = $1"
-	args := []interface{}{deviceID}
-	paramCounter := 2
+	whereClause := "WHERE tenant_id = $1 AND device_id = $2"
+	args := []interface{}{filters.TenantID, deviceID}
+	paramCounter := 3
 
 	// Add status filter
 	if filters.StatusFilter != nil {
@@ -249,24 +245,24 @@ func (s *ActionStore) ListForDevice(ctx context.Context, deviceID string, filter
 
 // ListPending retrieves all pending (QUEUED) actions for a device
 // CRITICAL: Used by Pull endpoint
-func (s *ActionStore) ListPending(ctx context.Context, deviceID string) ([]*models.Action, error) {
-	if deviceID == "" {
+func (s *ActionStore) ListPending(ctx context.Context, tenantID, deviceID string) ([]*models.Action, error) {
+	if deviceID == "" || tenantID == "" {
 		return nil, ErrInvalidInput
 	}
 
 	return s.listActions(ctx,
-		"WHERE device_id = $1 AND status = $2 ORDER BY created_at ASC",
-		deviceID, int32(models.ActionStatusQueued))
+		"WHERE tenant_id = $1 AND device_id = $2 AND status = $3 ORDER BY created_at ASC",
+		tenantID, deviceID, int32(models.ActionStatusQueued))
 }
 
 // UpdateStatus updates an action's status
-func (s *ActionStore) UpdateStatus(ctx context.Context, id string, status models.ActionStatus) error {
-	if id == "" {
+func (s *ActionStore) UpdateStatus(ctx context.Context, tenantID, id string, status models.ActionStatus) error {
+	if id == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
 	result, err := s.db.ExecContext(ctx,
-		"UPDATE actions SET status = $1 WHERE id = $2", int32(status), id)
+		"UPDATE actions SET status = $1 WHERE tenant_id = $2 AND id = $3", int32(status), tenantID, id)
 	if err != nil {
 		return fmt.Errorf("failed to update action status: %w", err)
 	}
@@ -280,13 +276,13 @@ func (s *ActionStore) UpdateStatus(ctx context.Context, id string, status models
 }
 
 // UpdateErrorMessage updates the error message for an action
-func (s *ActionStore) UpdateErrorMessage(ctx context.Context, id string, errorMessage string) error {
-	if id == "" {
+func (s *ActionStore) UpdateErrorMessage(ctx context.Context, tenantID, id string, errorMessage string) error {
+	if id == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
 	result, err := s.db.ExecContext(ctx,
-		"UPDATE actions SET error_message = $1 WHERE id = $2", errorMessage, id)
+		"UPDATE actions SET error_message = $1 WHERE tenant_id = $2 AND id = $3", errorMessage, tenantID, id)
 	if err != nil {
 		return fmt.Errorf("failed to update action error message: %w", err)
 	}
@@ -300,16 +296,16 @@ func (s *ActionStore) UpdateErrorMessage(ctx context.Context, id string, errorMe
 }
 
 // MarkDelivered marks an action as delivered
-func (s *ActionStore) MarkDelivered(ctx context.Context, id string) error {
-	if id == "" {
+func (s *ActionStore) MarkDelivered(ctx context.Context, tenantID, id string) error {
+	if id == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE actions 
 		 SET status = $1, delivered_at = CURRENT_TIMESTAMP 
-		 WHERE id = $2`,
-		int32(models.ActionStatusDelivered), id)
+		 WHERE tenant_id = $2 AND id = $3`,
+		int32(models.ActionStatusDelivered), tenantID, id)
 	if err != nil {
 		return fmt.Errorf("failed to mark action delivered: %w", err)
 	}
@@ -323,16 +319,16 @@ func (s *ActionStore) MarkDelivered(ctx context.Context, id string) error {
 }
 
 // MarkCompleted marks an action as completed
-func (s *ActionStore) MarkCompleted(ctx context.Context, id string) error {
-	if id == "" {
+func (s *ActionStore) MarkCompleted(ctx context.Context, tenantID, id string) error {
+	if id == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE actions 
 		 SET status = $1, completed_at = CURRENT_TIMESTAMP 
-		 WHERE id = $2`,
-		int32(models.ActionStatusCompleted), id)
+		 WHERE tenant_id = $2 AND id = $3`,
+		int32(models.ActionStatusCompleted), tenantID, id)
 	if err != nil {
 		return fmt.Errorf("failed to mark action completed: %w", err)
 	}
@@ -346,16 +342,16 @@ func (s *ActionStore) MarkCompleted(ctx context.Context, id string) error {
 }
 
 // MarkFailed marks an action as failed
-func (s *ActionStore) MarkFailed(ctx context.Context, id string) error {
-	if id == "" {
+func (s *ActionStore) MarkFailed(ctx context.Context, tenantID, id string) error {
+	if id == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE actions 
 		 SET status = $1, completed_at = CURRENT_TIMESTAMP 
-		 WHERE id = $2`,
-		int32(models.ActionStatusFailed), id)
+		 WHERE tenant_id = $2 AND id = $3`,
+		int32(models.ActionStatusFailed), tenantID, id)
 	if err != nil {
 		return fmt.Errorf("failed to mark action failed: %w", err)
 	}
@@ -369,13 +365,13 @@ func (s *ActionStore) MarkFailed(ctx context.Context, id string) error {
 }
 
 // IncrementRetry increments the retry count for an action
-func (s *ActionStore) IncrementRetry(ctx context.Context, id string) error {
-	if id == "" {
+func (s *ActionStore) IncrementRetry(ctx context.Context, tenantID, id string) error {
+	if id == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
 	result, err := s.db.ExecContext(ctx,
-		"UPDATE actions SET retry_count = retry_count + 1 WHERE id = $1", id)
+		"UPDATE actions SET retry_count = retry_count + 1 WHERE tenant_id = $1 AND id = $2", tenantID, id)
 	if err != nil {
 		return fmt.Errorf("failed to increment retry: %w", err)
 	}
@@ -389,12 +385,12 @@ func (s *ActionStore) IncrementRetry(ctx context.Context, id string) error {
 }
 
 // Delete removes an action
-func (s *ActionStore) Delete(ctx context.Context, id string) error {
-	if id == "" {
+func (s *ActionStore) Delete(ctx context.Context, tenantID, id string) error {
+	if id == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
-	result, err := s.db.ExecContext(ctx, "DELETE FROM actions WHERE id = $1", id)
+	result, err := s.db.ExecContext(ctx, "DELETE FROM actions WHERE tenant_id = $1 AND id = $2", tenantID, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete action: %w", err)
 	}
@@ -408,12 +404,12 @@ func (s *ActionStore) Delete(ctx context.Context, id string) error {
 }
 
 // DeleteByDeviceID removes all actions for a device
-func (s *ActionStore) DeleteByDeviceID(ctx context.Context, deviceID string) error {
-	if deviceID == "" {
+func (s *ActionStore) DeleteByDeviceID(ctx context.Context, tenantID, deviceID string) error {
+	if deviceID == "" || tenantID == "" {
 		return ErrInvalidInput
 	}
 
-	_, err := s.db.ExecContext(ctx, "DELETE FROM actions WHERE device_id = $1", deviceID)
+	_, err := s.db.ExecContext(ctx, "DELETE FROM actions WHERE tenant_id = $1 AND device_id = $2", tenantID, deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete actions for device: %w", err)
 	}
