@@ -4,6 +4,7 @@ package api.umh_core.v2;
 
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 import "common/models.proto";
 import "umh-core/v2/models.proto";
 
@@ -67,6 +68,7 @@ message LoginResponse {
   string name = 4; // Device name (required)
   api.common.CompanyDetails companyDetails = 5; // Company details from common (wire protocol canonical form)
   string jwtToken = 6; // JWT token for authentication (set in HttpOnly cookie)
+  google.protobuf.Timestamp expiresAt = 7; // JWT expiry timestamp
 }
 
 

@@ -2181,6 +2181,9 @@ components:
                     $ref: '#/components/schemas/api.common.CompanyDetails'
                 jwtToken:
                     type: string
+                expiresAt:
+                    type: string
+                    format: date-time
             description: "LoginResponse returns device information and authentication token\n Matches umh-core's InstanceLoginResponse (backend_api_structs/backend_api_struct.go:119-125)\n but includes jwtToken for device-management client convenience\n \n CRITICAL: Uses common.CompanyDetails and common.LicenseStatus for wire protocol compatibility\n These are the exact types that umh-core sends, ensuring 100% compatibility"
         api.umh_core.v2.Memory:
             type: object

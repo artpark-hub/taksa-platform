@@ -25,10 +25,11 @@ func (s *DeviceCertificateStore) SaveDevice(ctx context.Context, tenantID, devic
 	INSERT INTO device_certificates (
 		device_id, tenant_id, certificate, private_key, expires_at
 	) VALUES ($1, $2, $3, $4, $5)
-	ON CONFLICT(device_id, tenant_id) DO UPDATE SET
+	ON CONFLICT(device_id) DO UPDATE SET
 		certificate = EXCLUDED.certificate,
 		private_key = EXCLUDED.private_key,
 		expires_at = EXCLUDED.expires_at
+	WHERE device_certificates.tenant_id = EXCLUDED.tenant_id
 	`
 
 	// Expire in 1 year if not specified

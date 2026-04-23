@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	kerrors "github.com/go-kratos/kratos/v2/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -41,7 +42,7 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 	tokenHash, ok := ctx.Value(AuthorizationKey).(string)
 	if !ok || tokenHash == "" {
 		s.logger.Warn("Login failed: missing or invalid authorization header")
-		return nil, status.Error(codes.Unauthenticated, "missing or invalid authorization header")
+		return nil, kerrors.Unauthorized("missing_authorization_token", "missing or invalid authorization header")
 	}
 
 	s.logger.Debug("Login API called",
@@ -55,7 +56,7 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 			zap.String("token_hash_preview", tokenHash[:min(len(tokenHash), 16)]),
 			zap.Error(err),
 		)
-		return nil, status.Error(codes.Unauthenticated, err.Error())
+		return nil, kerrors.Unauthorized("invalid_auth_token", err.Error())
 	}
 
 	s.logger.Info("Device logged in successfully",
@@ -104,6 +105,7 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 		Name:                resp.Name,
 		CompanyDetails:      companyDetails,
 		JwtToken:            resp.JwtToken, // Will be set as cookie by HTTP encoder, not in JSON (taksa-specific field)
+		ExpiresAt:           resp.ExpiresAt,
 	}
 
 	return protoResp, nil
@@ -119,7 +121,7 @@ func (s *InstanceService) Pull(ctx context.Context, req *emptypb.Empty) (*v2.Pul
 	tenantID := middleware.GetTenantID(ctx)
 	if tenantID == "" || deviceID == "" {
 		s.logger.Warn("Pull failed: missing tenant_id or device_id in context")
-		return nil, status.Error(codes.Unauthenticated, "missing tenant_id or device_id in token")
+		return nil, kerrors.Unauthorized("invalid_token", "missing tenant_id or device_id in token")
 	}
 	
 	s.logger.Debug("Pull API device context",
@@ -202,7 +204,7 @@ func (s *InstanceService) Push(ctx context.Context, req *v2.PushRequest) (*empty
 	tenantID := middleware.GetTenantID(ctx)
 	if tenantID == "" || deviceID == "" {
 		s.logger.Warn("Push failed: missing tenant_id or device_id in context")
-		return nil, status.Error(codes.Unauthenticated, "missing tenant_id or device_id in token")
+		return nil, kerrors.Unauthorized("invalid_token", "missing tenant_id or device_id in token")
 	}
 	
 	s.logger.Debug("Processing push messages",
@@ -249,13 +251,13 @@ func (s *InstanceService) GetCertificate(ctx context.Context, req *v2.GetCertifi
 	tenantID := middleware.GetTenantID(ctx)
 	if tenantID == "" {
 		s.logger.Warn("GetCertificate failed: missing tenant_id in context")
-		return nil, status.Error(codes.Unauthenticated, "missing tenant_id in context")
+		return nil, kerrors.Unauthorized("invalid_token", "missing tenant_id in context")
 	}
 
 	deviceID := middleware.GetDeviceID(ctx)
 	if deviceID == "" {
 		s.logger.Warn("GetCertificate failed: missing device_id in context")
-		return nil, status.Error(codes.Unauthenticated, "missing device_id in context")
+		return nil, kerrors.Unauthorized("invalid_token", "missing device_id in context")
 	}
 
 	s.logger.Debug("GetCertificate API called",

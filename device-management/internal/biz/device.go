@@ -119,8 +119,8 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 	dockerCmd := uc.buildDockerCommand(device.Name, device.Location, token)
 
 	return &RegisterDeviceResponse{
-		Device:       deviceToSummary(device),
-		AuthToken:    token,
+		Device:    deviceToSummary(device),
+		AuthToken: token,
 		Instructions: map[string]string{
 			"docker_command": dockerCmd,
 		},
@@ -173,20 +173,20 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 	}
 
 	messages, _, err := uc.store.Messages().ListHistory(ctx, filter)
-	
+
 	// Build response based on device's current state
 	resp := &GetDeviceHealthResponse{
 		DeviceId:    deviceID,
 		LastUpdated: device.LastSeen, // Use device's last_seen from Pull API heartbeat
-		Status:      nil,              // Status message not yet implemented
-		StatusB64:   "",               // Will be populated when Status message is sent
+		Status:      nil,             // Status message not yet implemented
+		StatusB64:   "",              // Will be populated when Status message is sent
 	}
 
 	// Check if device has recent activity (within last 30 seconds)
 	if device.LastSeen != nil {
 		lastSeenTime := time.Unix(device.LastSeen.Seconds, int64(device.LastSeen.Nanos))
 		timeSinceLastSeen := time.Since(lastSeenTime)
-		
+
 		if timeSinceLastSeen < 30*time.Second {
 			resp.ErrorMessage = "" // Device is healthy - recently seen
 		} else if timeSinceLastSeen < 5*time.Minute {
@@ -202,7 +202,7 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 	// Currently looking for status-type messages (future enhancement)
 	if len(messages) > 0 && messages[0] != nil {
 		msg := messages[0]
-		
+
 		// Look for StatusMessage in message content
 		// The Content field contains base64-encoded JSON with the message payload
 		if msg.Content != "" && msg.Type == "StatusMessage" {
@@ -216,12 +216,12 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 
 // GetDeviceHealthResponse contains health metrics
 type GetDeviceHealthResponse struct {
-	DeviceId      string
-	LastUpdated   *timestamppb.Timestamp
-	Status        *v2.StatusMessage
-	StatusB64     string // Base64-encoded StatusMessage fallback
+	DeviceId        string
+	LastUpdated     *timestamppb.Timestamp
+	Status          *v2.StatusMessage
+	StatusB64       string // Base64-encoded StatusMessage fallback
 	DeviceTimestamp *timestamppb.Timestamp
-	ErrorMessage  string
+	ErrorMessage    string
 }
 
 // deviceToSummary converts a full Device to a DeviceSummary (lightweight version)
@@ -354,7 +354,7 @@ func (uc *DeviceUsecase) buildDockerCommand(
 	cmd += fmt.Sprintf(" -v umh-core-data-%s:/data", sanitizedName)
 
 	// Add auth token
-	cmd += fmt.Sprintf(` -e AUTH_TOKEN="%s"`, authToken)
+	cmd += fmt.Sprintf(" -e AUTH_TOKEN=%s", authToken)
 
 	// Add release channel
 	cmd += " -e RELEASE_CHANNEL=stable"
@@ -372,7 +372,7 @@ func (uc *DeviceUsecase) buildDockerCommand(
 
 	// Add API URL
 	apiURL := fmt.Sprintf("%s/api", strings.TrimSuffix(baseURL, "/"))
-	cmd += fmt.Sprintf(` -e API_URL="%s"`, apiURL)
+	cmd += fmt.Sprintf(" -e API_URL=%s", apiURL)
 
 	// Add docker image
 	cmd += fmt.Sprintf(" %s", dockerImage)

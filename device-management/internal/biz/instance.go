@@ -189,7 +189,7 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 		Device:              device,
 		Certificate:         device.Certificate,
 		EncryptedPrivateKey: device.EncryptedPrivateKey,
-		ExpiresAt:           timestamppb.New(time.Now().Add(1 * time.Hour)),
+		ExpiresAt:           timestamppb.New(time.Now().Add(DeviceJWTTTL)),
 	}, nil
 }
 

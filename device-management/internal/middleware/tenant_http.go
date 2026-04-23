@@ -2,15 +2,25 @@ package middleware
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
+	"time"
 
+	kerrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/transport"
 	httptransport "github.com/go-kratos/kratos/v2/transport/http"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+)
+
+const (
+	cookieJWTLeeway                  = 2 * time.Minute
+	authRealm                        = "device-management"
+	reasonMissingAuthorizationToken  = "missing_authorization_token"
+	reasonInvalidToken               = "invalid_token"
+	reasonTokenExpired               = "token_expired"
 )
 
 // isPublicPath returns true for endpoints that don't require JWT authentication.
@@ -84,7 +94,7 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 			if tokenStr == "" {
 				logger.Warn("Rejected: no JWT in Authorization header or cookie",
 					zap.String("path", request.RequestURI))
-				return nil, status.Error(codes.Unauthenticated, "missing authorization token")
+				return nil, unauthorizedHTTP(httpTr, reasonMissingAuthorizationToken, "missing authorization token")
 			}
 
 			// Parse JWT claims with appropriate trust level
@@ -92,16 +102,30 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 			if fromCookie {
 				// Cookie JWT was issued by us — verify signature
 				claims = jwt.MapClaims{}
-				token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-					if token.Method != jwt.SigningMethodHS256 {
-						return nil, jwt.ErrTokenSignatureInvalid
-					}
+				parser := jwt.NewParser(
+					jwt.WithLeeway(cookieJWTLeeway),
+					jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+				)
+				token, err := parser.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 					return []byte(jwtSecret), nil
 				})
-				if err != nil || !token.Valid {
-					logger.Warn("Rejected: invalid cookie JWT signature",
+				if err != nil {
+					reason := reasonInvalidToken
+					message := "invalid token"
+					logMessage := "Rejected: invalid cookie JWT"
+					if errors.Is(err, jwt.ErrTokenExpired) {
+						reason = reasonTokenExpired
+						message = "token expired"
+						logMessage = "Rejected: expired cookie JWT"
+					}
+					logger.Warn(logMessage,
 						zap.Error(err), zap.String("path", request.RequestURI))
-					return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
+					return nil, unauthorizedHTTP(httpTr, reason, message)
+				}
+				if !token.Valid {
+					logger.Warn("Rejected: invalid cookie JWT",
+						zap.String("path", request.RequestURI))
+					return nil, unauthorizedHTTP(httpTr, reasonInvalidToken, "invalid token")
 				}
 			} else {
 				// Authorization header JWT validated by Oathkeeper upstream — trust it
@@ -110,7 +134,7 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 				if err != nil {
 					logger.Warn("Rejected: invalid JWT", zap.Error(err),
 						zap.String("path", request.RequestURI))
-					return nil, status.Error(codes.Unauthenticated, "invalid authorization token")
+					return nil, unauthorizedHTTP(httpTr, reasonInvalidToken, "invalid authorization token")
 				}
 			}
 
@@ -119,7 +143,7 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 			if !ok || tenantID == "" {
 				logger.Warn("Rejected: missing tenant_id in JWT claims",
 					zap.String("path", request.RequestURI))
-				return nil, status.Error(codes.PermissionDenied, "missing tenant_id in token")
+				return nil, unauthorizedHTTP(httpTr, reasonInvalidToken, "missing tenant_id in token")
 			}
 			ctx = context.WithValue(ctx, TenantIDContextKey, tenantID)
 
@@ -131,6 +155,11 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 			return handler(ctx, req)
 		}
 	}
+}
+
+func unauthorizedHTTP(httpTr *httptransport.Transport, reason, message string) error {
+	httpTr.ReplyHeader().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm=%q, error=%q, error_description=%q`, authRealm, reason, message))
+	return kerrors.Unauthorized(reason, message)
 }
 
 func extractBearerTokenFromHeader(authHeader string) string {

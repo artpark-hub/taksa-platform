@@ -16,6 +16,8 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
+const DeviceJWTTTL = 24 * time.Hour
+
 // AuthUsecase handles authentication and token operations
 type AuthUsecase struct {
 	store     storage.Store
@@ -85,7 +87,7 @@ func (uc *AuthUsecase) GenerateJWT(ctx context.Context, device *v1.Device) (stri
 		"device_id":   device.Id,
 		"device_name": device.Name,
 		"tenant_id":   tenantID,  // Multi-tenancy: device APIs use this to enforce tenant isolation
-		"exp":         time.Now().Add(1 * time.Hour).Unix(),
+		"exp":         time.Now().Add(DeviceJWTTTL).Unix(),
 		"iat":         time.Now().Unix(),
 	}
 
