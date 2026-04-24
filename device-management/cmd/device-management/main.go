@@ -2,9 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/utils"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/config"
@@ -141,9 +144,17 @@ func main() {
 	if jwtSecret := os.Getenv("TAKSA_DM_JWT_SECRET"); jwtSecret != "" {
 		bc.Server.JwtSecret = jwtSecret
 	}
-	if bc.Server.JwtSecret == "" {
-		panic("TAKSA_DM_JWT_SECRET is required (set in .env, config.yaml server.jwt_secret, or environment)")
+
+	// Get or generate JWT secret (generate-once, persist-under-/data strategy)
+	// Treat quoted empty strings ("" or \"\" from YAML) as needing generation
+	if strings.TrimSpace(bc.Server.JwtSecret) == "" || bc.Server.JwtSecret == `""` {
+		bc.Server.JwtSecret = ""
 	}
+	jwtSecret, err := utils.GetOrGenerateJWTSecret(bc.Server.JwtSecret)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to get or generate JWT secret: %v", err))
+	}
+	bc.Server.JwtSecret = jwtSecret
 
 	// Initialize Zap logger based on config log_level and log_file
 	zapLogger, err := newZapLogger(bc.LogLevel, bc.LogFile)
