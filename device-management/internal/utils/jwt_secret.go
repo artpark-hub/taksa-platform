@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -54,16 +55,17 @@ func GetOrGenerateJWTSecretWithPath(envSecret, filePath string) (string, error) 
 	return secret, nil
 }
 
-// readJWTSecretFromFile reads the JWT secret from a file
+// readJWTSecretFromFile reads the JWT secret from a file and trims whitespace/newlines
+// to prevent issues when secrets are created with echo or have trailing newlines
 func readJWTSecretFromFile(filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", err
 	}
 
-	secret := string(data)
+	secret := strings.TrimSpace(string(data))
 	if secret == "" {
-		return "", fmt.Errorf("%w: JWT secret file is empty", os.ErrNotExist)
+		return "", fmt.Errorf("%w: JWT secret file is empty or contains only whitespace", os.ErrNotExist)
 	}
 
 	return secret, nil

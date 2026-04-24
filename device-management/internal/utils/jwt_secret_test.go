@@ -128,3 +128,40 @@ func TestGetOrGenerateJWTSecretPersistence(t *testing.T) {
 		t.Errorf("expected file permissions 0600, got %o", mode.Perm())
 	}
 }
+
+func TestGetOrGenerateJWTSecretTrimsWhitespace(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFilePath := filepath.Join(tmpDir, "jwt.secret")
+
+	// Write secret with trailing newline (common with echo command)
+	secretValue := "my-secret-value"
+	if err := os.WriteFile(testFilePath, []byte(secretValue+"\n"), 0600); err != nil {
+		t.Fatalf("failed to setup test file: %v", err)
+	}
+
+	// Should trim and return without newline
+	secret, err := GetOrGenerateJWTSecretWithPath("", testFilePath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if secret != secretValue {
+		t.Errorf("expected %q, got %q (newline not trimmed)", secretValue, secret)
+	}
+}
+
+func TestGetOrGenerateJWTSecretRejectsWhitespaceOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFilePath := filepath.Join(tmpDir, "jwt.secret")
+
+	// Write only whitespace/newlines
+	if err := os.WriteFile(testFilePath, []byte("   \n  \t  \n"), 0600); err != nil {
+		t.Fatalf("failed to setup test file: %v", err)
+	}
+
+	// Should fail because file is whitespace-only
+	_, err := GetOrGenerateJWTSecretWithPath("", testFilePath)
+	if err == nil {
+		t.Errorf("expected error for whitespace-only file, got nil")
+	}
+}
