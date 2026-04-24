@@ -41,17 +41,22 @@ func GetOrGenerateJWTSecretWithPath(envSecret, filePath string) (string, error) 
 	if err == nil {
 		return secret, nil
 	}
-	// If file doesn't exist, we'll generate a new one
-	if !os.IsNotExist(err) {
-		return "", fmt.Errorf("failed to read JWT secret file: %w", err)
+	
+	// If file doesn't exist, generate a new one
+	if os.IsNotExist(err) {
+		secret, err = generateAndPersistJWTSecret(filePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate JWT secret: %w", err)
+		}
+		return secret, nil
 	}
-
-	// 3. Generate and persist a new secret
+	
+	// 3. File exists but is invalid (empty/whitespace-only)
+	// Regenerate and overwrite the corrupted file
 	secret, err = generateAndPersistJWTSecret(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate JWT secret: %w", err)
+		return "", fmt.Errorf("failed to regenerate JWT secret after detecting corrupted file: %w", err)
 	}
-
 	return secret, nil
 }
 
@@ -65,7 +70,8 @@ func readJWTSecretFromFile(filePath string) (string, error) {
 
 	secret := strings.TrimSpace(string(data))
 	if secret == "" {
-		return "", fmt.Errorf("%w: JWT secret file is empty or contains only whitespace", os.ErrNotExist)
+		// File exists but contains only whitespace - this is an error condition
+		return "", fmt.Errorf("JWT secret file is empty or contains only whitespace")
 	}
 
 	return secret, nil

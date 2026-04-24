@@ -154,14 +154,31 @@ func TestGetOrGenerateJWTSecretRejectsWhitespaceOnly(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFilePath := filepath.Join(tmpDir, "jwt.secret")
 
-	// Write only whitespace/newlines
+	// Write only whitespace/newlines (corrupted file)
 	if err := os.WriteFile(testFilePath, []byte("   \n  \t  \n"), 0600); err != nil {
 		t.Fatalf("failed to setup test file: %v", err)
 	}
 
-	// Should fail because file is whitespace-only
-	_, err := GetOrGenerateJWTSecretWithPath("", testFilePath)
-	if err == nil {
-		t.Errorf("expected error for whitespace-only file, got nil")
+	// Should regenerate the corrupted file (not error)
+	secret, err := GetOrGenerateJWTSecretWithPath("", testFilePath)
+	if err != nil {
+		t.Errorf("unexpected error for corrupted file: %v", err)
+	}
+
+	// Should have generated a valid secret
+	if secret == "" {
+		t.Errorf("expected valid secret, got empty string")
+	}
+	if len(secret) != 64 { // 32 bytes * 2 hex chars
+		t.Errorf("expected hex secret length 64, got %d", len(secret))
+	}
+
+	// File should be overwritten with new secret
+	fileContent, err := os.ReadFile(testFilePath)
+	if err != nil {
+		t.Fatalf("failed to read file after regeneration: %v", err)
+	}
+	if string(fileContent) != secret {
+		t.Errorf("file content doesn't match returned secret: got %q, expected %q", string(fileContent), secret)
 	}
 }
