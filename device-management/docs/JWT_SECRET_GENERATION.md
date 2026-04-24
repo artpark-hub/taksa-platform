@@ -66,9 +66,16 @@ if bc.Server.JwtSecret == "" {
 }
 
 // New (after)
-jwtSecret, err := utils.GetOrGenerateJWTSecret(bc.Server.JwtSecret)
+jwtSecret := strings.TrimSpace(bc.Server.JwtSecret)
+if jwtSecret == `""` {
+    jwtSecret = ""
+} else if len(jwtSecret) >= 2 && strings.HasPrefix(jwtSecret, `"`) && strings.HasSuffix(jwtSecret, `"`) {
+    jwtSecret = strings.Trim(jwtSecret, `"`)
+}
+
+jwtSecret, err := utils.GetOrGenerateJWTSecret(jwtSecret)
 if err != nil {
-    panic(err)
+    panic(fmt.Sprintf("failed to get or generate JWT secret: %v", err))
 }
 bc.Server.JwtSecret = jwtSecret
 ```
