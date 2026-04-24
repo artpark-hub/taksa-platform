@@ -63,7 +63,7 @@ func readJWTSecretFromFile(filePath string) (string, error) {
 
 	secret := string(data)
 	if secret == "" {
-		return "", fmt.Errorf("JWT secret file is empty")
+		return "", fmt.Errorf("%w: JWT secret file is empty", os.ErrNotExist)
 	}
 
 	return secret, nil
