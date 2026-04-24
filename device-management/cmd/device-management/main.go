@@ -152,7 +152,7 @@ func main() {
 	}
 	jwtSecret, err := utils.GetOrGenerateJWTSecret(bc.Server.JwtSecret)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to get or generate JWT secret: %v", err))
+		panic(fmt.Errorf("Failed to get or generate JWT secret: %w", err))
 	}
 	bc.Server.JwtSecret = jwtSecret
 
