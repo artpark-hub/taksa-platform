@@ -25,7 +25,7 @@ func NewTenantsRepo(data *Data, logger log.Logger) biz.TenantsRepo {
 	}
 }
 
-func (r *tenantsRepo) CreateKratosIdentity(ctx context.Context, email, password, firstName, lastName, orgName, role string) (*biz.User, error) {
+func (r *tenantsRepo) CreateKratosIdentity(ctx context.Context, email, password, firstName, lastName, orgName, orgID, role string) (*biz.User, error) {
 	url := fmt.Sprintf("%s/admin/identities", r.data.KratosAdminURL())
 
 	payload := map[string]interface{}{
@@ -39,6 +39,7 @@ func (r *tenantsRepo) CreateKratosIdentity(ctx context.Context, email, password,
 			},
 			"role":              role,
 			"organization_name": orgName,
+			"organization_id":   orgID,
 		},
 		"credentials": map[string]interface{}{
 			"password": map[string]interface{}{
@@ -84,11 +85,12 @@ func (r *tenantsRepo) CreateKratosIdentity(ctx context.Context, email, password,
 		FirstName:        firstName,
 		LastName:         lastName,
 		OrganizationName: orgName,
+		OrganizationID:   orgID,
 		Role:             role,
 	}, nil
 }
 
-func (r *tenantsRepo) ListIdentitiesByOrg(ctx context.Context, orgName string) ([]*biz.User, error) {
+func (r *tenantsRepo) ListIdentitiesByOrg(ctx context.Context, orgName, orgID string) ([]*biz.User, error) {
 	url := fmt.Sprintf("%s/admin/identities?per_page=500", r.data.KratosAdminURL())
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -116,7 +118,10 @@ func (r *tenantsRepo) ListIdentitiesByOrg(ctx context.Context, orgName string) (
 
 	var users []*biz.User
 	for _, id := range identities {
-		if tOrg, ok := id.Traits["organization_name"].(string); ok && tOrg == orgName {
+		tOrgName, _ := id.Traits["organization_name"].(string)
+		tOrgID, _ := id.Traits["organization_id"].(string)
+
+		if tOrgName == orgName && tOrgID == orgID {
 			email, _ := id.Traits["email"].(string)
 			role, _ := id.Traits["role"].(string)
 
@@ -131,7 +136,8 @@ func (r *tenantsRepo) ListIdentitiesByOrg(ctx context.Context, orgName string) (
 				Email:            email,
 				FirstName:        firstName,
 				LastName:         lastName,
-				OrganizationName: orgName,
+				OrganizationName: tOrgName,
+				OrganizationID:   tOrgID,
 				Role:             role,
 			})
 		}
@@ -187,6 +193,7 @@ func (r *tenantsRepo) UpdateIdentity(ctx context.Context, id, firstName, lastNam
 	}
 
 	orgName, _ := currentIdentity.Traits["organization_name"].(string)
+	orgID, _ := currentIdentity.Traits["organization_id"].(string)
 	email, _ := currentIdentity.Traits["email"].(string)
 	currentRole, _ := currentIdentity.Traits["role"].(string)
 
@@ -217,6 +224,7 @@ func (r *tenantsRepo) UpdateIdentity(ctx context.Context, id, firstName, lastNam
 			},
 			"role":              role,
 			"organization_name": orgName,
+			"organization_id":   orgID,
 		},
 	}
 
@@ -248,6 +256,7 @@ func (r *tenantsRepo) UpdateIdentity(ctx context.Context, id, firstName, lastNam
 		FirstName:        firstName,
 		LastName:         lastName,
 		OrganizationName: orgName,
+		OrganizationID:   orgID,
 		Role:             role,
 	}, nil
 }

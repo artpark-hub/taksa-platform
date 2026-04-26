@@ -12,6 +12,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/transport"
 	jwtv5 "github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 type UserManagementService struct {
@@ -24,6 +25,7 @@ type UserManagementService struct {
 
 type JWTDetails struct {
 	OrganizationName string
+	OrganizationID   string
 	Role             string
 	Email            string
 	Subject          string
@@ -60,10 +62,11 @@ func (s *UserManagementService) CreateSubUser(ctx context.Context, req *v1.Creat
 	}
 
 	s.log.Infof(
-		"CreateSubUser called by subject=%s role=%s org=%s targetEmail=%s targetRole=%s",
+		"CreateSubUser called by subject=%s role=%s orgName=%s orgID=%s targetEmail=%s targetRole=%s",
 		details.Subject,
 		details.Role,
 		details.OrganizationName,
+		details.OrganizationID,
 		req.Email,
 		role,
 	)
@@ -75,6 +78,7 @@ func (s *UserManagementService) CreateSubUser(ctx context.Context, req *v1.Creat
 		req.FirstName,
 		req.LastName,
 		details.OrganizationName,
+		details.OrganizationID,
 		role,
 	)
 	if err != nil {
@@ -86,6 +90,7 @@ func (s *UserManagementService) CreateSubUser(ctx context.Context, req *v1.Creat
 		Data: &v1.UserData{
 			IdentityId:       data.IdentityID,
 			OrganizationName: data.OrganizationName,
+			OrganizationId:   data.OrganizationID,
 		},
 	}, nil
 }
@@ -97,7 +102,7 @@ func (s *UserManagementService) ListSubUsers(ctx context.Context, req *v1.ListSu
 		return nil, err
 	}
 
-	users, err := s.uc.ListSubUsers(ctx, details.OrganizationName)
+	users, err := s.uc.ListSubUsers(ctx, details.OrganizationName, details.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +115,7 @@ func (s *UserManagementService) ListSubUsers(ctx context.Context, req *v1.ListSu
 			FirstName:        u.FirstName,
 			LastName:         u.LastName,
 			OrganizationName: u.OrganizationName,
+			OrganizationId:   u.OrganizationID,
 			Role:             u.Role,
 		})
 	}
@@ -126,12 +132,12 @@ func (s *UserManagementService) DeleteSubUser(ctx context.Context, req *v1.Delet
 		return nil, errors.New("unauthorized: unable to verify user role")
 	}
 
-	if details.Role != "master" {
+	if strings.ToLower(strings.TrimSpace(details.Role)) != "master" {
 		s.log.Warnf("Unauthorized delete attempt by non-master user with role: %s", details.Role)
 		return nil, errors.New("forbidden: only master users can delete other users")
 	}
 
-	users, err := s.uc.ListSubUsers(ctx, details.OrganizationName)
+	users, err := s.uc.ListSubUsers(ctx, details.OrganizationName, details.OrganizationID)
 	if err != nil {
 		s.log.Errorf("Failed to list organization users: %v", err)
 		return nil, errors.New("failed to validate user deletion")
@@ -143,7 +149,7 @@ func (s *UserManagementService) DeleteSubUser(ctx context.Context, req *v1.Delet
 	for _, user := range users {
 		if user.IdentityID == req.IdentityId {
 			targetFound = true
-			if strings.ToLower(user.Role) == "master" {
+			if strings.ToLower(strings.TrimSpace(user.Role)) == "master" {
 				targetIsMaster = true
 			}
 			break
@@ -176,12 +182,12 @@ func (s *UserManagementService) DeleteMasterUser(ctx context.Context, req *v1.De
 		return nil, errors.New("unauthorized: unable to verify user role")
 	}
 
-	if details.Role != "master" {
+	if strings.ToLower(strings.TrimSpace(details.Role)) != "master" {
 		s.log.Warnf("Unauthorized delete master user attempt by role: %s", details.Role)
 		return nil, errors.New("forbidden: only master users can delete master users")
 	}
 
-	users, err := s.uc.ListSubUsers(ctx, details.OrganizationName)
+	users, err := s.uc.ListSubUsers(ctx, details.OrganizationName, details.OrganizationID)
 	if err != nil {
 		s.log.Errorf("Failed to list organization users: %v", err)
 		return nil, errors.New("failed to validate master-user deletion")
@@ -192,12 +198,12 @@ func (s *UserManagementService) DeleteMasterUser(ctx context.Context, req *v1.De
 	targetIsMaster := false
 
 	for _, user := range users {
-		if strings.ToLower(user.Role) == "master" {
+		if strings.ToLower(strings.TrimSpace(user.Role)) == "master" {
 			masterCount++
 		}
 		if user.IdentityID == req.IdentityId {
 			targetFound = true
-			if strings.ToLower(user.Role) == "master" {
+			if strings.ToLower(strings.TrimSpace(user.Role)) == "master" {
 				targetIsMaster = true
 			}
 		}
@@ -238,7 +244,7 @@ func (s *UserManagementService) UpdateUserProfile(ctx context.Context, req *v1.U
 	normalizedReqRole := strings.ToLower(strings.TrimSpace(req.Role))
 	isChangingRole := normalizedReqRole != ""
 
-	users, err := s.uc.ListSubUsers(ctx, details.OrganizationName)
+	users, err := s.uc.ListSubUsers(ctx, details.OrganizationName, details.OrganizationID)
 	if err != nil {
 		s.log.Errorf("Failed to list organization users: %v", err)
 		return nil, errors.New("failed to validate profile update")
@@ -294,10 +300,12 @@ func (s *UserManagementService) UpdateUserProfile(ctx context.Context, req *v1.U
 			FirstName:        user.FirstName,
 			LastName:         user.LastName,
 			OrganizationName: user.OrganizationName,
+			OrganizationId:   user.OrganizationID,
 			Role:             user.Role,
 		},
 	}, nil
 }
+
 func (s *UserManagementService) GetJWTToken(ctx context.Context, req *v1.GetJWTTokenRequest) (*v1.GetJWTTokenResponse, error) {
 	if tr, ok := transport.FromServerContext(ctx); ok {
 		authHeader := tr.RequestHeader().Get("Authorization")
@@ -319,6 +327,12 @@ func (s *UserManagementService) GetJWTToken(ctx context.Context, req *v1.GetJWTT
 	}
 
 	return nil, errors.New("failed to extract transport info")
+}
+
+func (s *UserManagementService) GenerateOrganizationID(ctx context.Context, req *v1.GenerateOrganizationIDRequest) (*v1.GenerateOrganizationIDResponse, error) {
+	return &v1.GenerateOrganizationIDResponse{
+		OrganizationId: uuid.NewString(),
+	}, nil
 }
 
 func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDetails, error) {
@@ -352,6 +366,9 @@ func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDeta
 		if org, found := claims["organization_name"]; found {
 			details.OrganizationName, _ = org.(string)
 		}
+		if orgID, found := claims["organization_id"]; found {
+			details.OrganizationID, _ = orgID.(string)
+		}
 		if role, found := claims["role"]; found {
 			details.Role, _ = role.(string)
 		}
@@ -366,6 +383,11 @@ func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDeta
 			if details.OrganizationName == "" {
 				if org, ok := traits["organization_name"].(string); ok {
 					details.OrganizationName = org
+				}
+			}
+			if details.OrganizationID == "" {
+				if orgID, ok := traits["organization_id"].(string); ok {
+					details.OrganizationID = orgID
 				}
 			}
 			if details.Role == "" {
@@ -384,11 +406,14 @@ func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDeta
 	if details.OrganizationName == "" {
 		return nil, errors.New("organization_name claim not found in token")
 	}
+	if details.OrganizationID == "" {
+		return nil, errors.New("organization_id claim not found in token")
+	}
 	if details.Role == "" {
 		return nil, errors.New("role claim not found in token")
 	}
 
-	details.Role = strings.ToLower(details.Role)
+	details.Role = strings.ToLower(strings.TrimSpace(details.Role))
 
 	return details, nil
 }

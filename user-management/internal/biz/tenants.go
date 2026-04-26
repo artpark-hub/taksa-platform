@@ -12,12 +12,13 @@ type User struct {
 	FirstName        string
 	LastName         string
 	OrganizationName string
+	OrganizationID   string
 	Role             string
 }
 
 type TenantsRepo interface {
-	CreateKratosIdentity(ctx context.Context, email, password, firstName, lastName, orgName, role string) (*User, error)
-	ListIdentitiesByOrg(ctx context.Context, orgName string) ([]*User, error)
+	CreateKratosIdentity(ctx context.Context, email, password, firstName, lastName, orgName, orgID, role string) (*User, error)
+	ListIdentitiesByOrg(ctx context.Context, orgName, orgID string) ([]*User, error)
 	DeleteIdentity(ctx context.Context, id string) error
 	UpdateIdentity(ctx context.Context, id, firstName, lastName, role string) (*User, error)
 }
@@ -34,12 +35,12 @@ func NewTenantsUsecase(repo TenantsRepo, logger log.Logger) *TenantsUsecase {
 	}
 }
 
-func (uc *TenantsUsecase) CreateSubUser(ctx context.Context, email, password, firstName, lastName, orgName, role string) (*User, error) {
-	return uc.repo.CreateKratosIdentity(ctx, email, password, firstName, lastName, orgName, role)
+func (uc *TenantsUsecase) CreateSubUser(ctx context.Context, email, password, firstName, lastName, orgName, orgID, role string) (*User, error) {
+	return uc.repo.CreateKratosIdentity(ctx, email, password, firstName, lastName, orgName, orgID, role)
 }
 
-func (uc *TenantsUsecase) ListSubUsers(ctx context.Context, orgName string) ([]*User, error) {
-	return uc.repo.ListIdentitiesByOrg(ctx, orgName)
+func (uc *TenantsUsecase) ListSubUsers(ctx context.Context, orgName, orgID string) ([]*User, error) {
+	return uc.repo.ListIdentitiesByOrg(ctx, orgName, orgID)
 }
 
 func (uc *TenantsUsecase) DeleteSubUser(ctx context.Context, id string) error {
