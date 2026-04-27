@@ -352,6 +352,7 @@ const Register = () => {
             }
 
             if (!pending) {
+                if (cancelled) return;
                 setFormError('Google registration context expired or was not found. Please start Google registration again.');
                 setOpenSection('social');
                 router.replace('/register');
@@ -361,6 +362,7 @@ const Register = () => {
             if (!pending?.source || Date.now() - (pending.created_at || 0) > 10 * 60 * 1000) {
                 await clearSecurePendingGoogleRegistration();
                 sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
+                if (cancelled) return;
                 setFormError('Google registration context expired. Please start Google registration again.');
                 setOpenSection('social');
                 router.replace('/register');
