@@ -3,9 +3,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import './GrafanaDashboard.css';
 
-const DEFAULT_GRAFANA_PATH = '/grafana/dashboards';
+const DEFAULT_GRAFANA_PATH = '/grafana/explore';
 
-const GrafanaDashboard = ({ deviceId = null }) => {
+const Explore = ({ deviceId = null }) => {
     const iframeRef = useRef(null);
     const [iframeSrc, setIframeSrc] = useState('');
 
@@ -66,6 +66,7 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                     window.history.replaceState({}, '', parentUrl.toString());
                 }
             } catch {
+                // Cross-origin access blocked — stop polling to avoid log spam and wasted CPU.
                 crossOriginBlocked = true;
                 if (interval) clearInterval(interval);
                 interval = null;
@@ -174,4 +175,4 @@ const GrafanaDashboard = ({ deviceId = null }) => {
     );
 };
 
-export default GrafanaDashboard;
+export default Explore;

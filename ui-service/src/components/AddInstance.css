@@ -166,6 +166,8 @@
 
 .form-input {
     flex: 1;
+    width: 100%;
+    min-width: 0;
     height: var(--input-height);
     padding: 0 var(--space-md);
     background: #fff;
@@ -176,6 +178,11 @@
     box-shadow: var(--shadow-input);
     box-sizing: border-box;
     transition: all 0.2s ease;
+}
+
+.form-row > div:last-child {
+    flex: 1;
+    min-width: 0;
 }
 
 .form-input:focus {
@@ -202,6 +209,7 @@
     display: flex;
     align-items: center;
     margin-bottom: var(--space-sm);
+    width: 100%;
 }
 
 .location-label-col {
