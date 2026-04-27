@@ -13,12 +13,12 @@ paths:
             description: List all registered devices
             operationId: DeviceMgmtService_ListDevices
             parameters:
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   schema:
                     type: string
@@ -30,7 +30,7 @@ paths:
                     items:
                         type: integer
                         format: enum
-                - name: locationLevel0
+                - name: location_level_0
                   in: query
                   schema:
                     type: string
@@ -38,17 +38,17 @@ paths:
                   in: query
                   schema:
                     type: string
-                - name: createdBy
+                - name: created_by
                   in: query
                   schema:
                     type: string
-                - name: sortBy
+                - name: sort_by
                   in: query
                   description: Sorting
                   schema:
                     type: integer
                     format: enum
-                - name: sortDesc
+                - name: sort_desc
                   in: query
                   schema:
                     type: boolean
@@ -223,12 +223,12 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   schema:
                     type: string
@@ -383,21 +383,21 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   schema:
                     type: string
-                - name: nameFilter
+                - name: name_filter
                   in: query
                   description: Optional filters
                   schema:
                     type: string
-                - name: versionFilter
+                - name: version_filter
                   in: query
                   schema:
                     type: string
@@ -687,37 +687,37 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   schema:
                     type: string
-                - name: uuidFilter
+                - name: uuid_filter
                   in: query
                   description: Optional filters
                   schema:
                     type: string
-                - name: nameFilter
+                - name: name_filter
                   in: query
                   schema:
                     type: string
-                - name: typeFilter
+                - name: type_filter
                   in: query
                   schema:
                     type: string
-                - name: deploymentStatusFilter
+                - name: deployment_status_filter
                   in: query
                   schema:
                     type: string
-                - name: connectionUuidFilter
+                - name: connection_uuid_filter
                   in: query
                   schema:
                     type: string
-                - name: healthStatusFilter
+                - name: health_status_filter
                   in: query
                   schema:
                     type: string
@@ -875,33 +875,33 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   schema:
                     type: string
-                - name: uuidFilter
+                - name: uuid_filter
                   in: query
                   description: Optional filters
                   schema:
                     type: string
-                - name: nameFilter
+                - name: name_filter
                   in: query
                   schema:
                     type: string
-                - name: deploymentStatusFilter
+                - name: deployment_status_filter
                   in: query
                   schema:
                     type: string
-                - name: healthStatusFilter
+                - name: health_status_filter
                   in: query
                   schema:
                     type: string
-                - name: modelNameFilter
+                - name: model_name_filter
                   in: query
                   schema:
                     type: string

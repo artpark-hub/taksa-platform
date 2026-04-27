@@ -432,19 +432,19 @@ enum DeviceSortField {
 }
 
 message ListDevicesRequest {
-  int32  page_size  = 1; // Maximum number of results per page (0 = default)
-  string page_token = 2; // Token from previous response for pagination
+  int32  page_size  = 1 [json_name = "page_size"]; // Maximum number of results per page (0 = default)
+  string page_token = 2 [json_name = "page_token"]; // Token from previous response for pagination
 
   // Filters
   repeated DeviceStatus status = 3; // Filter by status (multiple statuses supported)
-  string location_level_0 = 4; // Filter by enterprise/company level
+  string location_level_0 = 4 [json_name = "location_level_0"]; // Filter by enterprise/company level
 
   string search = 5; // Full-text search in name, serial number
-  string created_by = 8; // Filter by device owner/tenant UUID
+  string created_by = 8 [json_name = "created_by"]; // Filter by device owner/tenant UUID
 
   // Sorting
-  DeviceSortField sort_by   = 6; // Sort field (default: CREATED_AT)
-  bool            sort_desc = 7; // Sort in descending order
+  DeviceSortField sort_by   = 6 [json_name = "sort_by"]; // Sort field (default: CREATED_AT)
+  bool            sort_desc = 7 [json_name = "sort_desc"]; // Sort in descending order
 }
 
 // ListDevicesResponse contains paginated device list
@@ -623,16 +623,16 @@ message ProtocolConverterActionResponse {
 
 message ListProtocolConvertersRequest {
   string device_id  = 1;
-  int32  page_size  = 2; // Maximum number of results per page (0 = default 20, max 100)
-  string page_token = 3; // Token from previous response for pagination
+  int32  page_size  = 2 [json_name = "page_size"]; // Maximum number of results per page (0 = default 20, max 100)
+  string page_token = 3 [json_name = "page_token"]; // Token from previous response for pagination
   
   // Optional filters
-  string uuid_filter = 4; // Filter by exact UUID match
-  string name_filter = 5; // Filter by name (substring match)
-  string type_filter = 6; // Filter by protocol type (e.g., "benthos_opcua"). Empty = all types
-  string deployment_status_filter = 7; // Filter: "PENDING", "ACTIVE", "FAILED". Empty = all statuses
-  string connection_uuid_filter = 8; // Filter by connection UUID
-  string health_status_filter = 9; // Filter by health status: "ONLINE", "OFFLINE", "UNKNOWN"
+  string uuid_filter = 4 [json_name = "uuid_filter"]; // Filter by exact UUID match
+  string name_filter = 5 [json_name = "name_filter"]; // Filter by name (substring match)
+  string type_filter = 6 [json_name = "type_filter"]; // Filter by protocol type (e.g., "benthos_opcua"). Empty = all types
+  string deployment_status_filter = 7 [json_name = "deployment_status_filter"]; // Filter: "PENDING", "ACTIVE", "FAILED". Empty = all statuses
+  string connection_uuid_filter = 8 [json_name = "connection_uuid_filter"]; // Filter by connection UUID
+  string health_status_filter = 9 [json_name = "health_status_filter"]; // Filter by health status: "ONLINE", "OFFLINE", "UNKNOWN"
 }
 
 message ListProtocolConvertersResponse {
@@ -689,8 +689,8 @@ message DataFlowComponentActionResponse {
 
 message ListDataFlowComponentsRequest {
   string device_id  = 1;
-  int32  page_size  = 2; // Maximum number of results per page (0 = default)
-  string page_token = 3; // Token from previous response for pagination
+  int32  page_size  = 2 [json_name = "page_size"]; // Maximum number of results per page (0 = default)
+  string page_token = 3 [json_name = "page_token"]; // Token from previous response for pagination
 }
 
 message ListDataFlowComponentsResponse {
@@ -747,12 +747,12 @@ message DataModelActionResponse {
 
 message ListDataModelsRequest {
   string device_id      = 1;
-  int32  page_size      = 2; // Maximum number of results per page (0 = default 20, max 100)
-  string page_token     = 3; // Token from previous response for pagination
+  int32  page_size      = 2 [json_name = "page_size"]; // Maximum number of results per page (0 = default 20, max 100)
+  string page_token     = 3 [json_name = "page_token"]; // Token from previous response for pagination
   
   // Optional filters
-  string name_filter    = 4; // Filter by name (substring match)
-  string version_filter = 5; // Filter by version (exact match, e.g., "1.0.0")
+  string name_filter    = 4 [json_name = "name_filter"]; // Filter by name (substring match)
+  string version_filter = 5 [json_name = "version_filter"]; // Filter by version (exact match, e.g., "1.0.0")
 }
 
 message ListDataModelsResponse {
@@ -823,15 +823,15 @@ message StreamProcessorModelRef {
 
 message ListStreamProcessorsRequest {
   string device_id  = 1;
-  int32  page_size  = 2; // Maximum number of results per page (0 = default 20, max 100)
-  string page_token = 3; // Token from previous response for pagination
+  int32  page_size  = 2 [json_name = "page_size"]; // Maximum number of results per page (0 = default 20, max 100)
+  string page_token = 3 [json_name = "page_token"]; // Token from previous response for pagination
   
   // Optional filters
-  string uuid_filter = 4; // Filter by exact UUID match
-  string name_filter = 5; // Filter by name (substring match)
-  string deployment_status_filter = 6; // Filter: "PENDING", "ACTIVE", "FAILED". Empty = all statuses
-  string health_status_filter = 7; // Filter by health status: "ONLINE", "OFFLINE", "UNKNOWN". Empty = all
-  string model_name_filter = 8; // Filter by model name (substring match)
+  string uuid_filter = 4 [json_name = "uuid_filter"]; // Filter by exact UUID match
+  string name_filter = 5 [json_name = "name_filter"]; // Filter by name (substring match)
+  string deployment_status_filter = 6 [json_name = "deployment_status_filter"]; // Filter: "PENDING", "ACTIVE", "FAILED". Empty = all statuses
+  string health_status_filter = 7 [json_name = "health_status_filter"]; // Filter by health status: "ONLINE", "OFFLINE", "UNKNOWN". Empty = all
+  string model_name_filter = 8 [json_name = "model_name_filter"]; // Filter by model name (substring match)
 }
 
 message ListStreamProcessorsResponse {
