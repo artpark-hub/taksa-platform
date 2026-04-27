@@ -14,7 +14,8 @@ type PendingContext = {
     created_at: number;
 };
 
-const getSecret = () => process.env.TAKSA_UI_CONTEXT_SECRET || process.env.NEXTAUTH_SECRET || '';
+const _fallbackSecret = require('crypto').randomBytes(32).toString('hex');
+const getSecret = () => process.env.TAKSA_UI_CONTEXT_SECRET || process.env.NEXTAUTH_SECRET || _fallbackSecret;
 
 const toBase64Url = (value: string | Uint8Array) => {
     const base64 = Buffer.from(value).toString('base64');
