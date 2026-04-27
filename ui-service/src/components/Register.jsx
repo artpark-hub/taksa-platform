@@ -154,9 +154,10 @@ const Register = () => {
 
     const fetchOrganizationId = async () => {
         const orgIdRes = await fetch('/api/v1/um/generate_organization_id', {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-            credentials: 'include'
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({})
         });
 
         const orgIdData = await orgIdRes.json().catch(() => ({}));
