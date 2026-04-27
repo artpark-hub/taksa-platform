@@ -14,7 +14,34 @@ type PendingContext = {
     created_at: number;
 };
 
-const getSecret = () => process.env.TAKSA_UI_CONTEXT_SECRET || process.env.NEXTAUTH_SECRET || '';
+let devFallbackSecret: string | undefined;
+let hasWarnedAboutDevFallback = false;
+
+const createFallbackSecret = () => {
+    const bytes = new Uint8Array(32);
+    globalThis.crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+
+const getSecret = (): string | undefined => {
+    const configuredSecret = process.env.TAKSA_UI_CONTEXT_SECRET || process.env.NEXTAUTH_SECRET;
+    if (configuredSecret) return configuredSecret;
+
+    if (process.env.NODE_ENV === 'production') {
+        return undefined;
+    }
+
+    if (!devFallbackSecret) {
+        devFallbackSecret = createFallbackSecret();
+    }
+
+    if (!hasWarnedAboutDevFallback) {
+        console.warn('Using generated dev fallback for Google register context secret. Set TAKSA_UI_CONTEXT_SECRET or NEXTAUTH_SECRET to avoid this warning.');
+        hasWarnedAboutDevFallback = true;
+    }
+
+    return devFallbackSecret;
+};
 
 const toBase64Url = (value: string | Uint8Array) => {
     const base64 = Buffer.from(value).toString('base64');

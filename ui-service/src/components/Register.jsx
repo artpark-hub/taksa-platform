@@ -85,7 +85,10 @@ const Register = () => {
                 Accept: 'application/json'
             },
             credentials: 'include',
-            body: JSON.stringify(pendingContext)
+            body: JSON.stringify({
+                organizationName: pendingContext?.organization_name,
+                organizationId: pendingContext?.organization_id
+            })
         });
 
         return response.ok;
