@@ -432,19 +432,19 @@ enum DeviceSortField {
 }
 
 message ListDevicesRequest {
-  int32  page_size  = 1; // Maximum number of results per page (0 = default)
-  string page_token = 2; // Token from previous response for pagination
+  int32  page_size  = 1 [json_name = "page_size"]; // Maximum number of results per page (0 = default)
+  string page_token = 2 [json_name = "page_token"]; // Token from previous response for pagination
 
   // Filters
   repeated DeviceStatus status = 3; // Filter by status (multiple statuses supported)
-  string location_level_0 = 4; // Filter by enterprise/company level
+  string location_level_0 = 4 [json_name = "location_level_0"]; // Filter by enterprise/company level
 
   string search = 5; // Full-text search in name, serial number
-  string created_by = 8; // Filter by device owner/tenant UUID
+  string created_by = 8 [json_name = "created_by"]; // Filter by device owner/tenant UUID
 
   // Sorting
-  DeviceSortField sort_by   = 6; // Sort field (default: CREATED_AT)
-  bool            sort_desc = 7; // Sort in descending order
+  DeviceSortField sort_by   = 6 [json_name = "sort_by"]; // Sort field (default: CREATED_AT)
+  bool            sort_desc = 7 [json_name = "sort_desc"]; // Sort in descending order
 }
 
 // ListDevicesResponse contains paginated device list
@@ -623,16 +623,16 @@ message ProtocolConverterActionResponse {
 
 message ListProtocolConvertersRequest {
   string device_id  = 1;
-  int32  page_size  = 2; // Maximum number of results per page (0 = default 20, max 100)
-  string page_token = 3; // Token from previous response for pagination
+  int32  page_size  = 2 [json_name = "page_size"]; // Maximum number of results per page (0 = default 20, max 100)
+  string page_token = 3 [json_name = "page_token"]; // Token from previous response for pagination
   
   // Optional filters
-  string uuid_filter = 4; // Filter by exact UUID match
-  string name_filter = 5; // Filter by name (substring match)
-  string type_filter = 6; // Filter by protocol type (e.g., "benthos_opcua"). Empty = all types
-  string deployment_status_filter = 7; // Filter: "PENDING", "ACTIVE", "FAILED". Empty = all statuses
-  string connection_uuid_filter = 8; // Filter by connection UUID
-  string health_status_filter = 9; // Filter by health status: "ONLINE", "OFFLINE", "UNKNOWN"
+  string uuid_filter = 4 [json_name = "uuid_filter"]; // Filter by exact UUID match
+  string name_filter = 5 [json_name = "name_filter"]; // Filter by name (substring match)
+  string type_filter = 6 [json_name = "type_filter"]; // Filter by protocol type (e.g., "benthos_opcua"). Empty = all types
+  string deployment_status_filter = 7 [json_name = "deployment_status_filter"]; // Filter: "PENDING", "ACTIVE", "FAILED". Empty = all statuses
+  string connection_uuid_filter = 8 [json_name = "connection_uuid_filter"]; // Filter by connection UUID
+  string health_status_filter = 9 [json_name = "health_status_filter"]; // Filter by health status: "ONLINE", "OFFLINE", "UNKNOWN"
 }
 
 message ListProtocolConvertersResponse {
@@ -689,8 +689,8 @@ message DataFlowComponentActionResponse {
 
 message ListDataFlowComponentsRequest {
   string device_id  = 1;
-  int32  page_size  = 2; // Maximum number of results per page (0 = default)
-  string page_token = 3; // Token from previous response for pagination
+  int32  page_size  = 2 [json_name = "page_size"]; // Maximum number of results per page (0 = default)
+  string page_token = 3 [json_name = "page_token"]; // Token from previous response for pagination
 }
 
 message ListDataFlowComponentsResponse {
@@ -747,12 +747,12 @@ message DataModelActionResponse {
 
 message ListDataModelsRequest {
   string device_id      = 1;
-  int32  page_size      = 2; // Maximum number of results per page (0 = default 20, max 100)
-  string page_token     = 3; // Token from previous response for pagination
+  int32  page_size      = 2 [json_name = "page_size"]; // Maximum number of results per page (0 = default 20, max 100)
+  string page_token     = 3 [json_name = "page_token"]; // Token from previous response for pagination
   
   // Optional filters
-  string name_filter    = 4; // Filter by name (substring match)
-  string version_filter = 5; // Filter by version (exact match, e.g., "1.0.0")
+  string name_filter    = 4 [json_name = "name_filter"]; // Filter by name (substring match)
+  string version_filter = 5 [json_name = "version_filter"]; // Filter by version (exact match, e.g., "1.0.0")
 }
 
 message ListDataModelsResponse {
@@ -786,12 +786,12 @@ message DeployStreamProcessorRequest {
 message EditStreamProcessorRequest {
   string                      device_id = 1;
   string                      uuid = 2; // Stream processor UUID to edit (path parameter, required)
-  string                      name = 3; // Optional: new name
-  google.protobuf.Struct      config = 4; // Optional: new config (JSON)
-  string                      model_name = 5; // Optional: update model name
-  string                      model_version = 6; // Optional: update model version
+  string                      name = 3; // Required: name of the stream processor
+  google.protobuf.Struct      config = 4; // Required: new config (JSON)
+  string                      model_name = 5; // Required: model name (must match a DataModel)
+  string                      model_version = 6; // Required: model version (must match a DataModel version)
   map<int32, string>          location = 7; // Optional: update location
-  bool                        ignore_health_check = 8;
+  bool                        ignore_health_check = 8; // Optional: ignore health check
 }
 
 message DeleteStreamProcessorRequest {
@@ -812,12 +812,26 @@ message StreamProcessorActionResponse {
   string                    uuid          = 5; // Stream processor UUID (populated on success)
   string                    name          = 6; // Stream processor name (populated on success)
   google.protobuf.Struct    config        = 7; // Decoded config (sources and mappings)
+  StreamProcessorModelRef   model         = 8; // Data model reference (name and version)
+  map<int32, string>        location      = 9; // Location hierarchy (populated on success)
+}
+
+message StreamProcessorModelRef {
+  string name    = 1; // Data model name
+  string version = 2; // Data model version
 }
 
 message ListStreamProcessorsRequest {
   string device_id  = 1;
-  int32  page_size  = 2; // Maximum number of results per page (0 = default)
-  string page_token = 3; // Token from previous response for pagination
+  int32  page_size  = 2 [json_name = "page_size"]; // Maximum number of results per page (0 = default 20, max 100)
+  string page_token = 3 [json_name = "page_token"]; // Token from previous response for pagination
+  
+  // Optional filters
+  string uuid_filter = 4 [json_name = "uuid_filter"]; // Filter by exact UUID match
+  string name_filter = 5 [json_name = "name_filter"]; // Filter by name (substring match)
+  string deployment_status_filter = 6 [json_name = "deployment_status_filter"]; // Filter: "PENDING", "ACTIVE", "FAILED". Empty = all statuses
+  string health_status_filter = 7 [json_name = "health_status_filter"]; // Filter by health status: "ONLINE", "OFFLINE", "UNKNOWN". Empty = all
+  string model_name_filter = 8 [json_name = "model_name_filter"]; // Filter by model name (substring match)
 }
 
 message ListStreamProcessorsResponse {
@@ -826,9 +840,13 @@ message ListStreamProcessorsResponse {
 }
 
 message StreamProcessorSummary {
-  string                                  uuid  = 1;
-  string                                  name  = 2;
-  api.umh_core.v2.StreamProcessorModelRef model = 3;
+  string                                  uuid              = 1;
+  string                                  name              = 2;
+  api.umh_core.v2.StreamProcessorModelRef model             = 3;
+  string                                  deployment_status = 4; // "PENDING", "ACTIVE", or "FAILED"
+  string                                  health_status     = 5; // "ONLINE", "OFFLINE", or "UNKNOWN"
+  string                                  last_sync_time    = 6; // RFC3339 timestamp of last StatusMessage sync
+  string                                  error_message     = 7; // Only populated if deployment_status="FAILED"
 }
 
 // ============================================================================

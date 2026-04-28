@@ -13,12 +13,12 @@ paths:
             description: List all registered devices
             operationId: DeviceMgmtService_ListDevices
             parameters:
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   schema:
                     type: string
@@ -30,7 +30,7 @@ paths:
                     items:
                         type: integer
                         format: enum
-                - name: locationLevel0
+                - name: location_level_0
                   in: query
                   schema:
                     type: string
@@ -38,17 +38,17 @@ paths:
                   in: query
                   schema:
                     type: string
-                - name: createdBy
+                - name: created_by
                   in: query
                   schema:
                     type: string
-                - name: sortBy
+                - name: sort_by
                   in: query
                   description: Sorting
                   schema:
                     type: integer
                     format: enum
-                - name: sortDesc
+                - name: sort_desc
                   in: query
                   schema:
                     type: boolean
@@ -223,12 +223,12 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   schema:
                     type: string
@@ -383,21 +383,21 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   schema:
                     type: string
-                - name: nameFilter
+                - name: name_filter
                   in: query
                   description: Optional filters
                   schema:
                     type: string
-                - name: versionFilter
+                - name: version_filter
                   in: query
                   schema:
                     type: string
@@ -687,37 +687,37 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
                   in: query
                   schema:
                     type: string
-                - name: uuidFilter
+                - name: uuid_filter
                   in: query
                   description: Optional filters
                   schema:
                     type: string
-                - name: nameFilter
+                - name: name_filter
                   in: query
                   schema:
                     type: string
-                - name: typeFilter
+                - name: type_filter
                   in: query
                   schema:
                     type: string
-                - name: deploymentStatusFilter
+                - name: deployment_status_filter
                   in: query
                   schema:
                     type: string
-                - name: connectionUuidFilter
+                - name: connection_uuid_filter
                   in: query
                   schema:
                     type: string
-                - name: healthStatusFilter
+                - name: health_status_filter
                   in: query
                   schema:
                     type: string
@@ -875,12 +875,33 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: pageSize
+                - name: page_size
                   in: query
                   schema:
                     type: integer
                     format: int32
-                - name: pageToken
+                - name: page_token
+                  in: query
+                  schema:
+                    type: string
+                - name: uuid_filter
+                  in: query
+                  description: Optional filters
+                  schema:
+                    type: string
+                - name: name_filter
+                  in: query
+                  schema:
+                    type: string
+                - name: deployment_status_filter
+                  in: query
+                  schema:
+                    type: string
+                - name: health_status_filter
+                  in: query
+                  schema:
+                    type: string
+                - name: model_name_filter
                   in: query
                   schema:
                     type: string
@@ -1673,6 +1694,19 @@ components:
                     type: string
                 config:
                     type: object
+                model:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.StreamProcessorModelRef'
+                location:
+                    type: object
+                    additionalProperties:
+                        type: string
+        api.devicemgmt.v1.StreamProcessorModelRef:
+            type: object
+            properties:
+                name:
+                    type: string
+                version:
+                    type: string
         api.devicemgmt.v1.StreamProcessorSummary:
             type: object
             properties:
@@ -1682,6 +1716,14 @@ components:
                     type: string
                 model:
                     $ref: '#/components/schemas/api.umh_core.v2.StreamProcessorModelRef'
+                deploymentStatus:
+                    type: string
+                healthStatus:
+                    type: string
+                lastSyncTime:
+                    type: string
+                errorMessage:
+                    type: string
         api.devicemgmt.v1.UpdateDeviceRequest:
             type: object
             properties:
@@ -2139,6 +2181,9 @@ components:
                     $ref: '#/components/schemas/api.common.CompanyDetails'
                 jwtToken:
                     type: string
+                expiresAt:
+                    type: string
+                    format: date-time
             description: "LoginResponse returns device information and authentication token\n Matches umh-core's InstanceLoginResponse (backend_api_structs/backend_api_struct.go:119-125)\n but includes jwtToken for device-management client convenience\n \n CRITICAL: Uses common.CompanyDetails and common.LicenseStatus for wire protocol compatibility\n These are the exact types that umh-core sends, ensuring 100% compatibility"
         api.umh_core.v2.Memory:
             type: object

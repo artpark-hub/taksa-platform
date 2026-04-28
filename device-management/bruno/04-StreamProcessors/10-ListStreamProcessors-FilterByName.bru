@@ -1,0 +1,60 @@
+meta {
+  name: List Stream Processors Filter by Name
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors?name_filter=processor
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Filter stream processors by name (substring search).
+  
+  This is useful to find processors whose names contain specific text.
+  
+  Query Parameter:
+  - name_filter: Substring to search for in processor names (case-sensitive)
+  
+  Returns:
+  - All processors whose names contain the substring
+  - Empty result if no matches
+  
+  Examples:
+  - name_filter=processor (find all processors containing "processor")
+  - name_filter=metrics (find processors related to metrics)
+  - name_filter=transform (find transformation processors)
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.processors) {
+    console.log("✓ Found " + resp.processors.length + " processor(s) matching name filter");
+    
+    resp.processors.forEach((sp) => {
+      console.log(`  - ${sp.name}`);
+    });
+  } else {
+    console.log("✓ No processors match the name filter");
+  }
+}
+
+tests {
+  test("Name filter request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("All results match name filter (contain 'processor')", function() {
+    const resp = res.getBody();
+    if (resp.processors) {
+      resp.processors.forEach((sp) => {
+        expect(sp.name.toLowerCase()).to.include('processor');
+      });
+    }
+  });
+}

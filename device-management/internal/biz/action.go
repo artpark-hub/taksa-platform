@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
@@ -40,6 +41,12 @@ func (uc *ActionUsecase) QueueAction(ctx context.Context, req *QueueActionReques
 		return nil, fmt.Errorf("action payload cannot be empty if provided")
 	}
 
+	// Get tenant_id from context (set by middleware from JWT)
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, fmt.Errorf("tenant_id not found in context")
+	}
+
 	// Check device exists
 	_, err := uc.store.Devices().GetByID(ctx, req.DeviceID)
 	if err != nil {
@@ -63,8 +70,8 @@ func (uc *ActionUsecase) QueueAction(ctx context.Context, req *QueueActionReques
 		action.ExpiresAt = time.Now().Add(time.Duration(req.TTLSeconds) * time.Second)
 	}
 
-	// Save
-	if err := uc.store.Actions().Save(ctx, action); err != nil {
+	// Save with tenant isolation
+	if err := uc.store.Actions().Save(ctx, tenantID, action); err != nil {
 		return nil, fmt.Errorf("failed to save action: %w", err)
 	}
 
@@ -72,13 +79,16 @@ func (uc *ActionUsecase) QueueAction(ctx context.Context, req *QueueActionReques
 }
 
 // CancelAction cancels a pending action
-func (uc *ActionUsecase) CancelAction(ctx context.Context, actionID string) error {
+func (uc *ActionUsecase) CancelAction(ctx context.Context, tenantID, actionID string) error {
 	if actionID == "" {
 		return fmt.Errorf("action ID is empty")
 	}
+	if tenantID == "" {
+		return fmt.Errorf("tenant ID is empty")
+	}
 
 	// Get action
-	action, err := uc.store.Actions().GetByID(ctx, actionID)
+	action, err := uc.store.Actions().GetByID(ctx, tenantID, actionID)
 	if err != nil {
 		return fmt.Errorf("action not found: %w", err)
 	}
@@ -89,7 +99,7 @@ func (uc *ActionUsecase) CancelAction(ctx context.Context, actionID string) erro
 	}
 
 	// Mark as cancelled
-	return uc.store.Actions().UpdateStatus(ctx, actionID, models.ActionStatusCancelled)
+	return uc.store.Actions().UpdateStatus(ctx, tenantID, actionID, models.ActionStatusCancelled)
 }
 
 // ListActions retrieves actions for a device
@@ -102,53 +112,73 @@ func (uc *ActionUsecase) ListActions(ctx context.Context, deviceID string, filte
 		filters = &storage.ActionListFilter{Page: 1, PageSize: 50}
 	}
 
+	// Ensure tenantID is in filter (caller should set it, but validate)
+	if filters.TenantID == "" {
+		return nil, 0, fmt.Errorf("tenant ID is required in filter")
+	}
+
 	return uc.store.Actions().ListForDevice(ctx, deviceID, filters)
 }
 
-// GetAction retrieves an action by ID
-func (uc *ActionUsecase) GetAction(ctx context.Context, actionID string) (*models.Action, error) {
+// GetAction retrieves an action by ID - requires tenant context
+func (uc *ActionUsecase) GetAction(ctx context.Context, tenantID, actionID string) (*models.Action, error) {
 	if actionID == "" {
 		return nil, fmt.Errorf("action ID is empty")
 	}
+	if tenantID == "" {
+		return nil, fmt.Errorf("tenant ID is empty")
+	}
 
-	return uc.store.Actions().GetByID(ctx, actionID)
+	return uc.store.Actions().GetByID(ctx, tenantID, actionID)
 }
 
 // MarkActionDelivered marks an action as delivered to device
-func (uc *ActionUsecase) MarkActionDelivered(ctx context.Context, actionID string) error {
+func (uc *ActionUsecase) MarkActionDelivered(ctx context.Context, tenantID, actionID string) error {
 	if actionID == "" {
 		return fmt.Errorf("action ID is empty")
 	}
+	if tenantID == "" {
+		return fmt.Errorf("tenant ID is empty")
+	}
 
-	return uc.store.Actions().MarkDelivered(ctx, actionID)
+	return uc.store.Actions().MarkDelivered(ctx, tenantID, actionID)
 }
 
 // MarkActionCompleted marks an action as successfully completed
-func (uc *ActionUsecase) MarkActionCompleted(ctx context.Context, actionID string) error {
+func (uc *ActionUsecase) MarkActionCompleted(ctx context.Context, tenantID, actionID string) error {
 	if actionID == "" {
 		return fmt.Errorf("action ID is empty")
 	}
+	if tenantID == "" {
+		return fmt.Errorf("tenant ID is empty")
+	}
 
-	return uc.store.Actions().MarkCompleted(ctx, actionID)
+	return uc.store.Actions().MarkCompleted(ctx, tenantID, actionID)
 }
 
 // MarkActionFailed marks an action as failed
-func (uc *ActionUsecase) MarkActionFailed(ctx context.Context, actionID string) error {
+func (uc *ActionUsecase) MarkActionFailed(ctx context.Context, tenantID, actionID string) error {
 	if actionID == "" {
 		return fmt.Errorf("action ID is empty")
 	}
+	if tenantID == "" {
+		return fmt.Errorf("tenant ID is empty")
+	}
 
-	return uc.store.Actions().MarkFailed(ctx, actionID)
+	return uc.store.Actions().MarkFailed(ctx, tenantID, actionID)
 }
 
 // RetryAction increments retry count for a failed action
-func (uc *ActionUsecase) RetryAction(ctx context.Context, actionID string) error {
+func (uc *ActionUsecase) RetryAction(ctx context.Context, tenantID, actionID string) error {
 	if actionID == "" {
 		return fmt.Errorf("action ID is empty")
 	}
+	if tenantID == "" {
+		return fmt.Errorf("tenant ID is empty")
+	}
 
 	// Get action
-	action, err := uc.store.Actions().GetByID(ctx, actionID)
+	action, err := uc.store.Actions().GetByID(ctx, tenantID, actionID)
 	if err != nil {
 		return fmt.Errorf("action not found: %w", err)
 	}
@@ -159,12 +189,12 @@ func (uc *ActionUsecase) RetryAction(ctx context.Context, actionID string) error
 	}
 
 	// Reset status to QUEUED for retry
-	if err := uc.store.Actions().UpdateStatus(ctx, actionID, models.ActionStatusQueued); err != nil {
+	if err := uc.store.Actions().UpdateStatus(ctx, tenantID, actionID, models.ActionStatusQueued); err != nil {
 		return fmt.Errorf("failed to reset action status: %w", err)
 	}
 
 	// Increment retry count
-	return uc.store.Actions().IncrementRetry(ctx, actionID)
+	return uc.store.Actions().IncrementRetry(ctx, tenantID, actionID)
 }
 
 // QueueActionRequest represents a request to queue a new action

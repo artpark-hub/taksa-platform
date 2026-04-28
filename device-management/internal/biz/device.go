@@ -11,6 +11,7 @@ import (
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/pkg/cert"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
@@ -83,18 +84,24 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 	// Update device with certificate (private key is device-side, not stored)
 	device.Certificate = deviceCert.Certificate
 
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, fmt.Errorf("tenant_id not found in context")
+	}
+
 	// Save device FIRST (before certificate/token creation so FK constraints are satisfied)
 	if err := uc.store.Devices().Save(ctx, device); err != nil {
 		return nil, fmt.Errorf("failed to save device: %w", err)
 	}
 
-	// Save device certificate AFTER device exists
-	if err := uc.store.Certificates().DeviceStore().SaveDevice(ctx, device.Id, deviceCert); err != nil {
+	// Save device certificate AFTER device exists with tenant isolation
+	if err := uc.store.Certificates().DeviceStore().SaveDevice(ctx, tenantID, device.Id, deviceCert); err != nil {
 		return nil, fmt.Errorf("failed to create device certificate: %w", err)
 	}
 
-	// Create auth token AFTER device is saved
-	token, err := uc.authUc.CreateAuthToken(ctx, device.Id, 7)
+	// Create auth token AFTER device is saved with tenant isolation
+	token, err := uc.authUc.CreateAuthToken(ctx, tenantID, device.Id, 7)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auth token: %w", err)
 	}
@@ -112,8 +119,8 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 	dockerCmd := uc.buildDockerCommand(device.Name, device.Location, token)
 
 	return &RegisterDeviceResponse{
-		Device:       deviceToSummary(device),
-		AuthToken:    token,
+		Device:    deviceToSummary(device),
+		AuthToken: token,
 		Instructions: map[string]string{
 			"docker_command": dockerCmd,
 		},
@@ -166,20 +173,20 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 	}
 
 	messages, _, err := uc.store.Messages().ListHistory(ctx, filter)
-	
+
 	// Build response based on device's current state
 	resp := &GetDeviceHealthResponse{
 		DeviceId:    deviceID,
 		LastUpdated: device.LastSeen, // Use device's last_seen from Pull API heartbeat
-		Status:      nil,              // Status message not yet implemented
-		StatusB64:   "",               // Will be populated when Status message is sent
+		Status:      nil,             // Status message not yet implemented
+		StatusB64:   "",              // Will be populated when Status message is sent
 	}
 
 	// Check if device has recent activity (within last 30 seconds)
 	if device.LastSeen != nil {
 		lastSeenTime := time.Unix(device.LastSeen.Seconds, int64(device.LastSeen.Nanos))
 		timeSinceLastSeen := time.Since(lastSeenTime)
-		
+
 		if timeSinceLastSeen < 30*time.Second {
 			resp.ErrorMessage = "" // Device is healthy - recently seen
 		} else if timeSinceLastSeen < 5*time.Minute {
@@ -195,7 +202,7 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 	// Currently looking for status-type messages (future enhancement)
 	if len(messages) > 0 && messages[0] != nil {
 		msg := messages[0]
-		
+
 		// Look for StatusMessage in message content
 		// The Content field contains base64-encoded JSON with the message payload
 		if msg.Content != "" && msg.Type == "StatusMessage" {
@@ -209,12 +216,12 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 
 // GetDeviceHealthResponse contains health metrics
 type GetDeviceHealthResponse struct {
-	DeviceId      string
-	LastUpdated   *timestamppb.Timestamp
-	Status        *v2.StatusMessage
-	StatusB64     string // Base64-encoded StatusMessage fallback
+	DeviceId        string
+	LastUpdated     *timestamppb.Timestamp
+	Status          *v2.StatusMessage
+	StatusB64       string // Base64-encoded StatusMessage fallback
 	DeviceTimestamp *timestamppb.Timestamp
-	ErrorMessage  string
+	ErrorMessage    string
 }
 
 // deviceToSummary converts a full Device to a DeviceSummary (lightweight version)
@@ -282,8 +289,15 @@ func (uc *DeviceUsecase) DeleteDevice(ctx context.Context, deviceID string) erro
 		return fmt.Errorf("device ID is empty")
 	}
 
-	// Delete associated data
-	_ = uc.store.Actions().DeleteByDeviceID(ctx, deviceID)
+	// Multi-tenancy: extract tenant_id from context for deletion queries
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return fmt.Errorf("tenant_id not found in context")
+	}
+
+	// Delete associated data with tenant isolation
+	_ = uc.store.Actions().DeleteByDeviceID(ctx, tenantID, deviceID)
+	_ = uc.store.AuthTokens().DeleteByDeviceID(ctx, tenantID, deviceID)
 	_ = uc.store.Messages().DeleteByDeviceID(ctx, deviceID)
 	_ = uc.store.Certificates().DeleteByDevice(ctx, deviceID)
 
@@ -340,7 +354,7 @@ func (uc *DeviceUsecase) buildDockerCommand(
 	cmd += fmt.Sprintf(" -v umh-core-data-%s:/data", sanitizedName)
 
 	// Add auth token
-	cmd += fmt.Sprintf(` -e AUTH_TOKEN="%s"`, authToken)
+	cmd += fmt.Sprintf(" -e AUTH_TOKEN=%s", authToken)
 
 	// Add release channel
 	cmd += " -e RELEASE_CHANNEL=stable"
@@ -358,7 +372,7 @@ func (uc *DeviceUsecase) buildDockerCommand(
 
 	// Add API URL
 	apiURL := fmt.Sprintf("%s/api", strings.TrimSuffix(baseURL, "/"))
-	cmd += fmt.Sprintf(` -e API_URL="%s"`, apiURL)
+	cmd += fmt.Sprintf(" -e API_URL=%s", apiURL)
 
 	// Add docker image
 	cmd += fmt.Sprintf(" %s", dockerImage)

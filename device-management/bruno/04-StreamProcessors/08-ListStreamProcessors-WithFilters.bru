@@ -1,0 +1,94 @@
+meta {
+  name: List Stream Processors With Filters
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors?name_filter=processor&deployment_status_filter=ACTIVE
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  List stream processors with filtering.
+  
+  This example demonstrates how to filter stream processors using multiple filters.
+  
+  Available Filters (all optional):
+  - uuid_filter: Exact UUID match
+  - name_filter: Substring search in processor name
+  - deployment_status_filter: Status: PENDING, ACTIVE, or FAILED
+  - health_status_filter: Status: ONLINE, OFFLINE, or UNKNOWN
+  - model_name_filter: Substring search in model name
+  
+  Filters can be combined (AND logic).
+  
+  Example Query (name contains "processor" AND deployment status is ACTIVE):
+  ?name_filter=processor&deployment_status_filter=ACTIVE
+  
+  All filters are optional. Empty = no filter applied.
+  
+  Status Field Definitions:
+  - deployment_status: Maps from device Health.State
+    - PENDING: Starting/pending state
+    - ACTIVE: Actively running
+    - FAILED: Error or failed state
+  
+  - health_status: Maps from device Health.Category
+    - ONLINE: Actively communicating
+    - OFFLINE: Not responding
+    - UNKNOWN: Health not yet determined
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.processors) {
+    console.log("✓ Retrieved " + resp.processors.length + " filtered processors");
+    
+    const statuses = new Set();
+    const deploymentStatuses = new Set();
+    
+    resp.processors.forEach((sp) => {
+      if (sp.healthStatus) statuses.add(sp.healthStatus);
+      if (sp.deploymentStatus) deploymentStatuses.add(sp.deploymentStatus);
+    });
+    
+    console.log("  Health Statuses: " + Array.from(statuses).join(", "));
+    console.log("  Deployment Statuses: " + Array.from(deploymentStatuses).join(", "));
+  }
+}
+
+tests {
+  test("Filtered list retrieved successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response structure is valid", function() {
+    const resp = res.getBody();
+    if (resp.processors) {
+      expect(resp.processors).to.be.an('array');
+    }
+  });
+  
+  test("All processors match name filter (contains 'processor')", function() {
+    const resp = res.getBody();
+    if (resp.processors && resp.processors.length > 0) {
+      resp.processors.forEach((sp) => {
+        expect(sp.name.toLowerCase()).to.include('processor');
+      });
+    }
+  });
+  
+  test("All processors match deployment status filter (ACTIVE)", function() {
+    const resp = res.getBody();
+    if (resp.processors && resp.processors.length > 0) {
+      resp.processors.forEach((sp) => {
+        expect(sp.deploymentStatus).to.equal('ACTIVE');
+      });
+    }
+  });
+}

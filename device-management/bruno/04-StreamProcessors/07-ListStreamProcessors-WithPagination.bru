@@ -1,0 +1,75 @@
+meta {
+  name: List Stream Processors With Pagination
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors?page_size=2
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  List stream processors with pagination support.
+  
+  This example demonstrates cursor-based pagination using page tokens.
+  
+  Query Parameters:
+  - page_size: Number of results per page (default 20, max 100)
+  - page_token: Token from previous response to get next page
+  
+  Pagination Flow:
+  1. First request: ?page_size=2 (no page_token)
+  2. Response includes next_page_token if more results exist
+  3. Second request: ?page_size=2&page_token=<token_from_previous>
+  4. Continue until next_page_token is empty (last page)
+  
+  Benefits:
+  - Efficient for large result sets
+  - No duplicate results when data changes between requests
+  - Consistent ordering (ORDER BY created_at DESC)
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.processors) {
+    console.log("✓ Retrieved page with " + resp.processors.length + " processor(s)");
+    
+    resp.processors.forEach((sp) => {
+      console.log(`  - ${sp.name} (${sp.uuid})`);
+    });
+    
+    if (resp.nextPageToken) {
+      console.log("  ✓ More results available");
+      console.log("  Next page token: " + resp.nextPageToken.substring(0, 20) + "...");
+      // Store for next pagination request
+      bru.setEnvVar('stream_processor_page_token', resp.nextPageToken);
+    } else {
+      console.log("  ✓ Last page reached");
+    }
+  }
+}
+
+tests {
+  test("Pagination request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response structure is valid", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('processors');
+    expect(resp.processors).to.be.an('array');
+    expect(resp.processors.length).to.be.at.most(2);
+  });
+  
+  test("Page size limit is respected", function() {
+    const resp = res.getBody();
+    if (resp.processors) {
+      expect(resp.processors.length).to.be.at.most(2);
+    }
+  });
+}

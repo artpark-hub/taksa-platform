@@ -14,10 +14,12 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gopkg.in/yaml.v3"
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
@@ -30,6 +32,15 @@ func generateUUID() string {
 // encodeBase64 encodes a string to base64
 func encodeBase64(s string) string {
 	return base64.StdEncoding.EncodeToString([]byte(s))
+}
+
+// redactHash returns a safe preview of a hash for logging (first 6 + last 6 chars with ... in between)
+// Useful for debugging without exposing the full credential
+func redactHash(s string) string {
+	if len(s) <= 12 {
+		return "***REDACTED***"
+	}
+	return s[:6] + "..." + s[len(s)-6:]
 }
 
 // decompressIfNeeded detects and decompresses gzip or zstd compressed data.
@@ -101,24 +112,47 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 //
 // Validates the token hash, retrieves device information, and issues a JWT token.
 // Device must send: Authorization: Bearer <SHA3(SHA3(token))>
-// On successful login, renews the auth token's expiry to 7 days from now.
+// On successful login, renews the auth token's expiry and includes tenant_id in JWT for multi-tenancy isolation.
+//
+// DEVICE RETRY PATTERN:
+// If Pull returns 401 Unauthenticated (expired/invalid JWT), device should:
+//  1. Call Login with stored auth token to refresh JWT
+//  2. Store returned JWT in "token" cookie
+//  3. Retry the failed Pull request
+// This handles service restarts and token expiry gracefully.
+//
+// MULTI-TENANCY FLOW:
+//  1. ValidateAuthToken does system-wide search (tokens are cryptographically unique)
+//  2. Get device to extract tenant_id from device.CreatedBy
+//  3. Inject tenant_id into context
+//  4. Pass context to RenewAuthToken and GenerateJWT with tenant isolation
 func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginResponse, error) {
-
-	fmt.Printf("DEBUG: Received tokenHash '%s' and length '%d' for login\n", tokenHash, len(tokenHash))
 
 	if tokenHash == "" {
 		return nil, fmt.Errorf("token hash is empty")
 	}
 
-	deviceID, token, err := uc.authUc.ValidateAuthToken(ctx, tokenHash)
+	// Log hash preview (first 6 + last 6 chars) for debugging without exposing full credential
+	hashPreview := redactHash(tokenHash)
+	fmt.Printf("DEBUG: Login attempt with tokenHash (preview: %s, length: %d)\n", hashPreview, len(tokenHash))
+
+	// ValidateAuthToken resolves device_id and tenant_id from the auth token in one lookup
+	deviceID, tenantID, token, err := uc.authUc.ValidateAuthToken(ctx, tokenHash)
 	if err != nil {
 		return nil, fmt.Errorf("invalid token: %w", err)
 	}
 
+	// Fetch device BEFORE setting tenant context — during login the tenant_id
+	// in auth_tokens may differ from devices (e.g., after migration). The device
+	// lookup must be by ID only; tenant scoping starts after login completes.
 	device, err := uc.store.Devices().GetByID(ctx, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("device not found: %w", err)
 	}
+
+	// Now inject tenant_id and device_id into context for downstream operations
+	ctx = middleware.SetTenantID(ctx, tenantID)
+	ctx = middleware.SetDeviceID(ctx, deviceID)
 
 	// Record login activity and transition device to ACTIVE on first successful login
 	_ = uc.store.Devices().UpdateLastLogin(ctx, deviceID, time.Now())
@@ -126,8 +160,8 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 		_ = uc.store.Devices().UpdateStatus(ctx, deviceID, v1.DeviceStatus_ACTIVE)
 	}
 
-	// Renew auth token expiry to 50 years from now (active devices stay valid indefinitely)
-	if err := uc.authUc.RenewAuthToken(ctx, token); err != nil {
+	// Renew auth token expiry with tenant isolation
+	if err := uc.authUc.RenewAuthToken(ctx, tenantID, token); err != nil {
 		// Log error but don't fail login - JWT is still valid
 		fmt.Printf("ERROR: Failed to renew auth token for device %s: %v\n", deviceID, err)
 	} else {
@@ -142,7 +176,8 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 		}
 	}
 
-	jwtToken, err := uc.authUc.GenerateJWT(device)
+	// GenerateJWT reads tenant_id from context (set above) and includes it in JWT claims
+	jwtToken, err := uc.authUc.GenerateJWT(ctx, device)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate JWT: %w", err)
 	}
@@ -154,7 +189,7 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 		Device:              device,
 		Certificate:         device.Certificate,
 		EncryptedPrivateKey: device.EncryptedPrivateKey,
-		ExpiresAt:           timestamppb.New(time.Now().Add(1 * time.Hour)),
+		ExpiresAt:           timestamppb.New(time.Now().Add(DeviceJWTTTL)),
 	}, nil
 }
 
@@ -163,12 +198,16 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 //
 // Device polls for queued actions. Returns all QUEUED actions for this device.
 // Also records the device's activity timestamp.
+// Multi-tenancy: tenant_id and device_id obtained from JWT context (via middleware)
 func (uc *InstanceUsecase) Pull(ctx context.Context, deviceID string) ([]*models.Action, error) {
 	if deviceID == "" {
 		return nil, fmt.Errorf("device ID is empty")
 	}
 
-	actions, err := uc.store.Actions().ListPending(ctx, deviceID)
+	// Get tenant_id from context (set by middleware from JWT)
+	tenantID := middleware.GetTenantID(ctx)
+
+	actions, err := uc.store.Actions().ListPending(ctx, tenantID, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pending actions: %w", err)
 	}
@@ -196,13 +235,17 @@ func (uc *InstanceUsecase) Pull(ctx context.Context, deviceID string) ([]*models
 //  4. When device responds via Push, echo trace_id for correlation
 //  5. Creates complete request-response audit trail
 //
+// Multi-tenancy: tenant_id and device_id obtained from JWT context (via middleware)
 // Returns empty slice if no actions pending.
 func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (interface{}, error) {
 	if deviceID == "" {
 		return nil, fmt.Errorf("device ID is empty")
 	}
 
-	actions, err := uc.store.Actions().ListPending(ctx, deviceID)
+	// Get tenant_id from context (set by middleware from JWT)
+	tenantID := middleware.GetTenantID(ctx)
+
+	actions, err := uc.store.Actions().ListPending(ctx, tenantID, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pending actions: %w", err)
 	}
@@ -251,7 +294,7 @@ func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (i
 		// Mark action as DELIVERED now that we're returning it to the device
 		// This prevents ListPending from returning the same action repeatedly
 		// State progression: QUEUED → DELIVERED (on Pull) → COMPLETED (on Push)
-		if err := uc.store.Actions().MarkDelivered(ctx, action.Id); err != nil {
+		if err := uc.store.Actions().MarkDelivered(ctx, tenantID, action.Id); err != nil {
 			fmt.Printf("Warning: Failed to mark action %s as delivered: %v\n", action.Id, err)
 			// Continue even if marking fails - action still needs to be sent
 			// Error will be logged for troubleshooting but won't block Pull response
@@ -499,13 +542,20 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 			return fmt.Errorf("device instance UUID is empty: not found in message umhInstance or JWT token")
 		}
 
+		// Get tenant_id from context (set by middleware from JWT)
+		tenantID := middleware.GetTenantID(ctx)
+
 		// Record device activity
 		_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
 
+		// Track message types for summary
+		messageTypeCount := make(map[string]int)
+		
 		// Persist each message and handle correlation
 		for _, msg := range protoMsgs {
 			// Extract MessageType from content JSON
 			msgType := extractMessageType(msg.Content)
+			messageTypeCount[msgType]++
 
 			// DEBUG: Log incoming messages
 			fmt.Printf("DEBUG: Push received message - Type: %s, Content (first 200 chars): %.200s\n", msgType, msg.Content)
@@ -518,8 +568,17 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 				CreatedAt: time.Now(),
 			}
 
-			_ = uc.store.Messages().Save(ctx, message)
-
+			if tenantID == "" {
+				fmt.Printf("ERROR: missing tenant ID in context; skipping persistence for message %s on device %s\n", message.ID, deviceID)
+				continue
+			}
+			if err := uc.store.Messages().Save(ctx, tenantID, message); err != nil {
+				fmt.Printf("ERROR: failed to persist message %s for tenant %s on device %s: %v\n", message.ID, tenantID, deviceID, err)
+				continue
+			}
+			
+			fmt.Printf("INFO: successfully persisted message %s for tenant %s on device %s\n", message.ID, tenantID, deviceID)
+			
 			// TRACEABILITY: Correlate response to original action request
 			if msgType == "action-result" || msgType == "action-reply" {
 				// Extract action reply state to determine if this is an intermediate or terminal update
@@ -551,22 +610,30 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 
 					// Fallback to secondary correlation using actionUUID
 					if actionUUID != "" {
-						if err := uc.correlateResponseByActionUUID(ctx, actionUUID, message.ID); err != nil {
+						if err := uc.correlateResponseByActionUUID(ctx, tenantID, actionUUID, message.ID); err != nil {
 							fmt.Printf("Note: Failed to correlate by actionUUID %s: %v\n", actionUUID, err)
 						}
 					}
-				} else if isIntermediateActionState(actionReplyState) {
+					} else if isIntermediateActionState(actionReplyState) {
 					// For intermediate states, just log for debugging (don't finalize)
 					actionUUID := extractActionUUID(msg.Content)
 					fmt.Printf("DEBUG: Received intermediate action state '%s' for action %s - not finalizing yet\n", actionReplyState, actionUUID)
 				}
 			}
 
-			// TASK 2: Sync protocol converters from StatusMessage
+			// TASK 2: Sync protocol converters and stream processors from StatusMessage
 			if msgType == "status-message" || msgType == "StatusMessage" {
-				_ = uc.syncProtocolConvertersFromStatusMessage(ctx, deviceID, msg.Content)
+				_ = uc.syncProtocolConvertersFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
+				_ = uc.syncStreamProcessorsFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
 			}
 		}
+		
+		// Log summary of message types received in this push batch
+		fmt.Printf("DEBUG: Push batch summary - Total messages: %d, Type breakdown: %v\n", len(protoMsgs), messageTypeCount)
+		if messageTypeCount["status-message"] == 0 && messageTypeCount["StatusMessage"] == 0 {
+			fmt.Printf("WARNING: No StatusMessage in push batch. Device must send StatusMessage (1-second heartbeat) to update health_status. Message types: %v\n", messageTypeCount)
+		}
+		
 		return nil
 	}
 
@@ -592,6 +659,19 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 
 	if deviceID == "" {
 		return fmt.Errorf("device instance UUID is empty: not found in message umhInstance or JWT token")
+	}
+
+	// Verify device exists
+	device, err := uc.store.Devices().GetByID(ctx, deviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get device %s: %w", deviceID, err)
+	}
+	if device == nil {
+		return fmt.Errorf("device %s not found", deviceID)
+	}
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return fmt.Errorf("missing tenant ID in context")
 	}
 
 	// Record device activity
@@ -624,7 +704,9 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 			CreatedAt: time.Now(),
 		}
 
-		_ = uc.store.Messages().Save(ctx, message)
+		if err := uc.store.Messages().Save(ctx, tenantID, message); err != nil {
+			return fmt.Errorf("failed to persist message %s for tenant %s on device %s: %w", message.ID, tenantID, deviceID, err)
+		}
 
 		// TRACEABILITY: Correlate response to original action request
 		if msgType == "action-result" || msgType == "action-reply" {
@@ -659,7 +741,7 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 
 				// Fallback to secondary correlation using actionUUID
 				if actionUUID != "" {
-					if err := uc.correlateResponseByActionUUID(ctx, actionUUID, message.ID); err != nil {
+					if err := uc.correlateResponseByActionUUID(ctx, tenantID, actionUUID, message.ID); err != nil {
 						fmt.Printf("Note: Failed to correlate by actionUUID %s: %v\n", actionUUID, err)
 					}
 				}
@@ -768,8 +850,14 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 		return fmt.Errorf("device mismatch: tracking device %s vs request device %s", track.DeviceID, deviceID)
 	}
 
+	// 2b. Verify device exists (GetByID applies tenant scoping when JWT tenant is present)
+	if _, err := uc.store.Devices().GetByID(ctx, deviceID); err != nil {
+		return fmt.Errorf("device not found: %w", err)
+	}
+	tenantID := middleware.GetTenantID(ctx)
+
 	// 3. Get the action to check its type and payload (for protocol converter sync)
-	action, err := uc.store.Actions().GetByID(ctx, track.ActionID)
+	action, err := uc.store.Actions().GetByID(ctx, tenantID, track.ActionID)
 	if err != nil || action == nil {
 		fmt.Printf("Warning: Could not retrieve action %s for protocol converter sync: %v\n", track.ActionID, err)
 		// Continue anyway - action can still be marked complete
@@ -835,13 +923,13 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 	}
 
 	// Update action status based on actionReplyState
-	if err := uc.store.Actions().UpdateStatus(ctx, track.ActionID, finalStatus); err != nil {
+	if err := uc.store.Actions().UpdateStatus(ctx, tenantID, track.ActionID, finalStatus); err != nil {
 		return fmt.Errorf("failed to update action status: %w", err)
 	}
 
 	// Store error message in action for retrieval (for both FAILED and FAILED_PARSING_RESPONSE)
 	if (finalStatus == models.ActionStatusFailed || finalStatus == models.ActionStatusFailedParsingResponse) && errorMessage != "" {
-		if err := uc.store.Actions().UpdateErrorMessage(ctx, track.ActionID, errorMessage); err != nil {
+		if err := uc.store.Actions().UpdateErrorMessage(ctx, tenantID, track.ActionID, errorMessage); err != nil {
 			fmt.Printf("Warning: Failed to store error message: %v\n", err)
 		}
 	}
@@ -879,9 +967,9 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 // using the actionUUID from payload (secondary/fallback correlation method).
 // Also updates the action_message_tracking table to record the correlation with the response message ID.
 // Marks action as COMPLETED.
-func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, actionUUID string, messageID string) error {
+func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, tenantID, actionUUID string, messageID string) error {
 	// Look up action by UUID
-	action, err := uc.store.Actions().GetByID(ctx, actionUUID)
+	action, err := uc.store.Actions().GetByID(ctx, tenantID, actionUUID)
 	if err != nil {
 		return fmt.Errorf("action not found: %w", err)
 	}
@@ -949,13 +1037,13 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, ac
 	}
 
 	// Mark action with appropriate status
-	if err := uc.store.Actions().UpdateStatus(ctx, action.Id, finalStatus); err != nil {
+	if err := uc.store.Actions().UpdateStatus(ctx, tenantID, action.Id, finalStatus); err != nil {
 		return fmt.Errorf("failed to update action status: %w", err)
 	}
 
 	// Store error message if action failed or parse failed
 	if (finalStatus == models.ActionStatusFailed || finalStatus == models.ActionStatusFailedParsingResponse) && errorMessage != "" {
-		if err := uc.store.Actions().UpdateErrorMessage(ctx, action.Id, errorMessage); err != nil {
+		if err := uc.store.Actions().UpdateErrorMessage(ctx, tenantID, action.Id, errorMessage); err != nil {
 			fmt.Printf("Warning: Failed to store error message: %v\n", err)
 		}
 	}
@@ -983,9 +1071,9 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, ac
 // 1. Direct message ID lookup (O(1)) via action_message_tracking.response_message_id
 // 2. Fallback: Linear search through recent messages for actionUUID
 // Returns JSON bytes of the actionReplyPayload, or nil if not found/not completed
-func (uc *InstanceUsecase) GetActionResultPayload(ctx context.Context, actionID string) ([]byte, error) {
+func (uc *InstanceUsecase) GetActionResultPayload(ctx context.Context, tenantID, actionID string) ([]byte, error) {
 	// 1. Get the action to verify it exists
-	action, err := uc.store.Actions().GetByID(ctx, actionID)
+	action, err := uc.store.Actions().GetByID(ctx, tenantID, actionID)
 	if err != nil {
 		return nil, fmt.Errorf("action not found: %w", err)
 	}
@@ -1113,6 +1201,9 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 		return nil
 	}
 
+	// Extract tenant_id from context (set by middleware)
+	tenantID := middleware.GetTenantID(ctx)
+
 	// DEBUG: Log incoming payload
 	fmt.Printf("DEBUG: syncProtocolConverterActionResult - ActionType: %s, Payload (first 500 chars): %.500s\n", action.Type, string(payload))
 
@@ -1184,10 +1275,10 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 					if uuid, ok := origPayload["uuid"].(string); ok && uuid != "" {
 						// If action succeeded, delete from DB
 						if action.Status == models.ActionStatusCompleted {
-							_ = uc.protocolConverterRepo.Delete(ctx, action.DeviceId, uuid)
+							_ = uc.protocolConverterRepo.Delete(ctx, tenantID, action.DeviceId, uuid)
 						} else if action.Status == models.ActionStatusFailed {
 							// If action failed, mark as OFFLINE but keep record
-							_ = uc.protocolConverterRepo.UpdateStatus(ctx, action.DeviceId, uuid,
+							_ = uc.protocolConverterRepo.UpdateStatus(ctx, tenantID, action.DeviceId, uuid,
 								"FAILED", "OFFLINE", "Failed to delete protocol converter")
 						}
 						return nil
@@ -1273,7 +1364,7 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				}
 			}
 
-			err := uc.protocolConverterRepo.Upsert(ctx, action.DeviceId, uuid, name, converterType, connectionUUID)
+			err := uc.protocolConverterRepo.Upsert(ctx, tenantID, action.DeviceId, uuid, name, converterType, connectionUUID)
 			if err != nil {
 				fmt.Printf("Warning: Failed to upsert protocol converter: %v\n", err)
 			}
@@ -1294,7 +1385,7 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 			// If UUID changed (name changed), delete old and create new
 			if oldUUID != "" && oldUUID != uuid {
 				// Delete old record
-				_ = uc.protocolConverterRepo.Delete(ctx, action.DeviceId, oldUUID)
+				_ = uc.protocolConverterRepo.Delete(ctx, tenantID, action.DeviceId, oldUUID)
 
 				// Create new record with new UUID and updated details
 				converterType := "protocol-converter"
@@ -1329,12 +1420,13 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				}
 
 				// Upsert with new UUID
-				if err := uc.protocolConverterRepo.Upsert(ctx, action.DeviceId, uuid, newName, converterType, connectionUUID); err != nil {
+				if err := uc.protocolConverterRepo.Upsert(ctx, tenantID, action.DeviceId, uuid, newName, converterType, connectionUUID); err != nil {
 					fmt.Printf("Warning: Failed to upsert renamed protocol converter: %v\n", err)
 				}
-			} else {
+				} else {
 				// UUID unchanged (name unchanged) - just update status and details
 				err := uc.protocolConverterRepo.UpdateStatus(ctx,
+					tenantID,
 					action.DeviceId,
 					uuid,
 					"ACTIVE", // deployment_status
@@ -1348,7 +1440,7 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 
 		case "delete":
 			// For delete: REMOVE from database
-			err := uc.protocolConverterRepo.Delete(ctx, action.DeviceId, uuid)
+			err := uc.protocolConverterRepo.Delete(ctx, tenantID, action.DeviceId, uuid)
 			if err != nil {
 				fmt.Printf("Warning: Failed to delete protocol converter: %v\n", err)
 			}
@@ -1364,14 +1456,14 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 
 		if actionType == "delete" {
 			// Delete failure: mark as OFFLINE but keep record
-			err := uc.protocolConverterRepo.UpdateStatus(ctx, action.DeviceId, uuid,
+			err := uc.protocolConverterRepo.UpdateStatus(ctx, tenantID, action.DeviceId, uuid,
 				"FAILED", "OFFLINE", errorMessage)
 			if err != nil {
 				fmt.Printf("Warning: Failed to update protocol converter status on delete failure: %v\n", err)
 			}
 		} else {
 			// Deploy/Edit failure: mark as FAILED
-			err := uc.protocolConverterRepo.UpdateStatus(ctx, action.DeviceId, uuid,
+			err := uc.protocolConverterRepo.UpdateStatus(ctx, tenantID, action.DeviceId, uuid,
 				"FAILED", "OFFLINE", errorMessage)
 			if err != nil {
 				fmt.Printf("Warning: Failed to update protocol converter status on failure: %v\n", err)
@@ -1381,7 +1473,7 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 
 	// Mark as synced (for all successful operations)
 	if action.Status == models.ActionStatusCompleted {
-		_ = uc.protocolConverterRepo.MarkSynced(ctx, action.DeviceId, uuid)
+		_ = uc.protocolConverterRepo.MarkSynced(ctx, tenantID, action.DeviceId, uuid)
 	}
 
 	return nil
@@ -1392,9 +1484,10 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 // Extracts version from umh-core action response and updates local database
 func (uc *InstanceUsecase) syncDataModelActionResult(ctx context.Context, action *models.Action, payload []byte) error {
 	if uc.dataModelRepo == nil {
-		// Skip if repo is not available
 		return nil
 	}
+
+	tenantID := middleware.GetTenantID(ctx)
 
 	// Determine action type and corresponding operation
 	var actionType string
@@ -1471,7 +1564,7 @@ func (uc *InstanceUsecase) syncDataModelActionResult(ctx context.Context, action
 
 		// If action succeeded and deletion confirmed, delete from DB
 		if nameToDelete != "" && action.Status == models.ActionStatusCompleted {
-			_ = uc.dataModelRepo.DeleteByName(ctx, action.DeviceId, nameToDelete)
+			_ = uc.dataModelRepo.DeleteByName(ctx, tenantID, action.DeviceId, nameToDelete)
 		}
 		return nil
 	}
@@ -1522,7 +1615,7 @@ func (uc *InstanceUsecase) syncDataModelActionResult(ctx context.Context, action
 	// NOTE: encodedStructure is empty because umh-core returns the parsed "structure" map, not the encoded string
 	// The dataModelRepo will store this empty encodedStructure, which is okay since we have the structure from StatusMessage
 	if action.Status == models.ActionStatusCompleted {
-		err := uc.dataModelRepo.Upsert(ctx, action.DeviceId, name, version, description, "")
+		err := uc.dataModelRepo.Upsert(ctx, tenantID, action.DeviceId, name, version, description, "")
 		if err != nil {
 			fmt.Printf("Warning: Failed to upsert data model: %v\n", err)
 		}
@@ -1538,6 +1631,9 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 	if uc.streamProcessorRepo == nil {
 		return nil
 	}
+
+	// Extract tenant_id from context (set by middleware)
+	tenantID := middleware.GetTenantID(ctx)
 
 	// Determine action type
 	var actionType string
@@ -1556,6 +1652,28 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 
 	// Only sync COMPLETED actions
 	if action.Status != models.ActionStatusCompleted {
+		return nil
+	}
+
+	// Successful delete operations commonly return an empty result payload.
+	// In that case, we must delete based on the ORIGINAL queued action payload.
+	if actionType == "delete" && len(payload) == 0 {
+		if action.Payload != nil && len(action.Payload.Value) > 0 {
+			var origPayload map[string]interface{}
+			if err := json.Unmarshal(action.Payload.Value, &origPayload); err == nil {
+				// The queued payload is JSON-serialized from the proto request.
+				// Keys are expected to be "uuid" (and "device_id").
+				uuid := ""
+				if u, ok := origPayload["uuid"].(string); ok && u != "" {
+					uuid = u
+				} else if u, ok := origPayload["Uuid"].(string); ok && u != "" {
+					uuid = u
+				}
+				if uuid != "" {
+					_ = uc.streamProcessorRepo.Delete(ctx, tenantID, action.DeviceId, uuid)
+				}
+			}
+		}
 		return nil
 	}
 
@@ -1596,6 +1714,28 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 		return nil
 	}
 
+	// Delete actions often return a minimal success payload (e.g. { "deleted_name": "..." })
+	// with no uuid field. For delete, always fall back to the ORIGINAL queued action payload
+	// to determine which record to remove from the DB.
+	if actionType == "delete" {
+		// Try to extract UUID from the action request payload first (canonical for delete).
+		if action.Payload != nil && len(action.Payload.Value) > 0 {
+			var origPayload map[string]interface{}
+			if err := json.Unmarshal(action.Payload.Value, &origPayload); err == nil {
+				uuid := ""
+				if u, ok := origPayload["uuid"].(string); ok && u != "" {
+					uuid = u
+				} else if u, ok := origPayload["Uuid"].(string); ok && u != "" {
+					uuid = u
+				}
+				if uuid != "" {
+					_ = uc.streamProcessorRepo.Delete(ctx, tenantID, action.DeviceId, uuid)
+					return nil
+				}
+			}
+		}
+	}
+
 	// Handle delete with empty result (successful deletion returns no data)
 	if actionType == "delete" && len(streamProcessor) == 0 {
 		if action.Payload != nil {
@@ -1611,7 +1751,7 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 
 				if uuid != "" {
 					// Empty payload on delete = success; delete from DB
-					_ = uc.streamProcessorRepo.Delete(ctx, action.DeviceId, uuid)
+					_ = uc.streamProcessorRepo.Delete(ctx, tenantID, action.DeviceId, uuid)
 					return nil
 				}
 			}
@@ -1629,44 +1769,173 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 		return nil
 	}
 
-	// Extract common fields for deploy and edit
-	name, _ := streamProcessor["name"].(string)
+	// Handle based on action type
+	switch actionType {
+	case "deploy":
+		// Deploy returns full StreamProcessor: UUID, name, model, config, location, etc.
+		// Extract all fields from response
+		name, _ := streamProcessor["name"].(string)
 
-	// Extract model reference
-	var modelName, modelVersion string
-	if model, ok := streamProcessor["model"].(map[string]interface{}); ok {
-		modelName, _ = model["name"].(string)
-		modelVersion, _ = model["version"].(string)
-	}
-
-	// Extract encoded config
-	encodedConfig, _ := streamProcessor["encodedConfig"].(string)
-
-	// Extract location and metadata as JSON strings
-	var locationJSON, metadataJSON string
-	if location, ok := streamProcessor["location_json"].(map[string]interface{}); ok {
-		if b, err := json.Marshal(location); err == nil {
-			locationJSON = string(b)
+		var modelName, modelVersion string
+		if model, ok := streamProcessor["model"].(map[string]interface{}); ok {
+			modelName, _ = model["name"].(string)
+			modelVersion, _ = model["version"].(string)
 		}
-	}
-	if metadata, ok := streamProcessor["metadata_json"].(map[string]interface{}); ok {
-		if b, err := json.Marshal(metadata); err == nil {
-			metadataJSON = string(b)
+
+		encodedConfig, _ := streamProcessor["encodedConfig"].(string)
+
+		var locationJSON, metadataJSON string
+		if location, ok := streamProcessor["location_json"].(map[string]interface{}); ok {
+			if b, err := json.Marshal(location); err == nil {
+				locationJSON = string(b)
+			}
 		}
-	}
+		if metadata, ok := streamProcessor["metadata_json"].(map[string]interface{}); ok {
+			if b, err := json.Marshal(metadata); err == nil {
+				metadataJSON = string(b)
+			}
+		}
 
-	ignoreHealthCheck := false
-	if val, ok := streamProcessor["ignoreHealthCheck"].(bool); ok {
-		ignoreHealthCheck = val
-	}
+		ignoreHealthCheck := false
+		if val, ok := streamProcessor["ignoreHealthCheck"].(bool); ok {
+			ignoreHealthCheck = val
+		}
 
-	// Sync deploy and edit operations via Upsert
-	// Both operations update the DB with the device's final state
-	if actionType == "deploy" || actionType == "edit" {
-		err := uc.streamProcessorRepo.Upsert(ctx, action.DeviceId, uuid, name, modelName, modelVersion, encodedConfig, ignoreHealthCheck, locationJSON, metadataJSON)
+		// Upsert with full response data
+		err := uc.streamProcessorRepo.Upsert(ctx, tenantID, action.DeviceId, uuid, name, modelName, modelVersion, encodedConfig, ignoreHealthCheck, locationJSON, metadataJSON)
 		if err != nil {
-			fmt.Printf("Warning: Failed to upsert stream processor (action=%s): %v\n", actionType, err)
+			fmt.Printf("Warning: Failed to upsert stream processor (deploy): %v\n", err)
 		}
+
+	case "edit":
+		// Edit returns only UUID from response
+		// Must extract name, model, config from REQUEST payload since response doesn't have them
+		var name, modelName, modelVersion, encodedConfig string
+		var locationJSON string
+
+		if action.Payload != nil && action.Payload.Value != nil {
+			var editRequest map[string]interface{}
+			if err := json.Unmarshal(action.Payload.Value, &editRequest); err == nil {
+				// Debug: Log what we got
+				fmt.Printf("DEBUG: Edit sync - editRequest keys: %v\n", func() []string {
+					keys := make([]string, 0, len(editRequest))
+					for k := range editRequest {
+						keys = append(keys, k)
+					}
+					return keys
+				}())
+
+				// Extract name from request
+				name, _ = editRequest["name"].(string)
+
+				// Extract model from request (v2.StreamProcessor uses Model as nested object)
+				if modelObj, ok := editRequest["model"].(map[string]interface{}); ok {
+					if modelName_, ok := modelObj["name"].(string); ok {
+						modelName = modelName_
+					}
+					if modelVersion_, ok := modelObj["version"].(string); ok {
+						modelVersion = modelVersion_
+					}
+				}
+				// Fallback: Try top-level fields (if request was original API format)
+				if modelName == "" {
+					if modelObj, ok := editRequest["modelName"].(string); ok {
+						modelName = modelObj
+					}
+				}
+				if modelVersion == "" {
+					if versionObj, ok := editRequest["modelVersion"].(string); ok {
+						modelVersion = versionObj
+					}
+				}
+				
+				fmt.Printf("DEBUG: Edit sync extracted - name: %s, modelName: %s, modelVersion: %s\n", name, modelName, modelVersion)
+
+				// Extract and encode config from request
+				if configObj, ok := editRequest["config"].(map[string]interface{}); ok {
+					configYAML, err := yaml.Marshal(configObj)
+					if err == nil {
+						encodedConfig = base64.StdEncoding.EncodeToString(configYAML)
+					}
+				}
+
+				// Extract location from request
+				if locationObj, ok := editRequest["location"].(map[string]interface{}); ok {
+					if b, err := json.Marshal(locationObj); err == nil {
+						locationJSON = string(b)
+					}
+				}
+			}
+		}
+
+		// Upsert with data from request payload (editor has confirmed the edit succeeded via UUID response)
+		err := uc.streamProcessorRepo.Upsert(ctx, tenantID, action.DeviceId, uuid, name, modelName, modelVersion, encodedConfig, false, locationJSON, "")
+		if err != nil {
+			fmt.Printf("Warning: Failed to upsert stream processor (edit): %v\n", err)
+		}
+
+	case "get":
+		// Get returns full StreamProcessor with current state/status from device
+		// Extract name, model, config, and status information
+		name, _ := streamProcessor["name"].(string)
+
+		var modelName, modelVersion string
+		if model, ok := streamProcessor["model"].(map[string]interface{}); ok {
+			modelName, _ = model["name"].(string)
+			modelVersion, _ = model["version"].(string)
+		}
+
+		encodedConfig, _ := streamProcessor["encodedConfig"].(string)
+
+		var locationJSON, metadataJSON string
+		if location, ok := streamProcessor["location"].(map[string]interface{}); ok {
+			if b, err := json.Marshal(location); err == nil {
+				locationJSON = string(b)
+			}
+		}
+		if metadata, ok := streamProcessor["metadata"].(map[string]interface{}); ok {
+			if b, err := json.Marshal(metadata); err == nil {
+				metadataJSON = string(b)
+			}
+		}
+
+		ignoreHealthCheck := false
+		if val, ok := streamProcessor["ignoreHealthCheck"].(bool); ok {
+			ignoreHealthCheck = val
+		}
+
+		// Upsert basic processor info
+		err := uc.streamProcessorRepo.Upsert(ctx, tenantID, action.DeviceId, uuid, name, modelName, modelVersion, encodedConfig, ignoreHealthCheck, locationJSON, metadataJSON)
+		if err != nil {
+			fmt.Printf("Warning: Failed to upsert stream processor (get): %v\n", err)
+		}
+
+		// Extract and update status from Get response
+		// GetStreamProcessor returns configuration (uuid, name, model, config, location, etc.)
+		// It does NOT include runtime health state information.
+		// 
+		// What we CAN infer from a successful Get:
+		// - Processor EXISTS on device (can be retrieved) → deployment_status = "ACTIVE"
+		// 
+		// What we CANNOT infer without StatusMessage:
+		// - Processor's actual runtime state (running, stopped, failed, etc.)
+		// - Processor's health condition (healthy, degraded, offline, etc.)
+		// 
+		// Therefore:
+		// - Set deployment_status = "ACTIVE" (exists and is deployed)
+		// - Keep health_status = "UNKNOWN" (wait for StatusMessage with actual Health.Category)
+		// 
+		// StatusMessage (from device's 1-second heartbeat) will provide the actual health via:
+		//   Health.State → deployment_status mapping
+		//   Health.Category → health_status mapping (active/healthy → ONLINE, degraded/neutral → OFFLINE)
+		
+		deploymentStatus := "ACTIVE"   // Get succeeded = processor exists and is deployed
+		healthStatus := "UNKNOWN"      // Wait for StatusMessage with actual Health.Category
+		errorMessage := ""
+
+		// Update status and mark as synced
+		_ = uc.streamProcessorRepo.UpdateStatus(ctx, tenantID, action.DeviceId, uuid, deploymentStatus, healthStatus, errorMessage)
+		_ = uc.streamProcessorRepo.MarkSynced(ctx, tenantID, action.DeviceId, uuid)
 	}
 
 	return nil
@@ -1675,7 +1944,7 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 // syncProtocolConvertersFromStatusMessage syncs protocol converters from device's StatusMessage
 // Implements "eventual consistency" - device state wins, reconciles DB with actual device state
 // Called periodically via device heartbeat StatusMessage
-func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.Context, deviceID, messageContent string) error {
+func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.Context, tenantID, deviceID, messageContent string) error {
 	if uc.protocolConverterRepo == nil {
 		return nil // Skip if repo unavailable
 	}
@@ -1754,6 +2023,7 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 		// Use Upsert to create or update
 		// This handles both new converters and converters transitioning from PENDING to ACTIVE
 		err := uc.protocolConverterRepo.Upsert(ctx,
+			tenantID,
 			deviceID,
 			converter.UUID,
 			converter.Name,
@@ -1767,7 +2037,7 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 
 	// Step 2: Mark converters as OFFLINE if they were ACTIVE but are no longer in device status
 	// This reconciles DB with device state when converters are removed
-	allConverters, err := uc.protocolConverterRepo.List(ctx, &data.ListQuery{
+	allConverters, err := uc.protocolConverterRepo.List(ctx, tenantID, &data.ListQuery{
 		DeviceID:               deviceID,
 		DeploymentStatusFilter: "ACTIVE",
 		Limit:                  1000,
@@ -1790,6 +2060,7 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 		// If converter was ACTIVE in DB but not in StatusMessage, mark as OFFLINE
 		if !found && dbConverter.DeploymentStatus == "ACTIVE" {
 			err := uc.protocolConverterRepo.UpdateStatus(ctx,
+				tenantID,
 				deviceID,
 				dbConverter.UUID,
 				dbConverter.DeploymentStatus,
@@ -1797,7 +2068,7 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 				"",        // Clear error message
 			)
 			if err != nil {
-				fmt.Printf("Warning: Failed to mark converter %s as offline: %v\n", dbConverter.UUID, err)
+				fmt.Printf("Warning: Failed to mark converter %s as offline: %v\n", dbConverter.UUID, err);
 			}
 		}
 	}
@@ -1805,7 +2076,7 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 	// Mark all updated converters as synced
 	for _, converter := range discoveredConverters {
 		if converter.UUID != "" {
-			_ = uc.protocolConverterRepo.MarkSynced(ctx, deviceID, converter.UUID)
+			_ = uc.protocolConverterRepo.MarkSynced(ctx, tenantID, deviceID, converter.UUID)
 		}
 	}
 
@@ -1819,6 +2090,187 @@ type ConverterInfo struct {
 	Type           string
 	ConnectionUUID string
 	Health         *v2.Health
+}
+
+// syncStreamProcessorsFromStatusMessage syncs stream processors from device's StatusMessage
+// Implements "eventual consistency" - device state wins, reconciles DB with actual device state
+// Called periodically via device heartbeat StatusMessage
+func (uc *InstanceUsecase) syncStreamProcessorsFromStatusMessage(ctx context.Context, tenantID, deviceID, messageContent string) error {
+	if uc.streamProcessorRepo == nil {
+		return nil // Skip if repo unavailable
+	}
+
+	// Decode message content if base64 encoded
+	decodedContent := messageContent
+	if messageContent != "" {
+		decoded, err := base64.StdEncoding.DecodeString(messageContent)
+		if err == nil {
+			decodedContent = string(decoded)
+		}
+	}
+
+	// Parse JSON to extract StatusMessage structure
+	var messageData map[string]interface{}
+	if err := json.Unmarshal([]byte(decodedContent), &messageData); err != nil {
+		fmt.Printf("Warning: Failed to parse StatusMessage JSON: %v\n", err)
+		return nil
+	}
+
+	// Try to unmarshal as protobuf StatusMessage
+	var statusMsg *v2.StatusMessage
+	if msgBytes := []byte(decodedContent); len(msgBytes) > 0 {
+		statusMsg = &v2.StatusMessage{}
+		// Try to unmarshal from JSON (if that fails, we'll use map fallback)
+		_ = proto.UnmarshalOptions{AllowPartial: true}.Unmarshal(msgBytes, statusMsg)
+	}
+
+	// Extract DFCs from status message to find stream processors
+	var discoveredProcessors []*StreamProcessorStatusInfo
+	if statusMsg != nil && statusMsg.Core != nil {
+		// Stream processors are DFCs with dfcType == "stream-processor"
+		for _, dfc := range statusMsg.Core.Dfcs {
+			if dfc.DfcType == "stream-processor" {
+				discoveredProcessors = append(discoveredProcessors, &StreamProcessorStatusInfo{
+					UUID:   dfc.Uuid,
+					Name:   dfc.Name,
+					Type:   dfc.DfcType,
+					Health: dfc.Health,
+				})
+			}
+		}
+	}
+
+	// Fallback: Try to extract from JSON map if proto unmarshal didn't work
+	if len(discoveredProcessors) == 0 && messageData != nil {
+		// Check if message has a Core structure with DFCs
+		if coreData, ok := messageData["Core"].(map[string]interface{}); ok {
+			if dfcs, ok := coreData["dfcs"].([]interface{}); ok {
+				for _, dfc := range dfcs {
+					if dfcMap, ok := dfc.(map[string]interface{}); ok {
+						dfcType, _ := dfcMap["dfcType"].(string)
+						if dfcType == "stream-processor" {
+							processor := &StreamProcessorStatusInfo{
+								UUID: extractStringField(dfcMap, "uuid"),
+								Name: extractStringField(dfcMap, "name"),
+								Type: dfcType,
+							}
+							
+							// Extract Health from JSON
+							if healthMap, ok := dfcMap["health"].(map[string]interface{}); ok {
+								processor.Health = &v2.Health{
+									Message:    extractStringField(healthMap, "message"),
+									State:      extractStringField(healthMap, "state"),
+									DesiredState: extractStringField(healthMap, "desiredState"),
+									Category:   extractStringField(healthMap, "category"),
+								}
+							}
+							
+							if processor.UUID != "" && processor.Name != "" {
+								discoveredProcessors = append(discoveredProcessors, processor)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Step 1: Update status for discovered stream processors
+	for _, processor := range discoveredProcessors {
+		if processor.UUID == "" {
+			continue // Skip if no UUID
+		}
+
+		// Map health state to deployment/health status
+		deploymentStatus := "PENDING"
+		healthStatus := "UNKNOWN"
+
+		if processor.Health != nil {
+			// Determine deployment status from health state
+			// Common states: "active", "idle", "pending", "starting", "error", etc.
+			state := processor.Health.State
+			category := processor.Health.Category
+
+			if state == "active" || state == "idle" {
+				deploymentStatus = "ACTIVE"
+			} else if state == "error" || state == "failed" {
+				deploymentStatus = "FAILED"
+			} else if state == "pending" || state == "starting" {
+				deploymentStatus = "PENDING"
+			}
+
+			// Determine health status from category
+			if category == "active" || category == "healthy" {
+				healthStatus = "ONLINE"
+			} else if category == "degraded" || category == "neutral" {
+				healthStatus = "OFFLINE"
+			}
+		}
+
+		// Update status in database
+		err := uc.streamProcessorRepo.UpdateStatus(ctx,
+			tenantID,
+			deviceID,
+			processor.UUID,
+			deploymentStatus,
+			healthStatus,
+			"", // Clear error message on success
+		)
+		if err != nil {
+			fmt.Printf("Warning: Failed to update stream processor status %s: %v\n", processor.UUID, err)
+		}
+
+		// Mark as synced
+		_ = uc.streamProcessorRepo.MarkSynced(ctx, tenantID, deviceID, processor.UUID)
+	}
+
+	// Step 2: Mark stream processors as OFFLINE if they were ACTIVE but are no longer in device status
+	// This reconciles DB with device state when processors are removed
+	allProcessors, err := uc.streamProcessorRepo.List(ctx, tenantID, &data.StreamProcessorListQuery{
+		DeviceID: deviceID,
+		Limit:    1000,
+	})
+	if err != nil {
+		fmt.Printf("Warning: Failed to list existing stream processors: %v\n", err)
+		return nil
+	}
+
+	// Check which processors in DB are no longer in device state
+	for _, dbProcessor := range allProcessors {
+		found := false
+		for _, statusProcessor := range discoveredProcessors {
+			if statusProcessor.UUID == dbProcessor.UUID {
+				found = true
+				break
+			}
+		}
+
+		// If processor was ACTIVE in DB but not in StatusMessage, mark as OFFLINE
+		deploymentStatus := dbProcessor.DeploymentStatus.String
+		if !found && deploymentStatus == "ACTIVE" {
+			err := uc.streamProcessorRepo.UpdateStatus(ctx,
+				tenantID,
+				deviceID,
+				dbProcessor.UUID,
+				deploymentStatus,
+				"OFFLINE", // Mark health as offline
+				"",        // Clear error message
+			)
+			if err != nil {
+				fmt.Printf("Warning: Failed to mark stream processor %s as offline: %v\n", dbProcessor.UUID, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// StreamProcessorStatusInfo holds minimal stream processor information extracted from StatusMessage
+type StreamProcessorStatusInfo struct {
+	UUID   string
+	Name   string
+	Type   string
+	Health *v2.Health
 }
 
 // extractStringField safely extracts a string field from a map

@@ -5,12 +5,13 @@ server:
   grpc:
     addr: 0.0.0.0:9000
     timeout: 1s
+  jwt_secret: ""   # OPTIONAL: Leave empty to autogenerate. Can override via TAKSA_DM_JWT_SECRET env var
 log_level: debug  # Options: debug, info, warn, error, production
 log_file: /data/taksa-device-management.log  # Log file path (logs to both console and file)
 data:
   database:
-    driver: sqlite3
-    source: /data/taksa_platform_dm.db
+    driver: postgres
+    source: postgres://user:password@localhost/taksa_platform_dm?sslmode=disable
     max_open_conns: 25
     max_idle_conns: 5
     conn_max_lifetime: 300

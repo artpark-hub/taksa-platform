@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package api.umh_core.v2;
 
-import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "common/models.proto";
 

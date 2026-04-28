@@ -31,6 +31,7 @@ message Server {
   }
   HTTP http = 1;
   GRPC grpc = 2;
+  string jwt_secret = 3;  // JWT signing secret for device auth tokens (optional; may be provided via TAKSA_DM_JWT_SECRET, or auto-generated and persisted at startup if empty)
 }
 
 message Data {

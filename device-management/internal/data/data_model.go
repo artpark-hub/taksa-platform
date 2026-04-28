@@ -36,9 +36,9 @@ type DataModelModel struct {
 }
 
 // Upsert creates or updates a data model (for sync operations from umh-core actions)
-func (r *DataModelRepo) Upsert(ctx context.Context, deviceID, name, version, description, encodedStructure string) error {
+func (r *DataModelRepo) Upsert(ctx context.Context, tenantID, deviceID, name, version, description, encodedStructure string) error {
 	// Check if exists
-	existing, err := r.GetByNameAndVersion(ctx, deviceID, name, version)
+	existing, err := r.GetByNameAndVersion(ctx, tenantID, deviceID, name, version)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (r *DataModelRepo) Upsert(ctx context.Context, deviceID, name, version, des
 		query := `
 			UPDATE data_models 
 			SET description = ?, encoded_structure = ?, updated_at = ?
-			WHERE device_id = ? AND name = ? AND version = ?
+			WHERE tenant_id = ? AND device_id = ? AND name = ? AND version = ?
 		`
 
 		// Convert placeholders for PostgreSQL compatibility
@@ -56,7 +56,7 @@ func (r *DataModelRepo) Upsert(ctx context.Context, deviceID, name, version, des
 
 		_, err := r.data.db.ExecContext(ctx, query,
 			description, encodedStructure, time.Now(),
-			deviceID, name, version)
+			tenantID, deviceID, name, version)
 		if err != nil {
 			return fmt.Errorf("failed to update data model: %w", err)
 		}
@@ -66,8 +66,8 @@ func (r *DataModelRepo) Upsert(ctx context.Context, deviceID, name, version, des
 
 	// Insert new
 	query := `
-		INSERT INTO data_models (device_id, name, version, description, encoded_structure, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO data_models (tenant_id, device_id, name, version, description, encoded_structure, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	// Convert placeholders for PostgreSQL compatibility
@@ -75,7 +75,7 @@ func (r *DataModelRepo) Upsert(ctx context.Context, deviceID, name, version, des
 
 	now := time.Now()
 	_, err = r.data.db.ExecContext(ctx, query,
-		deviceID, name, version, description, encodedStructure, now, now)
+		tenantID, deviceID, name, version, description, encodedStructure, now, now)
 	if err != nil {
 		return fmt.Errorf("failed to insert data model: %w", err)
 	}
@@ -84,17 +84,17 @@ func (r *DataModelRepo) Upsert(ctx context.Context, deviceID, name, version, des
 }
 
 // GetByNameAndVersion retrieves a data model by name and version
-func (r *DataModelRepo) GetByNameAndVersion(ctx context.Context, deviceID, name, version string) (*DataModelModel, error) {
+func (r *DataModelRepo) GetByNameAndVersion(ctx context.Context, tenantID, deviceID, name, version string) (*DataModelModel, error) {
 	query := `
 		SELECT id, device_id, name, version, description, encoded_structure, created_at, updated_at
 		FROM data_models
-		WHERE device_id = ? AND name = ? AND version = ?
+		WHERE tenant_id = ? AND device_id = ? AND name = ? AND version = ?
 	`
 
 	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholdersDM(query)
 
-	row := r.data.db.QueryRowContext(ctx, query, deviceID, name, version)
+	row := r.data.db.QueryRowContext(ctx, query, tenantID, deviceID, name, version)
 
 	var dm DataModelModel
 	err := row.Scan(
@@ -122,14 +122,14 @@ type DataModelListQuery struct {
 }
 
 // List retrieves data models with optional filtering and cursor-based pagination
-func (r *DataModelRepo) List(ctx context.Context, query *DataModelListQuery) ([]*DataModelModel, error) {
+func (r *DataModelRepo) List(ctx context.Context, tenantID string, query *DataModelListQuery) ([]*DataModelModel, error) {
 	sqlQuery := `
 		SELECT id, device_id, name, version, description, encoded_structure, created_at, updated_at
 		FROM data_models
-		WHERE device_id = ?
+		WHERE tenant_id = ? AND device_id = ?
 	`
 
-	args := []interface{}{query.DeviceID}
+	args := []interface{}{tenantID, query.DeviceID}
 
 	// Add optional filters
 	if query.NameFilter != "" {
@@ -178,13 +178,11 @@ func (r *DataModelRepo) List(ctx context.Context, query *DataModelListQuery) ([]
 }
 
 // Delete removes a data model record
-func (r *DataModelRepo) Delete(ctx context.Context, deviceID, name, version string) error {
-	query := `DELETE FROM data_models WHERE device_id = ? AND name = ? AND version = ?`
-
-	// Convert placeholders for PostgreSQL compatibility
+func (r *DataModelRepo) Delete(ctx context.Context, tenantID, deviceID, name, version string) error {
+	query := `DELETE FROM data_models WHERE tenant_id = ? AND device_id = ? AND name = ? AND version = ?`
 	query = convertPlaceholdersDM(query)
 
-	_, err := r.data.db.ExecContext(ctx, query, deviceID, name, version)
+	_, err := r.data.db.ExecContext(ctx, query, tenantID, deviceID, name, version)
 	if err != nil {
 		return fmt.Errorf("failed to delete data model: %w", err)
 	}
@@ -193,13 +191,11 @@ func (r *DataModelRepo) Delete(ctx context.Context, deviceID, name, version stri
 }
 
 // DeleteByDevice removes all data models for a device
-func (r *DataModelRepo) DeleteByDevice(ctx context.Context, deviceID string) error {
-	query := `DELETE FROM data_models WHERE device_id = ?`
-
-	// Convert placeholders for PostgreSQL compatibility
+func (r *DataModelRepo) DeleteByDevice(ctx context.Context, tenantID, deviceID string) error {
+	query := `DELETE FROM data_models WHERE tenant_id = ? AND device_id = ?`
 	query = convertPlaceholdersDM(query)
 
-	_, err := r.data.db.ExecContext(ctx, query, deviceID)
+	_, err := r.data.db.ExecContext(ctx, query, tenantID, deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete data models for device: %w", err)
 	}
@@ -208,13 +204,11 @@ func (r *DataModelRepo) DeleteByDevice(ctx context.Context, deviceID string) err
 }
 
 // DeleteByName removes all versions of a named data model
-func (r *DataModelRepo) DeleteByName(ctx context.Context, deviceID, name string) error {
-	query := `DELETE FROM data_models WHERE device_id = ? AND name = ?`
-
-	// Convert placeholders for PostgreSQL compatibility
+func (r *DataModelRepo) DeleteByName(ctx context.Context, tenantID, deviceID, name string) error {
+	query := `DELETE FROM data_models WHERE tenant_id = ? AND device_id = ? AND name = ?`
 	query = convertPlaceholdersDM(query)
 
-	_, err := r.data.db.ExecContext(ctx, query, deviceID, name)
+	_, err := r.data.db.ExecContext(ctx, query, tenantID, deviceID, name)
 	if err != nil {
 		return fmt.Errorf("failed to delete data model by name: %w", err)
 	}
@@ -224,21 +218,17 @@ func (r *DataModelRepo) DeleteByName(ctx context.Context, deviceID, name string)
 
 // GetLatestByName retrieves the latest version of a data model by name
 // Used by GetDataModel RPC handler for enrichment and existence checks
-func (r *DataModelRepo) GetLatestByName(ctx context.Context, deviceID, name string) (*DataModelModel, error) {
-	// Note: Versions are strings (e.g., "1", "2", "3") but should be compared as integers for ordering
-	// For simplicity, we order by created_at DESC to get the most recently added version
+func (r *DataModelRepo) GetLatestByName(ctx context.Context, tenantID, deviceID, name string) (*DataModelModel, error) {
 	query := `
 		SELECT id, device_id, name, version, description, encoded_structure, created_at, updated_at
 		FROM data_models
-		WHERE device_id = ? AND name = ?
+		WHERE tenant_id = ? AND device_id = ? AND name = ?
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
-
-	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholdersDM(query)
 
-	row := r.data.db.QueryRowContext(ctx, query, deviceID, name)
+	row := r.data.db.QueryRowContext(ctx, query, tenantID, deviceID, name)
 
 	var dm DataModelModel
 	err := row.Scan(

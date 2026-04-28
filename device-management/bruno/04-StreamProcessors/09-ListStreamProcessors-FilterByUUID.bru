@@ -1,0 +1,65 @@
+meta {
+  name: List Stream Processors Filter by UUID
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/stream-processors?uuid_filter={{stream_processor_uuid}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  Filter stream processors by exact UUID match.
+  
+  This is useful to retrieve a specific processor by its UUID.
+  
+  Query Parameter:
+  - uuid_filter: Exact UUID of the stream processor to retrieve
+  
+  Returns:
+  - Single processor if UUID matches
+  - Empty result if UUID doesn't exist
+  
+  Note: Set stream_processor_uuid environment variable first by running
+  a List or Get Stream Processor test that returns a UUID.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.processors) {
+    console.log("✓ Retrieved " + resp.processors.length + " processor(s) by UUID");
+    
+    resp.processors.forEach((sp) => {
+      console.log(`  UUID: ${sp.uuid}`);
+      console.log(`  Name: ${sp.name}`);
+      console.log(`  Status: ${sp.deploymentStatus}`);
+    });
+  } else {
+    console.log("✓ No processors found for UUID");
+  }
+}
+
+tests {
+  test("UUID filter request successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Result contains at most 1 processor", function() {
+    const resp = res.getBody();
+    if (resp.processors) {
+      expect(resp.processors.length).to.be.at.most(1);
+    }
+  });
+  
+  test("If result exists, UUID matches filter", function() {
+    const resp = res.getBody();
+    if (resp.processors && resp.processors.length > 0) {
+      expect(resp.processors[0].uuid).to.equal(bru.getEnvVar('stream_processor_uuid'));
+    }
+  });
+}

@@ -6,7 +6,8 @@
 CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
   uuid TEXT UNIQUE NOT NULL,
-  created_by TEXT,  -- Owner UUID (tenant identifier)
+  tenant_id UUID NOT NULL,  -- Multi-tenancy: isolate devices by tenant
+  created_by TEXT,  -- Owner UUID (user identifier within tenant)
   name TEXT NOT NULL,
   
   -- Hardware metadata
@@ -39,20 +40,23 @@ CREATE TABLE IF NOT EXISTS devices (
   last_login_at TIMESTAMP WITH TIME ZONE,
   auth_token_expires_at TIMESTAMP WITH TIME ZONE,
   
-  UNIQUE(created_by, name),  -- Device names unique per tenant
+  UNIQUE(tenant_id, name),  -- Device names unique per tenant
   UNIQUE(uuid)
 );
 
+CREATE INDEX IF NOT EXISTS idx_devices_tenant_id ON devices(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_devices_created_by ON devices(created_by);
 CREATE INDEX IF NOT EXISTS idx_devices_uuid ON devices(uuid);
 CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
 CREATE INDEX IF NOT EXISTS idx_devices_company ON devices(location_company);
 CREATE INDEX IF NOT EXISTS idx_devices_created_at ON devices(created_at);
 CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen);
+CREATE INDEX IF NOT EXISTS idx_devices_tenant_created_by ON devices(tenant_id, created_by);
 
 -- Auth tokens table: Stores authentication tokens with raw token for hashing during validation
 CREATE TABLE IF NOT EXISTS auth_tokens (
   id TEXT PRIMARY KEY,
+  tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
   token TEXT UNIQUE NOT NULL,  -- Raw token (64 hex chars, 32 bytes)
   device_id TEXT NOT NULL,
   
@@ -62,13 +66,16 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
   FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_tenant_id ON auth_tokens(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_device_id ON auth_tokens(device_id);
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_expires_at ON auth_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_token ON auth_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_tenant_device ON auth_tokens(tenant_id, device_id);
 
 -- Actions table: Stores actions queued for devices
 CREATE TABLE IF NOT EXISTS actions (
   id TEXT PRIMARY KEY,
+  tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
   device_id TEXT NOT NULL,
   action_type TEXT NOT NULL,  -- deploy-protocol-converter, restart, update, etc.
 
@@ -95,14 +102,18 @@ CREATE TABLE IF NOT EXISTS actions (
   FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_actions_tenant_id ON actions(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_actions_device_id ON actions(device_id);
 CREATE INDEX IF NOT EXISTS idx_actions_status ON actions(status);
 CREATE INDEX IF NOT EXISTS idx_actions_created_at ON actions(created_at);
 CREATE INDEX IF NOT EXISTS idx_actions_device_status ON actions(device_id, status);
+CREATE INDEX IF NOT EXISTS idx_actions_tenant_status ON actions(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_actions_tenant_device ON actions(tenant_id, device_id);
 
 -- Messages table: Stores message history for auditing and debugging
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY,
+  tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
   device_id TEXT NOT NULL,
   message_type TEXT NOT NULL,  -- status, telemetry, action, error
   
@@ -124,15 +135,18 @@ CREATE TABLE IF NOT EXISTS messages (
   FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_messages_tenant_id ON messages(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_messages_device_id ON messages(device_id);
 CREATE INDEX IF NOT EXISTS idx_messages_message_type ON messages(message_type);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_direction ON messages(direction);
 CREATE INDEX IF NOT EXISTS idx_messages_device_created ON messages(device_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_tenant_device ON messages(tenant_id, device_id);
 
 -- Certificates table: Stores X.509 certificates for devices and users
 CREATE TABLE IF NOT EXISTS certificates (
   id TEXT PRIMARY KEY,
+  tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
   device_id TEXT NOT NULL,
   user_email TEXT,  -- Optional: email of certificate owner
   
@@ -147,18 +161,21 @@ CREATE TABLE IF NOT EXISTS certificates (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   expires_at TIMESTAMP WITH TIME ZONE,
   
-  UNIQUE(device_id, user_email),
+  UNIQUE(tenant_id, device_id, user_email),
   FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_certificates_tenant_id ON certificates(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_certificates_device_id ON certificates(device_id);
 CREATE INDEX IF NOT EXISTS idx_certificates_user_email ON certificates(user_email);
 CREATE INDEX IF NOT EXISTS idx_certificates_device_email ON certificates(device_id, user_email);
+CREATE INDEX IF NOT EXISTS idx_certificates_tenant_device ON certificates(tenant_id, device_id);
 
 -- Device certificates: Stores device's own certificate for mTLS communication
 -- One certificate per device, enforced by PRIMARY KEY
 CREATE TABLE IF NOT EXISTS device_certificates (
   device_id TEXT PRIMARY KEY,
+  tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
   certificate TEXT NOT NULL,  -- PEM format X.509 certificate
   private_key TEXT,           -- Encrypted PEM format private key
   is_active INTEGER DEFAULT 1,
@@ -168,12 +185,14 @@ CREATE TABLE IF NOT EXISTS device_certificates (
   FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_device_certificates_tenant_id ON device_certificates(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_device_certificates_expires_at ON device_certificates(expires_at);
 
 -- User certificates: Stores user-specific certificates for individual users on a device
--- Multiple certificates per device, one per user email
+-- Multiple certificates per device, one per user email per tenant
 CREATE TABLE IF NOT EXISTS user_certificates (
   id TEXT PRIMARY KEY,
+  tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
   device_id TEXT NOT NULL,
   user_email TEXT NOT NULL,   -- Email of certificate owner
   certificate TEXT NOT NULL,  -- PEM format X.509 certificate
@@ -182,13 +201,15 @@ CREATE TABLE IF NOT EXISTS user_certificates (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   expires_at TIMESTAMP WITH TIME ZONE,
   
-  UNIQUE(device_id, user_email),
+  UNIQUE(tenant_id, device_id, user_email),
   FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_user_certificates_tenant_id ON user_certificates(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_user_certificates_device_id ON user_certificates(device_id);
 CREATE INDEX IF NOT EXISTS idx_user_certificates_user_email ON user_certificates(user_email);
 CREATE INDEX IF NOT EXISTS idx_user_certificates_expires_at ON user_certificates(expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_certificates_tenant_device ON user_certificates(tenant_id, device_id);
 
 -- Action Message Tracking: Correlates request and response messages for complete traceability
 -- One entry per action sent to device - tracks the entire message flow lifecycle
@@ -201,6 +222,7 @@ CREATE INDEX IF NOT EXISTS idx_user_certificates_expires_at ON user_certificates
 --   5. Audit: Complete request-response pair available for tracing
 CREATE TABLE IF NOT EXISTS action_message_tracking (
   id TEXT PRIMARY KEY,
+  tenant_id UUID NOT NULL,        -- Multi-tenancy isolation
   action_id TEXT NOT NULL,        -- FK to actions(id) - the action being sent
   device_id TEXT NOT NULL,        -- FK to devices(id) - for querying traces by device
   
@@ -226,12 +248,14 @@ CREATE TABLE IF NOT EXISTS action_message_tracking (
   FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
+CREATE INDEX IF NOT EXISTS idx_action_message_tracking_tenant_id ON action_message_tracking(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_action_message_tracking_action_id ON action_message_tracking(action_id);
 CREATE INDEX IF NOT EXISTS idx_action_message_tracking_device_id ON action_message_tracking(device_id);
 CREATE INDEX IF NOT EXISTS idx_action_message_tracking_trace_id ON action_message_tracking(trace_id);
 CREATE INDEX IF NOT EXISTS idx_action_message_tracking_response_trace_id ON action_message_tracking(response_trace_id);
 CREATE INDEX IF NOT EXISTS idx_action_message_tracking_status ON action_message_tracking(correlation_status);
 CREATE INDEX IF NOT EXISTS idx_action_message_tracking_created_at ON action_message_tracking(created_at);
+CREATE INDEX IF NOT EXISTS idx_action_message_tracking_tenant_device ON action_message_tracking(tenant_id, device_id);
 
 -- Settings table: Stores system configuration
 CREATE TABLE IF NOT EXISTS settings (
@@ -257,6 +281,7 @@ ON CONFLICT (key) DO NOTHING;
 -- Tracks both intended state (from deploy/edit/delete actions) and actual state (from device)
 CREATE TABLE IF NOT EXISTS protocol_converters (
   id TEXT PRIMARY KEY,
+  tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
   device_id TEXT NOT NULL,
   uuid TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -283,16 +308,22 @@ CREATE TABLE IF NOT EXISTS protocol_converters (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   
   -- Constraints
-  CONSTRAINT unique_device_converter UNIQUE (device_id, uuid),
+  CONSTRAINT unique_tenant_device_converter UNIQUE (tenant_id, device_id, uuid),
   CONSTRAINT fk_protocol_converters_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_protocol_converters_tenant_id 
+  ON protocol_converters(tenant_id);
+
 CREATE INDEX IF NOT EXISTS idx_protocol_converters_device_id 
   ON protocol_converters(device_id);
 
 CREATE INDEX IF NOT EXISTS idx_protocol_converters_uuid 
   ON protocol_converters(uuid);
+
+CREATE INDEX IF NOT EXISTS idx_protocol_converters_tenant_device 
+  ON protocol_converters(tenant_id, device_id);
 
 CREATE INDEX IF NOT EXISTS idx_protocol_converters_device_status 
   ON protocol_converters(device_id, deployment_status);
@@ -310,6 +341,7 @@ CREATE INDEX IF NOT EXISTS idx_protocol_converters_last_synced
 -- DataModels use Name+Version as compound key (unlike Protocol Converters which use UUID)
 CREATE TABLE IF NOT EXISTS data_models (
   id SERIAL PRIMARY KEY,
+  tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
   device_id TEXT NOT NULL,
   name TEXT NOT NULL,
   version TEXT NOT NULL,  -- String representation of the integer version (e.g., "1", "2", "3")
@@ -319,13 +351,19 @@ CREATE TABLE IF NOT EXISTS data_models (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   
   -- Constraints
-  CONSTRAINT unique_device_model_version UNIQUE (device_id, name, version),
+  CONSTRAINT unique_tenant_device_model_version UNIQUE (tenant_id, device_id, name, version),
   CONSTRAINT fk_data_models_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_data_models_tenant_id 
+  ON data_models(tenant_id);
+
 CREATE INDEX IF NOT EXISTS idx_data_models_device_id 
   ON data_models(device_id);
+
+CREATE INDEX IF NOT EXISTS idx_data_models_tenant_device 
+  ON data_models(tenant_id, device_id);
 
 CREATE INDEX IF NOT EXISTS idx_data_models_name 
   ON data_models(device_id, name);
@@ -340,6 +378,7 @@ CREATE INDEX IF NOT EXISTS idx_data_models_created_at
 -- StreamProcessors use UUID as primary identifier (similar to Protocol Converters)
 CREATE TABLE IF NOT EXISTS stream_processors (
   id TEXT PRIMARY KEY,
+  tenant_id UUID NOT NULL,  -- Multi-tenancy isolation
   device_id TEXT NOT NULL,
   uuid TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -349,20 +388,39 @@ CREATE TABLE IF NOT EXISTS stream_processors (
   location_json TEXT,           -- JSON map of location levels
   ignore_health_check BOOLEAN DEFAULT false,
   metadata_json TEXT,           -- JSON map of metadata
+  
+  -- Status tracking
+  deployment_status TEXT DEFAULT 'PENDING',  -- PENDING, ACTIVE, FAILED
+  health_status TEXT DEFAULT 'UNKNOWN',      -- ONLINE, OFFLINE, UNKNOWN
+  error_message TEXT,
+  last_synced TIMESTAMP WITH TIME ZONE,     -- From latest StatusMessage
+  
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   
   -- Constraints
-  CONSTRAINT unique_device_stream_processor UNIQUE (device_id, uuid),
+  CONSTRAINT unique_tenant_device_stream_processor UNIQUE (tenant_id, device_id, uuid),
   CONSTRAINT fk_stream_processors_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_stream_processors_tenant_id 
+  ON stream_processors(tenant_id);
+
 CREATE INDEX IF NOT EXISTS idx_stream_processors_device_id 
   ON stream_processors(device_id);
 
 CREATE INDEX IF NOT EXISTS idx_stream_processors_uuid 
   ON stream_processors(uuid);
 
+CREATE INDEX IF NOT EXISTS idx_stream_processors_tenant_device 
+  ON stream_processors(tenant_id, device_id);
+
 CREATE INDEX IF NOT EXISTS idx_stream_processors_device_created_at 
   ON stream_processors(device_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_stream_processors_deployment_status 
+  ON stream_processors(device_id, deployment_status);
+
+CREATE INDEX IF NOT EXISTS idx_stream_processors_last_synced 
+  ON stream_processors(last_synced);

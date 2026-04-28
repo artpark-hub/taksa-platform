@@ -48,12 +48,12 @@ type ProtocolConverterModel struct {
 }
 
 // Insert creates a new protocol converter record
-func (r *ProtocolConverterRepo) Insert(ctx context.Context, deviceID, uuid, name, converterType, connectionUUID string) error {
+func (r *ProtocolConverterRepo) Insert(ctx context.Context, tenantID, deviceID, uuid, name, converterType, connectionUUID string) error {
 	query := `
 		INSERT INTO protocol_converters (
-			id, device_id, uuid, name, type, connection_uuid,
+			id, tenant_id, device_id, uuid, name, type, connection_uuid,
 			deployment_status, health_status, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', 'UNKNOWN', ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', 'UNKNOWN', ?, ?)
 	`
 
 	id := uuidgen.New().String()
@@ -63,7 +63,7 @@ func (r *ProtocolConverterRepo) Insert(ctx context.Context, deviceID, uuid, name
 	query = convertPlaceholders(query)
 
 	_, err := r.data.db.ExecContext(ctx, query,
-		id, deviceID, uuid, name, converterType, connectionUUID, now, now)
+		id, tenantID, deviceID, uuid, name, converterType, connectionUUID, now, now)
 	if err != nil {
 		return fmt.Errorf("failed to insert protocol converter: %w", err)
 	}
@@ -72,7 +72,7 @@ func (r *ProtocolConverterRepo) Insert(ctx context.Context, deviceID, uuid, name
 }
 
 // Update updates an existing protocol converter record
-func (r *ProtocolConverterRepo) Update(ctx context.Context, deviceID, uuid string, updates map[string]interface{}) error {
+func (r *ProtocolConverterRepo) Update(ctx context.Context, tenantID, deviceID, uuid string, updates map[string]interface{}) error {
 	if len(updates) == 0 {
 		return nil
 	}
@@ -86,12 +86,12 @@ func (r *ProtocolConverterRepo) Update(ctx context.Context, deviceID, uuid strin
 		args = append(args, val)
 	}
 
-	args = append(args, deviceID, uuid)
+	args = append(args, tenantID, deviceID, uuid)
 
 	query := fmt.Sprintf(`
 		UPDATE protocol_converters 
 		SET %s
-		WHERE device_id = ? AND uuid = ?
+		WHERE tenant_id = ? AND device_id = ? AND uuid = ?
 	`, updateClause)
 
 	// Convert placeholders for PostgreSQL compatibility
@@ -106,18 +106,18 @@ func (r *ProtocolConverterRepo) Update(ctx context.Context, deviceID, uuid strin
 }
 
 // UpdateStatus updates deployment and health status
-func (r *ProtocolConverterRepo) UpdateStatus(ctx context.Context, deviceID, uuid, deploymentStatus, healthStatus, errorMessage string) error {
+func (r *ProtocolConverterRepo) UpdateStatus(ctx context.Context, tenantID, deviceID, uuid, deploymentStatus, healthStatus, errorMessage string) error {
 	query := `
 		UPDATE protocol_converters 
 		SET deployment_status = ?, health_status = ?, error_message = ?, updated_at = ?
-		WHERE device_id = ? AND uuid = ?
+		WHERE tenant_id = ? AND device_id = ? AND uuid = ?
 	`
 
 	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholders(query)
 
 	_, err := r.data.db.ExecContext(ctx, query,
-		deploymentStatus, healthStatus, errorMessage, time.Now(), deviceID, uuid)
+		deploymentStatus, healthStatus, errorMessage, time.Now(), tenantID, deviceID, uuid)
 	if err != nil {
 		return fmt.Errorf("failed to update status: %w", err)
 	}
@@ -126,18 +126,18 @@ func (r *ProtocolConverterRepo) UpdateStatus(ctx context.Context, deviceID, uuid
 }
 
 // MarkSynced updates the last_synced timestamp
-func (r *ProtocolConverterRepo) MarkSynced(ctx context.Context, deviceID, uuid string) error {
+func (r *ProtocolConverterRepo) MarkSynced(ctx context.Context, tenantID, deviceID, uuid string) error {
 	query := `
 		UPDATE protocol_converters 
 		SET last_synced = ?, updated_at = ?
-		WHERE device_id = ? AND uuid = ?
+		WHERE tenant_id = ? AND device_id = ? AND uuid = ?
 	`
 
 	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholders(query)
 
 	_, err := r.data.db.ExecContext(ctx, query,
-		time.Now(), time.Now(), deviceID, uuid)
+		time.Now(), time.Now(), tenantID, deviceID, uuid)
 	if err != nil {
 		return fmt.Errorf("failed to mark synced: %w", err)
 	}
@@ -146,20 +146,20 @@ func (r *ProtocolConverterRepo) MarkSynced(ctx context.Context, deviceID, uuid s
 }
 
 // GetByUUID retrieves a protocol converter by UUID
-func (r *ProtocolConverterRepo) GetByUUID(ctx context.Context, deviceID, uuid string) (*ProtocolConverterModel, error) {
+func (r *ProtocolConverterRepo) GetByUUID(ctx context.Context, tenantID, deviceID, uuid string) (*ProtocolConverterModel, error) {
 	query := `
 		SELECT id, device_id, uuid, name, type, connection_uuid,
 		       input_yaml, processor_yaml, inject_yaml, ignore_errors, metadata,
 		       deployment_status, health_status, error_message, last_synced,
 		       created_at, updated_at
 		FROM protocol_converters
-		WHERE device_id = ? AND uuid = ?
+		WHERE tenant_id = ? AND device_id = ? AND uuid = ?
 	`
 
 	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholders(query)
 
-	row := r.data.db.QueryRowContext(ctx, query, deviceID, uuid)
+	row := r.data.db.QueryRowContext(ctx, query, tenantID, deviceID, uuid)
 
 	var pc ProtocolConverterModel
 	err := row.Scan(
@@ -193,17 +193,17 @@ type ListQuery struct {
 }
 
 // List retrieves protocol converters with optional filtering and pagination
-func (r *ProtocolConverterRepo) List(ctx context.Context, query *ListQuery) ([]*ProtocolConverterModel, error) {
+func (r *ProtocolConverterRepo) List(ctx context.Context, tenantID string, query *ListQuery) ([]*ProtocolConverterModel, error) {
 	sqlQuery := `
 		SELECT id, device_id, uuid, name, type, connection_uuid,
 		       input_yaml, processor_yaml, inject_yaml, ignore_errors, metadata,
 		       deployment_status, health_status, error_message, last_synced,
 		       created_at, updated_at
 		FROM protocol_converters
-		WHERE device_id = ?
+		WHERE tenant_id = ? AND device_id = ?
 	`
 
-	args := []interface{}{query.DeviceID}
+	args := []interface{}{tenantID, query.DeviceID}
 
 	// Add optional filters
 	if query.UUIDFilter != "" {
@@ -274,13 +274,13 @@ func (r *ProtocolConverterRepo) List(ctx context.Context, query *ListQuery) ([]*
 }
 
 // Delete removes a protocol converter record
-func (r *ProtocolConverterRepo) Delete(ctx context.Context, deviceID, uuid string) error {
-	query := `DELETE FROM protocol_converters WHERE device_id = ? AND uuid = ?`
+func (r *ProtocolConverterRepo) Delete(ctx context.Context, tenantID, deviceID, uuid string) error {
+	query := `DELETE FROM protocol_converters WHERE tenant_id = ? AND device_id = ? AND uuid = ?`
 
 	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholders(query)
 
-	_, err := r.data.db.ExecContext(ctx, query, deviceID, uuid)
+	_, err := r.data.db.ExecContext(ctx, query, tenantID, deviceID, uuid)
 	if err != nil {
 		return fmt.Errorf("failed to delete protocol converter: %w", err)
 	}
@@ -289,13 +289,13 @@ func (r *ProtocolConverterRepo) Delete(ctx context.Context, deviceID, uuid strin
 }
 
 // DeleteByDevice removes all protocol converters for a device
-func (r *ProtocolConverterRepo) DeleteByDevice(ctx context.Context, deviceID string) error {
-	query := `DELETE FROM protocol_converters WHERE device_id = ?`
+func (r *ProtocolConverterRepo) DeleteByDevice(ctx context.Context, tenantID, deviceID string) error {
+	query := `DELETE FROM protocol_converters WHERE tenant_id = ? AND device_id = ?`
 
 	// Convert placeholders for PostgreSQL compatibility
 	query = convertPlaceholders(query)
 
-	_, err := r.data.db.ExecContext(ctx, query, deviceID)
+	_, err := r.data.db.ExecContext(ctx, query, tenantID, deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to delete protocol converters for device: %w", err)
 	}
@@ -304,16 +304,16 @@ func (r *ProtocolConverterRepo) DeleteByDevice(ctx context.Context, deviceID str
 }
 
 // Upsert creates or updates a protocol converter (for sync operations)
-func (r *ProtocolConverterRepo) Upsert(ctx context.Context, deviceID, uuid, name, converterType, connectionUUID string) error {
+func (r *ProtocolConverterRepo) Upsert(ctx context.Context, tenantID, deviceID, uuid, name, converterType, connectionUUID string) error {
 	// Check if exists
-	existing, err := r.GetByUUID(ctx, deviceID, uuid)
+	existing, err := r.GetByUUID(ctx, tenantID, deviceID, uuid)
 	if err != nil {
 		return err
 	}
 
 	if existing != nil {
 		// Update existing
-		return r.Update(ctx, deviceID, uuid, map[string]interface{}{
+		return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 			"name":              name,
 			"type":              converterType,
 			"connection_uuid":   connectionUUID,
@@ -324,12 +324,12 @@ func (r *ProtocolConverterRepo) Upsert(ctx context.Context, deviceID, uuid, name
 	}
 
 	// Insert new - first insert with PENDING, then update to ACTIVE
-	if err := r.Insert(ctx, deviceID, uuid, name, converterType, connectionUUID); err != nil {
+	if err := r.Insert(ctx, tenantID, deviceID, uuid, name, converterType, connectionUUID); err != nil {
 		return err
 	}
 	
 	// Set to ACTIVE for successful deploy
-	return r.Update(ctx, deviceID, uuid, map[string]interface{}{
+	return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 		"deployment_status": "ACTIVE",
 		"health_status":     "ONLINE",
 		"last_synced":       time.Now(),

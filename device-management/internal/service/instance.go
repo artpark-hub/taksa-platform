@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	kerrors "github.com/go-kratos/kratos/v2/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -11,6 +12,7 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/api/common"
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/biz"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 )
 
 // InstanceService implements v2.InstanceServiceServer
@@ -40,7 +42,7 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 	tokenHash, ok := ctx.Value(AuthorizationKey).(string)
 	if !ok || tokenHash == "" {
 		s.logger.Warn("Login failed: missing or invalid authorization header")
-		return nil, status.Error(codes.Unauthenticated, "missing or invalid authorization header")
+		return nil, kerrors.Unauthorized("missing_authorization_token", "missing or invalid authorization header")
 	}
 
 	s.logger.Debug("Login API called",
@@ -54,7 +56,7 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 			zap.String("token_hash_preview", tokenHash[:min(len(tokenHash), 16)]),
 			zap.Error(err),
 		)
-		return nil, status.Error(codes.Unauthenticated, err.Error())
+		return nil, kerrors.Unauthorized("invalid_auth_token", err.Error())
 	}
 
 	s.logger.Info("Device logged in successfully",
@@ -103,6 +105,7 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 		Name:                resp.Name,
 		CompanyDetails:      companyDetails,
 		JwtToken:            resp.JwtToken, // Will be set as cookie by HTTP encoder, not in JSON (taksa-specific field)
+		ExpiresAt:           resp.ExpiresAt,
 	}
 
 	return protoResp, nil
@@ -113,41 +116,24 @@ func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.Lo
 func (s *InstanceService) Pull(ctx context.Context, req *emptypb.Empty) (*v2.PullResponse, error) {
 	s.logger.Debug("Pull API called")
 
-	// Extract JWT from context (set by middleware)
-	jwtDeviceID := ""
-	if jwtToken, ok := ctx.Value(JWTTokenKey).(string); ok && jwtToken != "" {
-		// s.logger.Debug("JWT token found in context",
-		// 	zap.String("token_preview", jwtToken[:min(len(jwtToken), 30)]+"..."),
-		// )
-		deviceID, err := s.authUc.ExtractDeviceIDFromJWT(jwtToken)
-		if err != nil {
-			s.logger.Warn("Failed to extract device ID from JWT",
-				zap.Error(err),
-			)
-			return &v2.PullResponse{
-				UMHMessages: []*v2.UMHMessage{},
-			}, nil
-		}
-		// s.logger.Debug("Extracted device ID from JWT",
-		// 	zap.String("device_id", deviceID),
-		// )
-		jwtDeviceID = deviceID
-	} else {
-		s.logger.Warn("No JWT token found in context")
+	// Extract device_id and tenant_id from context (set by middleware from JWT)
+	deviceID := middleware.GetDeviceID(ctx)
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" || deviceID == "" {
+		s.logger.Warn("Pull failed: missing tenant_id or device_id in context")
+		return nil, kerrors.Unauthorized("invalid_token", "missing tenant_id or device_id in token")
 	}
-
-	if jwtDeviceID == "" {
-		s.logger.Warn("Pull API: no device ID in JWT")
-		return &v2.PullResponse{
-			UMHMessages: []*v2.UMHMessage{},
-		}, nil
-	}
+	
+	s.logger.Debug("Pull API device context",
+		zap.String("device_id", deviceID),
+		zap.String("tenant_id", tenantID),
+	)
 
 	// Retrieve queued messages for this device
-	messageData, err := s.instanceUc.PullMessages(ctx, jwtDeviceID)
+	messageData, err := s.instanceUc.PullMessages(ctx, deviceID)
 	if err != nil {
 		s.logger.Error("Failed to pull messages",
-			zap.String("device_id", jwtDeviceID),
+			zap.String("device_id", deviceID),
 			zap.Error(err),
 		)
 		return &v2.PullResponse{
@@ -192,7 +178,7 @@ func (s *InstanceService) Pull(ctx context.Context, req *emptypb.Empty) (*v2.Pul
 	}
 
 	s.logger.Debug("Pull completed",
-		zap.String("device_id", jwtDeviceID),
+		zap.String("device_id", deviceID),
 		zap.Int("message_count", len(messages)),
 	)
 
@@ -213,26 +199,18 @@ func (s *InstanceService) Push(ctx context.Context, req *v2.PushRequest) (*empty
 		return nil, status.Error(codes.InvalidArgument, "messages are required")
 	}
 
-	// Extract JWT from context (set by middleware) to determine device context
-	// This is used as fallback if umhInstance field is not populated in messages
-	jwtDeviceID := ""
-	if jwtToken, ok := ctx.Value(JWTTokenKey).(string); ok && jwtToken != "" {
-		deviceID, err := s.authUc.ExtractDeviceIDFromJWT(jwtToken)
-		if err != nil {
-			s.logger.Warn("Failed to extract device ID from JWT, will rely on message umhInstance field",
-				zap.Error(err),
-			)
-		} else {
-			jwtDeviceID = deviceID
-			s.logger.Debug("Extracted device ID from JWT",
-				zap.String("device_id", deviceID),
-			)
-		}
+	// Extract device_id and tenant_id from context (set by middleware from JWT)
+	deviceID := middleware.GetDeviceID(ctx)
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" || deviceID == "" {
+		s.logger.Warn("Push failed: missing tenant_id or device_id in context")
+		return nil, kerrors.Unauthorized("invalid_token", "missing tenant_id or device_id in token")
 	}
-
+	
 	s.logger.Debug("Processing push messages",
 		zap.Int("message_count", len(req.UMHMessages)),
-		zap.String("jwt_device_id_fallback", jwtDeviceID),
+		zap.String("device_id", deviceID),
+		zap.String("tenant_id", tenantID),
 	)
 
 	// Log metadata from incoming messages for tracking
@@ -245,8 +223,8 @@ func (s *InstanceService) Push(ctx context.Context, req *v2.PushRequest) (*empty
 		}
 	}
 
-	// Process push messages with JWT device ID as fallback
-	err := s.instanceUc.PushMessages(ctx, req.UMHMessages, jwtDeviceID)
+	// Process push messages
+	err := s.instanceUc.PushMessages(ctx, req.UMHMessages, deviceID)
 	if err != nil {
 		s.logger.Error("Push failed",
 			zap.Int("message_count", len(req.UMHMessages)),
@@ -265,26 +243,25 @@ func (s *InstanceService) Push(ctx context.Context, req *v2.PushRequest) (*empty
 // GetCertificate retrieves device certificate
 // RPC: GET /v2/instance/user/certificate?email=<email>
 // Device identity comes from JWT token in cookie (extracted by middleware)
+// tenant_id and device_id are extracted from context by middleware
 // Response matches umh-core's UserCertificateResponse exactly
 // (pkg/communicator/api/v2/pull/pull.go:147-151)
 func (s *InstanceService) GetCertificate(ctx context.Context, req *v2.GetCertificateRequest) (*v2.Certificate, error) {
-	// Extract device_id from JWT token (set by ExtractJWTTokenMiddleware)
-	jwtToken, ok := ctx.Value(JWTTokenKey).(string)
-	if !ok || jwtToken == "" {
-		s.logger.Warn("GetCertificate failed: missing JWT token")
-		return nil, status.Error(codes.Unauthenticated, "missing JWT token")
+	// Extract tenant_id and device_id from context (set by middleware from JWT)
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		s.logger.Warn("GetCertificate failed: missing tenant_id in context")
+		return nil, kerrors.Unauthorized("invalid_token", "missing tenant_id in context")
 	}
 
-	// Decode JWT to get device_id
-	deviceID, err := s.authUc.ExtractDeviceIDFromJWT(jwtToken)
-	if err != nil {
-		s.logger.Warn("GetCertificate failed: invalid JWT token",
-			zap.Error(err),
-		)
-		return nil, status.Error(codes.Unauthenticated, "invalid JWT token")
+	deviceID := middleware.GetDeviceID(ctx)
+	if deviceID == "" {
+		s.logger.Warn("GetCertificate failed: missing device_id in context")
+		return nil, kerrors.Unauthorized("invalid_token", "missing device_id in context")
 	}
 
 	s.logger.Debug("GetCertificate API called",
+		zap.String("tenant_id", tenantID),
 		zap.String("device_id", deviceID),
 		zap.String("email", req.Email),
 	)
@@ -297,6 +274,7 @@ func (s *InstanceService) GetCertificate(ctx context.Context, req *v2.GetCertifi
 	cert, err := s.instanceUc.GetCertificate(ctx, deviceID, req.Email)
 	if err != nil {
 		s.logger.Error("GetCertificate failed",
+			zap.String("tenant_id", tenantID),
 			zap.String("device_id", deviceID),
 			zap.String("email", req.Email),
 			zap.Error(err),
@@ -305,6 +283,7 @@ func (s *InstanceService) GetCertificate(ctx context.Context, req *v2.GetCertifi
 	}
 
 	s.logger.Info("Certificate retrieved successfully",
+		zap.String("tenant_id", tenantID),
 		zap.String("device_id", deviceID),
 		zap.String("email", req.Email),
 	)

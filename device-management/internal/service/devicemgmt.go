@@ -24,6 +24,7 @@ import (
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/biz"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
@@ -470,8 +471,14 @@ func (s *DeviceMgmtService) GetDeviceConfigActionResponse(ctx context.Context, r
 		return nil, status.Error(codes.InvalidArgument, "action_id is required")
 	}
 
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
 	// Retrieve the action
-	action, err := s.actionUc.GetAction(ctx, req.ActionId)
+	action, err := s.actionUc.GetAction(ctx, tenantID, req.ActionId)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("action not found: %v", err))
 	}
@@ -499,7 +506,7 @@ func (s *DeviceMgmtService) GetDeviceConfigActionResponse(ctx context.Context, r
 	//   - other statuses → action still pending, result field empty
 	if action.Status == models.ActionStatusCompleted {
 		// Fetch result from messages table via action_message_tracking correlation
-		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, req.ActionId)
+		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, tenantID, req.ActionId)
 		if err == nil && resultPayload != nil {
 			// Deserialize based on action type
 			switch action.Type {
@@ -659,8 +666,14 @@ func (s *DeviceMgmtService) GetLogsActionResponse(ctx context.Context, req *v1.A
 		return nil, status.Error(codes.InvalidArgument, "action_id is required")
 	}
 
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
 	// Retrieve the action
-	action, err := s.actionUc.GetAction(ctx, req.ActionId)
+	action, err := s.actionUc.GetAction(ctx, tenantID, req.ActionId)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("action not found: %v", err))
 	}
@@ -689,7 +702,7 @@ func (s *DeviceMgmtService) GetLogsActionResponse(ctx context.Context, req *v1.A
 	//   - other statuses (QUEUED, DELIVERED, PROCESSING) → action still pending, result_payload empty
 	if action.Status == models.ActionStatusCompleted {
 		// Fetch result from messages table via action_message_tracking correlation
-		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, req.ActionId)
+		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, tenantID, req.ActionId)
 		if err == nil && resultPayload != nil {
 			// Detect and decompress if payload is gzip or zstd compressed
 			decompressed, err := decompressPayload(resultPayload)
@@ -723,8 +736,14 @@ func (s *DeviceMgmtService) GetMetricsActionResponse(ctx context.Context, req *v
 		return nil, status.Error(codes.InvalidArgument, "action_id is required")
 	}
 
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
 	// Retrieve the action
-	action, err := s.actionUc.GetAction(ctx, req.ActionId)
+	action, err := s.actionUc.GetAction(ctx, tenantID, req.ActionId)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("action not found: %v", err))
 	}
@@ -753,7 +772,7 @@ func (s *DeviceMgmtService) GetMetricsActionResponse(ctx context.Context, req *v
 	//   - other statuses (QUEUED, DELIVERED, PROCESSING) → action still pending, result_payload empty
 	if action.Status == models.ActionStatusCompleted {
 		// Fetch result from messages table via action_message_tracking correlation
-		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, req.ActionId)
+		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, tenantID, req.ActionId)
 		if err == nil && resultPayload != nil {
 			// Detect and decompress if payload is gzip or zstd compressed
 			decompressed, err := decompressPayload(resultPayload)
@@ -978,8 +997,14 @@ func (s *DeviceMgmtService) GetProtocolConverterActionResponse(ctx context.Conte
 		return nil, status.Error(codes.InvalidArgument, "action_id is required")
 	}
 
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
 	// Retrieve the action
-	action, err := s.actionUc.GetAction(ctx, req.ActionId)
+	action, err := s.actionUc.GetAction(ctx, tenantID, req.ActionId)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("action not found: %v", err))
 	}
@@ -1013,7 +1038,7 @@ func (s *DeviceMgmtService) GetProtocolConverterActionResponse(ctx context.Conte
 	// - status=DELETED (Delete action succeeded) → result field is empty (expected)
 	// - other statuses (QUEUED, DELIVERED, PROCESSING) → action still pending, result empty
 	if action.Status == models.ActionStatusCompleted {
-		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, req.ActionId)
+		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, tenantID, req.ActionId)
 		if err == nil && resultPayload != nil && len(resultPayload) > 0 {
 			// Decompress if needed
 			decompressed, err := decompressPayload(resultPayload)
@@ -1036,6 +1061,12 @@ func (s *DeviceMgmtService) GetProtocolConverterActionResponse(ctx context.Conte
 func (s *DeviceMgmtService) ListProtocolConverters(ctx context.Context, req *v1.ListProtocolConvertersRequest) (*v1.ListProtocolConvertersResponse, error) {
 	if req == nil || req.DeviceId == "" {
 		return nil, status.Error(codes.InvalidArgument, "device_id is required")
+	}
+
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
 	}
 
 	// Validate device exists and get its status for health determination
@@ -1084,11 +1115,11 @@ func (s *DeviceMgmtService) ListProtocolConverters(ctx context.Context, req *v1.
 		ConnectionUUIDFilter:   req.ConnectionUuidFilter,
 		HealthStatusFilter:     req.HealthStatusFilter,
 		Offset:                offset,
-		Limit:                 int64(pageSize),
+		Limit:                 int64(pageSize) + 1, // Fetch one extra to detect if more pages exist
 	}
 
 	// Query the database
-	converters, err := s.protocolConverterRepo.List(ctx, query)
+	converters, err := s.protocolConverterRepo.List(ctx, tenantID, query)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to list protocol converters: %v", err))
 	}
@@ -1476,8 +1507,14 @@ func (s *DeviceMgmtService) GetDataModelActionResponse(ctx context.Context, req 
 		return nil, status.Error(codes.InvalidArgument, "action_id is required")
 	}
 
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
 	// Retrieve the action
-	action, err := s.actionUc.GetAction(ctx, req.ActionId)
+	action, err := s.actionUc.GetAction(ctx, tenantID, req.ActionId)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("action not found: %v", err))
 	}
@@ -1502,7 +1539,7 @@ func (s *DeviceMgmtService) GetDataModelActionResponse(ctx context.Context, req 
 	// Only parse result if action succeeded
 	// Retrieve result payload (may be compressed)
 	if action.Status == models.ActionStatusCompleted {
-		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, req.ActionId)
+		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, tenantID, req.ActionId)
 		if err == nil && resultPayload != nil && len(resultPayload) > 0 {
 			// Decompress if needed
 			decompressed, err := decompressPayload(resultPayload)
@@ -1667,6 +1704,12 @@ func (s *DeviceMgmtService) ListDataModels(ctx context.Context, req *v1.ListData
 		return nil, status.Error(codes.InvalidArgument, "device_id is required")
 	}
 
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
 	// Validate device exists
 	device, err := s.deviceUc.GetDevice(ctx, req.DeviceId)
 	if err != nil {
@@ -1699,11 +1742,11 @@ func (s *DeviceMgmtService) ListDataModels(ctx context.Context, req *v1.ListData
 		NameFilter:    req.NameFilter,
 		VersionFilter: req.VersionFilter,
 		Offset:        offset,
-		Limit:         int64(pageSize),
+		Limit:         int64(pageSize) + 1, // Fetch one extra to detect if more pages exist
 	}
 
 	// Query the database
-	models, err := s.dataModelRepo.List(ctx, query)
+	models, err := s.dataModelRepo.List(ctx, tenantID, query)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to list data models: %v", err))
 	}
@@ -1808,31 +1851,37 @@ func (s *DeviceMgmtService) EditStreamProcessor(ctx context.Context, req *v1.Edi
 		return nil, status.Error(codes.InvalidArgument, "uuid is required (path parameter)")
 	}
 
-	// Encode config if provided
-	encodedConfig := ""
-	if req.Config != nil {
-		var err error
-		encodedConfig, err = encodeStreamProcessorConfig(req.Config)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to encode config: %v", err))
-		}
+	// Validate required fields (umh-core requires these to always be present)
+	if req.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "name is required")
+	}
+	if req.Config == nil {
+		return nil, status.Error(codes.InvalidArgument, "config is required")
+	}
+	if req.ModelName == "" {
+		return nil, status.Error(codes.InvalidArgument, "model_name is required")
+	}
+	if req.ModelVersion == "" {
+		return nil, status.Error(codes.InvalidArgument, "model_version is required")
 	}
 
-	// Build payload with provided fields (sparse update)
+	// Encode config (always required)
+	encodedConfig, err := encodeStreamProcessorConfig(req.Config)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to encode config: %v", err))
+	}
+
+	// Build complete payload (all required fields must be present for umh-core validation)
 	editPayload := &v2.StreamProcessor{
 		Uuid:              req.Uuid,
 		Name:              req.Name,
 		EncodedConfig:     encodedConfig,
 		IgnoreHealthCheck: req.IgnoreHealthCheck,
 		Location:          req.Location,
-	}
-
-	// Set model reference if provided
-	if req.ModelName != "" && req.ModelVersion != "" {
-		editPayload.Model = &v2.StreamProcessorModelRef{
+		Model: &v2.StreamProcessorModelRef{
 			Name:    req.ModelName,
 			Version: req.ModelVersion,
-		}
+		},
 	}
 
 	payload, err := convertRequestToAny(editPayload)
@@ -1931,7 +1980,13 @@ func (s *DeviceMgmtService) GetStreamProcessorActionResponse(ctx context.Context
 		return nil, status.Error(codes.InvalidArgument, "action_id is required")
 	}
 
-	action, err := s.actionUc.GetAction(ctx, req.ActionId)
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
+	action, err := s.actionUc.GetAction(ctx, tenantID, req.ActionId)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("action not found: %v", err))
 	}
@@ -1955,7 +2010,7 @@ func (s *DeviceMgmtService) GetStreamProcessorActionResponse(ctx context.Context
 	}
 
 	if action.Status == models.ActionStatusCompleted {
-		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, req.ActionId)
+		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, tenantID, req.ActionId)
 		if err == nil && resultPayload != nil && len(resultPayload) > 0 {
 			decompressed, err := decompressPayload(resultPayload)
 			if err == nil {
@@ -1977,6 +2032,19 @@ func (s *DeviceMgmtService) GetStreamProcessorActionResponse(ctx context.Context
 							}
 						}
 					}
+					
+					// Extract model reference
+					if result.Model != nil {
+						resp.Model = &v1.StreamProcessorModelRef{
+							Name:    result.Model.Name,
+							Version: result.Model.Version,
+						}
+					}
+					
+					// Extract location
+					if result.Location != nil {
+						resp.Location = result.Location
+					}
 				}
 			}
 		}
@@ -1990,6 +2058,12 @@ func (s *DeviceMgmtService) GetStreamProcessorActionResponse(ctx context.Context
 func (s *DeviceMgmtService) ListStreamProcessors(ctx context.Context, req *v1.ListStreamProcessorsRequest) (*v1.ListStreamProcessorsResponse, error) {
 	if req == nil || req.DeviceId == "" {
 		return nil, status.Error(codes.InvalidArgument, "device_id is required")
+	}
+
+	// Multi-tenancy: extract tenant_id from context
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
 	}
 
 	pageSize := req.PageSize
@@ -2011,13 +2085,17 @@ func (s *DeviceMgmtService) ListStreamProcessors(ctx context.Context, req *v1.Li
 	}
 
 	query := &data.StreamProcessorListQuery{
-		DeviceID:   req.DeviceId,
-		NameFilter: "", // No filter for basic list
-		Offset:     int64(offset),
-		Limit:      int64(pageSize),
+		DeviceID:              req.DeviceId,
+		UUIDFilter:            req.UuidFilter,
+		NameFilter:            req.NameFilter,
+		DeploymentStatusFilter: req.DeploymentStatusFilter,
+		HealthStatusFilter:     req.HealthStatusFilter,
+		ModelNameFilter:        req.ModelNameFilter,
+		Offset:                int64(offset),
+		Limit:                 int64(pageSize) + 1, // Fetch one extra to detect if more pages exist
 	}
 
-	models, err := s.streamProcessorRepo.List(ctx, query)
+	models, err := s.streamProcessorRepo.List(ctx, tenantID, query)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to list stream processors: %v", err))
 	}

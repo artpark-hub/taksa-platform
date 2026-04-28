@@ -3,10 +3,12 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	devicemgmt "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/service"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -23,13 +25,24 @@ func loginResponseEncoder(w http.ResponseWriter, r *http.Request, v interface{})
 	if loginResp, ok := v.(*v2.LoginResponse); ok {
 		// Set cookie FIRST, before any writes
 		if loginResp.JwtToken != "" {
+			cookieMaxAge := 0
+			cookieExpiresAt := time.Time{}
+			if loginResp.ExpiresAt != nil {
+				cookieExpiresAt = loginResp.ExpiresAt.AsTime()
+				cookieMaxAge = int(time.Until(cookieExpiresAt).Seconds())
+				if cookieMaxAge < 0 {
+					cookieMaxAge = 0
+				}
+			}
+
 			cookie := &http.Cookie{
 				Name:     "token",
 				Value:    loginResp.JwtToken,
 				Path:     "/",
 				HttpOnly: true,
 				SameSite: http.SameSiteStrictMode,
-				MaxAge:   3600,
+				Expires:  cookieExpiresAt,
+				MaxAge:   cookieMaxAge,
 			}
 			http.SetCookie(w, cookie)
 			// Remove JWT from response body
@@ -63,6 +76,7 @@ func NewHTTPServer(
 	var opts = []khttp.ServerOption{
 		khttp.Middleware(
 			recovery.Recovery(),
+			middleware.HTTPTenantMiddleware(zapLogger, c.JwtSecret),
 			service.AuthMiddleware(zapLogger),
 			service.ExtractJWTTokenMiddleware(zapLogger),
 		),
@@ -82,4 +96,3 @@ func NewHTTPServer(
 	devicemgmt.RegisterDeviceMgmtServiceHTTPServer(srv, deviceMgmt)
 	return srv
 }
-

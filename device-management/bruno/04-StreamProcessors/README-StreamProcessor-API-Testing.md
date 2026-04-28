@@ -24,6 +24,7 @@ GET /api/v1/devicemgmt/devices/{device_id}/stream-processors
 ```
 - Queries local database cache (synchronized from device)
 - Shows all processors for the device
+- Supports filtering and pagination (see Filter Tests section below)
 
 ### 4. Edit Stream Processor
 ```
@@ -159,6 +160,66 @@ Auto-populated:
 - **404 Not Found**: Device or processor not found
 - **500 Internal Server Error**: Server error
 
+## Filter Tests
+
+The following filter tests support testing the ListStreamProcessors endpoint with various filter combinations:
+
+### 07-ListStreamProcessors-WithPagination
+Tests cursor-based pagination with `page_size` and `page_token` parameters.
+- Demonstrates paginating through large result sets
+- Shows how to use `next_page_token` for subsequent requests
+
+### 08-ListStreamProcessors-WithFilters
+Tests combining multiple filters with AND logic.
+- Example: `name_filter=processor&deployment_status_filter=ACTIVE`
+- Verifies both filter conditions are applied
+
+### 09-ListStreamProcessors-FilterByUUID
+Tests exact UUID matching.
+- Returns at most 1 result
+- Useful for retrieving a specific processor by UUID
+
+### 10-ListStreamProcessors-FilterByName
+Tests substring search on processor name.
+- Case-sensitive matching
+- Returns all processors containing the filter string
+
+### 11-ListStreamProcessors-FilterByDeploymentStatus
+Tests filtering by deployment status.
+- Valid values: `PENDING`, `ACTIVE`, `FAILED`
+- Maps from device Health.State
+- Failed processors include `errorMessage` field
+
+### 12-ListStreamProcessors-FilterByHealthStatus
+Tests filtering by health status.
+- Valid values: `ONLINE`, `OFFLINE`, `UNKNOWN`
+- Maps from device Health.Category
+- Status progression: UNKNOWN → ONLINE/OFFLINE after StatusMessage heartbeat
+
+### 13-ListStreamProcessors-FilterByModelName
+Tests substring search on model name.
+- Searches StreamProcessorModelRef.name field
+- Useful for finding processors using specific models
+
+## Available Query Parameters
+
+```
+GET /api/v1/devicemgmt/devices/{device_id}/stream-processors?param1=value1&param2=value2
+```
+
+**Pagination:**
+- `page_size` (int): Results per page (default 20, max 100)
+- `page_token` (string): Cursor token from previous response
+
+**Filters (all optional):**
+- `uuid_filter` (string): Exact UUID match
+- `name_filter` (string): Substring match on processor name
+- `deployment_status_filter` (string): PENDING | ACTIVE | FAILED
+- `health_status_filter` (string): ONLINE | OFFLINE | UNKNOWN
+- `model_name_filter` (string): Substring match on model name
+
+All filters work independently or combined with AND logic.
+
 ## Notes
 
 1. All mutation operations (Deploy, Edit, Delete) are asynchronous
@@ -166,3 +227,5 @@ Auto-populated:
 3. Results are synced to local database when action completes
 4. Delete actions have empty result when status=COMPLETED
 5. Processor UUID is UUID format (same as ProtocolConverters)
+6. Status fields (`deployment_status`, `health_status`, `last_sync_time`) are populated from device StatusMessage heartbeats and action results
+7. `last_sync_time` is RFC3339 formatted timestamp of last sync from device
