@@ -39,7 +39,7 @@ func (r *tenantsRepo) CreateKratosIdentity(ctx context.Context, email, password,
 			},
 			"role":              role,
 			"organization_name": orgName,
-			"organization_id":   orgID,
+			"tenant_id":         orgID,
 		},
 		"credentials": map[string]interface{}{
 			"password": map[string]interface{}{
@@ -119,7 +119,7 @@ func (r *tenantsRepo) ListIdentitiesByOrg(ctx context.Context, orgName, orgID st
 	var users []*biz.User
 	for _, id := range identities {
 		tOrgName, _ := id.Traits["organization_name"].(string)
-		tOrgID, _ := id.Traits["organization_id"].(string)
+		tOrgID, _ := id.Traits["tenant_id"].(string)
 
 		if tOrgName == orgName && tOrgID == orgID {
 			email, _ := id.Traits["email"].(string)
@@ -193,7 +193,7 @@ func (r *tenantsRepo) UpdateIdentity(ctx context.Context, id, firstName, lastNam
 	}
 
 	orgName, _ := currentIdentity.Traits["organization_name"].(string)
-	orgID, _ := currentIdentity.Traits["organization_id"].(string)
+	orgID, _ := currentIdentity.Traits["tenant_id"].(string)
 	email, _ := currentIdentity.Traits["email"].(string)
 	currentRole, _ := currentIdentity.Traits["role"].(string)
 
@@ -224,7 +224,7 @@ func (r *tenantsRepo) UpdateIdentity(ctx context.Context, id, firstName, lastNam
 			},
 			"role":              role,
 			"organization_name": orgName,
-			"organization_id":   orgID,
+			"tenant_id":         orgID,
 		},
 	}
 

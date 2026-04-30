@@ -90,7 +90,7 @@ func (s *UserManagementService) CreateSubUser(ctx context.Context, req *v1.Creat
 		Data: &v1.UserData{
 			IdentityId:       data.IdentityID,
 			OrganizationName: data.OrganizationName,
-			OrganizationId:   data.OrganizationID,
+			TenantId:         data.OrganizationID,
 		},
 	}, nil
 }
@@ -115,7 +115,7 @@ func (s *UserManagementService) ListSubUsers(ctx context.Context, req *v1.ListSu
 			FirstName:        u.FirstName,
 			LastName:         u.LastName,
 			OrganizationName: u.OrganizationName,
-			OrganizationId:   u.OrganizationID,
+			TenantId:         u.OrganizationID,
 			Role:             u.Role,
 		})
 	}
@@ -300,7 +300,7 @@ func (s *UserManagementService) UpdateUserProfile(ctx context.Context, req *v1.U
 			FirstName:        user.FirstName,
 			LastName:         user.LastName,
 			OrganizationName: user.OrganizationName,
-			OrganizationId:   user.OrganizationID,
+			TenantId:         user.OrganizationID,
 			Role:             user.Role,
 		},
 	}, nil
@@ -331,7 +331,7 @@ func (s *UserManagementService) GetJWTToken(ctx context.Context, req *v1.GetJWTT
 
 func (s *UserManagementService) GenerateOrganizationID(ctx context.Context, req *v1.GenerateOrganizationIDRequest) (*v1.GenerateOrganizationIDResponse, error) {
 	return &v1.GenerateOrganizationIDResponse{
-		OrganizationId: uuid.NewString(),
+		TenantId: uuid.NewString(),
 	}, nil
 }
 
@@ -366,7 +366,7 @@ func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDeta
 		if org, found := claims["organization_name"]; found {
 			details.OrganizationName, _ = org.(string)
 		}
-		if orgID, found := claims["organization_id"]; found {
+		if orgID, found := claims["tenant_id"]; found {
 			details.OrganizationID, _ = orgID.(string)
 		}
 		if role, found := claims["role"]; found {
@@ -386,7 +386,7 @@ func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDeta
 				}
 			}
 			if details.OrganizationID == "" {
-				if orgID, ok := traits["organization_id"].(string); ok {
+				if orgID, ok := traits["tenant_id"].(string); ok {
 					details.OrganizationID = orgID
 				}
 			}
@@ -407,7 +407,7 @@ func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDeta
 		return nil, errors.New("organization_name claim not found in token")
 	}
 	if details.OrganizationID == "" {
-		return nil, errors.New("organization_id claim not found in token")
+		return nil, errors.New("tenant_id claim not found in token")
 	}
 	if details.Role == "" {
 		return nil, errors.New("role claim not found in token")
