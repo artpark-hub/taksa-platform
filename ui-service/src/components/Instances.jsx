@@ -121,8 +121,7 @@ const Instances = () => {
                 throw new Error(getErrorMessage(data, 'Failed to delete Data Collecting Device.'));
             }
 
-            const updatedList = instances.filter(inst => inst.id !== instanceId);
-            setInstances(updatedList);
+            setInstances((prev) => prev.filter((inst) => inst.id !== instanceId));
             setOpenDropdownId(null);
             setDeleteModalConfig({ isOpen: false, instance: null, isDeleting: false });
         } catch (error) {

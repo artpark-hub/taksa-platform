@@ -9,6 +9,7 @@ const Getconfig = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
     const editorRef = useRef(null);
+    const isMountedRef = useRef(true);
 
     const deviceId = searchParams?.get('deviceId') || '';
     const deviceName = searchParams?.get('deviceName') || 'Unknown device';
@@ -38,9 +39,17 @@ const Getconfig = () => {
 
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+    useEffect(() => {
+        isMountedRef.current = true;
+
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
     const pollConfigActionResult = async (actionId, cancelledRef) => {
         for (let attempt = 0; attempt < 60; attempt += 1) {
-            if (cancelledRef?.current) {
+            if (cancelledRef?.current || !isMountedRef.current) {
                 return null;
             }
 
@@ -94,7 +103,7 @@ const Getconfig = () => {
         }
 
         const result = await pollConfigActionResult(data.actionId, cancelledRef);
-        if (!result || cancelledRef.current) {
+        if (!result || cancelledRef.current || !isMountedRef.current) {
             return;
         }
 
@@ -119,7 +128,7 @@ const Getconfig = () => {
 
         const loadConfig = async () => {
             if (!deviceId) {
-                if (!cancelledRef.current) {
+                if (!cancelledRef.current && isMountedRef.current) {
                     setConfigValue('');
                     setInitialConfigValue('');
                     setConfigLastModifiedTime('');
@@ -138,14 +147,14 @@ const Getconfig = () => {
 
                 await queueGetConfig(cancelledRef);
             } catch (error) {
-                if (!cancelledRef.current) {
+                if (!cancelledRef.current && isMountedRef.current) {
                     setConfigValue('');
                     setInitialConfigValue('');
                     setConfigLastModifiedTime('');
                     setErrorMessage(error.message || 'Failed to load config file.');
                 }
             } finally {
-                if (!cancelledRef.current) {
+                if (!cancelledRef.current && isMountedRef.current) {
                     setIsQueued(false);
                     setQueueMessage('');
                     setIsLoading(false);
@@ -205,20 +214,26 @@ const Getconfig = () => {
             }
 
             const result = await pollConfigActionResult(data.actionId, cancelledRef);
-            if (!result || cancelledRef.current) {
+            if (!result || cancelledRef.current || !isMountedRef.current) {
                 return;
             }
 
             setQueueMessage('Fetching Config file from device, please wait.');
             await queueGetConfig(cancelledRef);
 
-            setSuccessMessage('Config saved successfully.');
+            if (!cancelledRef.current && isMountedRef.current) {
+                setSuccessMessage('Config saved successfully.');
+            }
         } catch (error) {
-            setErrorMessage(error.message || 'Failed to save config file.');
+            if (isMountedRef.current) {
+                setErrorMessage(error.message || 'Failed to save config file.');
+            }
         } finally {
-            setIsQueued(false);
-            setQueueMessage('');
-            setIsSaving(false);
+            if (isMountedRef.current) {
+                setIsQueued(false);
+                setQueueMessage('');
+                setIsSaving(false);
+            }
         }
     };
 
