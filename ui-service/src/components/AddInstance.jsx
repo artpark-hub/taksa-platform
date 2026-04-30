@@ -256,7 +256,7 @@ const AddInstance = () => {
                                 className={`form-input ${errors.orgName ? 'input-error' : ''}`}
                                 value={orgName}
                                 onChange={(e) => {
-                                    setOrgName(e.target.value);
+                                    setOrgName(e.target.value.replace(/ /g, '_'));
                                     if (errors.orgName) setErrors({ ...errors, orgName: null });
                                     if (formError) setFormError('');
                                 }}
@@ -267,19 +267,19 @@ const AddInstance = () => {
 
                     <div className="location-row">
                         <div className="location-label-col">Level 1</div>
-                        <input type="text" className="form-input" placeholder="Your level 1 name" value={level1} onChange={(e) => setLevel1(e.target.value)} />
+                        <input type="text" className="form-input" placeholder="Your level 1 name" value={level1} onChange={(e) => setLevel1(e.target.value.replace(/ /g, '_'))} />
                     </div>
                     <div className="location-row">
                         <div className="location-label-col">Level 2</div>
-                        <input type="text" className="form-input" placeholder="Your level 2 name" value={level2} onChange={(e) => setLevel2(e.target.value)} />
+                        <input type="text" className="form-input" placeholder="Your level 2 name" value={level2} onChange={(e) => setLevel2(e.target.value.replace(/ /g, '_'))} />
                     </div>
                     <div className="location-row">
                         <div className="location-label-col">Level 3</div>
-                        <input type="text" className="form-input" placeholder="Your level 3 name" value={level3} onChange={(e) => setLevel3(e.target.value)} />
+                        <input type="text" className="form-input" placeholder="Your level 3 name" value={level3} onChange={(e) => setLevel3(e.target.value.replace(/ /g, '_'))} />
                     </div>
                     <div className="location-row">
                         <div className="location-label-col">Level 4</div>
-                        <input type="text" className="form-input" placeholder="Your level 4 name" value={level4} onChange={(e) => setLevel4(e.target.value)} />
+                        <input type="text" className="form-input" placeholder="Your level 4 name" value={level4} onChange={(e) => setLevel4(e.target.value.replace(/ /g, '_'))} />
                     </div>
                 </div>
             </div>

@@ -70,14 +70,36 @@ const Instances = () => {
 
         const refreshInterval = setInterval(loadInstances, 180000);
 
+        const handlePageShow = () => {
+            loadInstances();
+        };
+
+        const handleWindowFocus = () => {
+            loadInstances();
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                loadInstances();
+            }
+        };
+
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setOpenDropdownId(null);
             }
         };
+
+        window.addEventListener('pageshow', handlePageShow);
+        window.addEventListener('focus', handleWindowFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
         document.addEventListener('mousedown', handleClickOutside);
+
         return () => {
             clearInterval(refreshInterval);
+            window.removeEventListener('pageshow', handlePageShow);
+            window.removeEventListener('focus', handleWindowFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
