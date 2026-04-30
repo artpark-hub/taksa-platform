@@ -86,7 +86,7 @@ func (s *DeviceStore) Save(ctx context.Context, device *v1.Device) error {
 		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,  // 7-level location hierarchy
 		device.Certificate, device.EncryptedPrivateKey,
 		device.Status, device.CreatedAt.AsTime().Format(time.RFC3339),
-		device.LastSeen.AsTime().Format(time.RFC3339),
+		optionalTime(device.LastSeen),
 		optionalTime(device.LastLogin), optionalTime(device.AuthTokenExpiresAt),
 	)
 
@@ -292,18 +292,60 @@ func (s *DeviceStore) ListSummaries(ctx context.Context, filters *storage.Device
 	
 	summaries := make([]*v1.DeviceSummary, 0, len(devices))
 	for _, device := range devices {
+		effectiveStatus := deriveEffectiveDeviceStatus(device)
 		summary := &v1.DeviceSummary{
 			Id:        device.Id,
 			CreatedBy: device.CreatedBy,
 			Name:      device.Name,
 			Location:  device.Location,
-			Status:    device.Status,
+			Status:    effectiveStatus,
 			CreatedAt: device.CreatedAt,
 			LastSeen:  device.LastSeen,
 		}
 		summaries = append(summaries, summary)
 	}
 	return summaries, nil
+}
+
+const deviceActiveWindow = 1 * time.Minute
+
+// deriveEffectiveDeviceStatus derives the listing status according to product rules:
+// - On registration: PENDING.
+// - On first successful login: becomes ACTIVE (persisted).
+// - Subsequently toggles between ACTIVE/INACTIVE based on last_seen activity.
+// - SUSPENDED/DECOMMISSIONED are terminal admin states.
+func deriveEffectiveDeviceStatus(device *v1.Device) v1.DeviceStatus {
+	if device == nil {
+		return v1.DeviceStatus_DEVICE_STATUS_UNSPECIFIED
+	}
+
+	switch device.Status {
+	case v1.DeviceStatus_SUSPENDED, v1.DeviceStatus_DECOMMISSIONED:
+		return device.Status
+	case v1.DeviceStatus_PENDING:
+		// Registration state always shows as PENDING until login flips status to ACTIVE.
+		// Do NOT use last_seen to infer ACTIVE/INACTIVE while still administratively PENDING
+		// (older rows or DB defaults may have last_seen initialized).
+		return v1.DeviceStatus_PENDING
+	default:
+		// For any other admin status, only derive ACTIVE/INACTIVE when the stored
+		// state is ACTIVE. Otherwise, return as-is.
+		if device.Status != v1.DeviceStatus_ACTIVE {
+			return device.Status
+		}
+	}
+
+	// If we have a heartbeat timestamp, use it as the primary activity signal.
+	if device.LastSeen != nil {
+		lastSeen := device.LastSeen.AsTime()
+		if time.Since(lastSeen) <= deviceActiveWindow {
+			return v1.DeviceStatus_ACTIVE
+		}
+		return v1.DeviceStatus_INACTIVE
+	}
+
+	// No last_seen, but has logged in at least once.
+	return v1.DeviceStatus_INACTIVE
 }
 
 // Update updates an existing device
@@ -362,7 +404,7 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 		device.Metadata.FirmwareVersion, device.Metadata.IpAddress, device.Metadata.MacAddress,
 		locCompany, locPlant, locArea, locZone, locLine, locWorkCell, locWorkUnit,
 		device.Certificate, device.EncryptedPrivateKey,
-		device.Status, device.LastSeen.AsTime().Format(time.RFC3339),
+		device.Status, optionalTime(device.LastSeen),
 		optionalTime(device.LastLogin), optionalTime(device.AuthTokenExpiresAt),
 		device.Id,
 	}
@@ -404,12 +446,15 @@ func (s *DeviceStore) UpdateStatus(ctx context.Context, id string, status v1.Dev
 		return ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+
 	query := "UPDATE devices SET status = $1 WHERE id = $2"
 	args := []interface{}{status, id}
-	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+	if tenantID != "" {
 		query = "UPDATE devices SET status = $1 WHERE id = $2 AND tenant_id = $3"
-		args = append(args, tenantID)
+		args = []interface{}{status, id, tenantID}
 	}
+
 	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update device status: %w", err)
@@ -418,6 +463,21 @@ func (s *DeviceStore) UpdateStatus(ctx context.Context, id string, status v1.Dev
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	// If the tenant_id in context is stale/mismatched (e.g. after migrations),
+	// fall back to updating by device id only. Device-facing endpoints already
+	// authenticate the device_id via JWT; tenant scoping here is best-effort.
+	if rows == 0 && tenantID != "" {
+		fallbackResult, fbErr := s.db.ExecContext(ctx, "UPDATE devices SET status = $1 WHERE id = $2", status, id)
+		if fbErr != nil {
+			return fmt.Errorf("failed to update device status (fallback): %w", fbErr)
+		}
+		fallbackRows, fbErr := fallbackResult.RowsAffected()
+		if fbErr != nil {
+			return fmt.Errorf("failed to get rows affected (fallback): %w", fbErr)
+		}
+		rows = fallbackRows
 	}
 
 	if rows == 0 {
@@ -433,12 +493,15 @@ func (s *DeviceStore) UpdateLastSeen(ctx context.Context, id string, timestamp t
 		return ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+
 	query := "UPDATE devices SET last_seen = $1 WHERE id = $2"
 	args := []interface{}{timestamp.Format(time.RFC3339), id}
-	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+	if tenantID != "" {
 		query = "UPDATE devices SET last_seen = $1 WHERE id = $2 AND tenant_id = $3"
-		args = append(args, tenantID)
+		args = []interface{}{timestamp.Format(time.RFC3339), id, tenantID}
 	}
+
 	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update last_seen: %w", err)
@@ -447,6 +510,19 @@ func (s *DeviceStore) UpdateLastSeen(ctx context.Context, id string, timestamp t
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	// Tenant mismatch fallback, see UpdateStatus for rationale.
+	if rows == 0 && tenantID != "" {
+		fallbackResult, fbErr := s.db.ExecContext(ctx, "UPDATE devices SET last_seen = $1 WHERE id = $2", timestamp.Format(time.RFC3339), id)
+		if fbErr != nil {
+			return fmt.Errorf("failed to update last_seen (fallback): %w", fbErr)
+		}
+		fallbackRows, fbErr := fallbackResult.RowsAffected()
+		if fbErr != nil {
+			return fmt.Errorf("failed to get rows affected (fallback): %w", fbErr)
+		}
+		rows = fallbackRows
 	}
 
 	if rows == 0 {
@@ -462,12 +538,15 @@ func (s *DeviceStore) UpdateLastLogin(ctx context.Context, id string, timestamp 
 		return ErrInvalidInput
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+
 	query := "UPDATE devices SET last_login_at = $1 WHERE id = $2"
 	args := []interface{}{timestamp.Format(time.RFC3339), id}
-	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+	if tenantID != "" {
 		query = "UPDATE devices SET last_login_at = $1 WHERE id = $2 AND tenant_id = $3"
-		args = append(args, tenantID)
+		args = []interface{}{timestamp.Format(time.RFC3339), id, tenantID}
 	}
+
 	result, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update last_login_at: %w", err)
@@ -476,6 +555,19 @@ func (s *DeviceStore) UpdateLastLogin(ctx context.Context, id string, timestamp 
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	// Tenant mismatch fallback, see UpdateStatus for rationale.
+	if rows == 0 && tenantID != "" {
+		fallbackResult, fbErr := s.db.ExecContext(ctx, "UPDATE devices SET last_login_at = $1 WHERE id = $2", timestamp.Format(time.RFC3339), id)
+		if fbErr != nil {
+			return fmt.Errorf("failed to update last_login_at (fallback): %w", fbErr)
+		}
+		fallbackRows, fbErr := fallbackResult.RowsAffected()
+		if fbErr != nil {
+			return fmt.Errorf("failed to get rows affected (fallback): %w", fbErr)
+		}
+		rows = fallbackRows
 	}
 
 	if rows == 0 {

@@ -155,9 +155,26 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 	ctx = middleware.SetDeviceID(ctx, deviceID)
 
 	// Record login activity and transition device to ACTIVE on first successful login
-	_ = uc.store.Devices().UpdateLastLogin(ctx, deviceID, time.Now())
-	if device.Status == v1.DeviceStatus_PENDING {
-		_ = uc.store.Devices().UpdateStatus(ctx, deviceID, v1.DeviceStatus_ACTIVE)
+	now := time.Now()
+	if err := uc.store.Devices().UpdateLastLogin(ctx, deviceID, now); err != nil {
+		fmt.Printf("ERROR: login: failed to update last_login_at for device %s (tenant_id=%s): %v\n", deviceID, tenantID, err)
+	}
+	if err := uc.store.Devices().UpdateLastSeen(ctx, deviceID, now); err != nil {
+		fmt.Printf("ERROR: login: failed to update last_seen for device %s (tenant_id=%s): %v\n", deviceID, tenantID, err)
+	}
+	if device.Status != v1.DeviceStatus_SUSPENDED && device.Status != v1.DeviceStatus_DECOMMISSIONED {
+		if err := uc.store.Devices().UpdateStatus(ctx, deviceID, v1.DeviceStatus_ACTIVE); err != nil {
+			fmt.Printf("ERROR: login: failed to set status ACTIVE for device %s (tenant_id=%s): %v\n", deviceID, tenantID, err)
+		}
+	}
+
+	// Re-read device row after login updates so later updates don't overwrite
+	// status/last_seen/last_login_at with stale values from the pre-login read.
+	var refreshedDevice *v1.Device
+	if refreshed, err := uc.store.Devices().GetByID(ctx, deviceID); err != nil {
+		fmt.Printf("ERROR: login: failed to re-read device %s (tenant_id=%s): %v\n", deviceID, tenantID, err)
+	} else if refreshed != nil {
+		refreshedDevice = refreshed
 	}
 
 	// Renew auth token expiry with tenant isolation
@@ -167,12 +184,14 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 	} else {
 		// Update device's auth token expiry to match the renewed token
 		newExpiryTime := time.Now().AddDate(50, 0, 0)
+		// IMPORTANT: use the refreshed device so we don't overwrite status/last_seen/last_login_at
+		// with stale values from the pre-login read.
+		if refreshedDevice != nil {
+			device = refreshedDevice
+		}
 		device.AuthTokenExpiresAt = timestamppb.New(newExpiryTime)
-		fmt.Printf("DEBUG: Updating device %s auth token expiry to %v\n", deviceID, newExpiryTime)
 		if err := uc.store.Devices().Update(ctx, device); err != nil {
 			fmt.Printf("ERROR: Failed to update device auth token expiry for device %s: %v\n", deviceID, err)
-		} else {
-			fmt.Printf("DEBUG: Successfully updated device %s auth token expiry\n", deviceID)
 		}
 	}
 
