@@ -309,6 +309,13 @@ func (s *DeviceStore) ListSummaries(ctx context.Context, filters *storage.Device
 
 const deviceActiveWindow = 1 * time.Minute
 
+func allowUnscopedDeviceUpdate(ctx context.Context, id string) bool {
+	// Only allow tenant bypass for explicitly device-authenticated requests.
+	// This prevents cross-tenant mutation from admin/user contexts that may carry
+	// a tenant_id but are not scoped to a specific device identity.
+	return id != "" && middleware.GetDeviceID(ctx) == id
+}
+
 // deriveEffectiveDeviceStatus derives the listing status according to product rules:
 // - On registration: PENDING.
 // - On first successful login: becomes ACTIVE (persisted).
@@ -328,9 +335,11 @@ func deriveEffectiveDeviceStatus(device *v1.Device) v1.DeviceStatus {
 		// (older rows or DB defaults may have last_seen initialized).
 		return v1.DeviceStatus_PENDING
 	default:
-		// For any other admin status, only derive ACTIVE/INACTIVE when the stored
-		// state is ACTIVE. Otherwise, return as-is.
-		if device.Status != v1.DeviceStatus_ACTIVE {
+		// Derive only for statuses that represent "logged in at least once" state
+		// (ACTIVE/INACTIVE) or legacy/unspecified rows. Keep other admin statuses as-is.
+		if device.Status != v1.DeviceStatus_ACTIVE &&
+			device.Status != v1.DeviceStatus_INACTIVE &&
+			device.Status != v1.DeviceStatus_DEVICE_STATUS_UNSPECIFIED {
 			return device.Status
 		}
 	}
@@ -466,9 +475,9 @@ func (s *DeviceStore) UpdateStatus(ctx context.Context, id string, status v1.Dev
 	}
 
 	// If the tenant_id in context is stale/mismatched (e.g. after migrations),
-	// fall back to updating by device id only. Device-facing endpoints already
-	// authenticate the device_id via JWT; tenant scoping here is best-effort.
-	if rows == 0 && tenantID != "" {
+	// optionally fall back to updating by device id only, but ONLY for explicitly
+	// device-authenticated calls.
+	if rows == 0 && tenantID != "" && allowUnscopedDeviceUpdate(ctx, id) {
 		fallbackResult, fbErr := s.db.ExecContext(ctx, "UPDATE devices SET status = $1 WHERE id = $2", status, id)
 		if fbErr != nil {
 			return fmt.Errorf("failed to update device status (fallback): %w", fbErr)
@@ -481,6 +490,9 @@ func (s *DeviceStore) UpdateStatus(ctx context.Context, id string, status v1.Dev
 	}
 
 	if rows == 0 {
+		if tenantID != "" && !allowUnscopedDeviceUpdate(ctx, id) {
+			return fmt.Errorf("%w: tenant mismatch or device not found", ErrNotFound)
+		}
 		return ErrNotFound
 	}
 
@@ -513,7 +525,7 @@ func (s *DeviceStore) UpdateLastSeen(ctx context.Context, id string, timestamp t
 	}
 
 	// Tenant mismatch fallback, see UpdateStatus for rationale.
-	if rows == 0 && tenantID != "" {
+	if rows == 0 && tenantID != "" && allowUnscopedDeviceUpdate(ctx, id) {
 		fallbackResult, fbErr := s.db.ExecContext(ctx, "UPDATE devices SET last_seen = $1 WHERE id = $2", timestamp.Format(time.RFC3339), id)
 		if fbErr != nil {
 			return fmt.Errorf("failed to update last_seen (fallback): %w", fbErr)
@@ -526,6 +538,9 @@ func (s *DeviceStore) UpdateLastSeen(ctx context.Context, id string, timestamp t
 	}
 
 	if rows == 0 {
+		if tenantID != "" && !allowUnscopedDeviceUpdate(ctx, id) {
+			return fmt.Errorf("%w: tenant mismatch or device not found", ErrNotFound)
+		}
 		return ErrNotFound
 	}
 
@@ -558,7 +573,7 @@ func (s *DeviceStore) UpdateLastLogin(ctx context.Context, id string, timestamp 
 	}
 
 	// Tenant mismatch fallback, see UpdateStatus for rationale.
-	if rows == 0 && tenantID != "" {
+	if rows == 0 && tenantID != "" && allowUnscopedDeviceUpdate(ctx, id) {
 		fallbackResult, fbErr := s.db.ExecContext(ctx, "UPDATE devices SET last_login_at = $1 WHERE id = $2", timestamp.Format(time.RFC3339), id)
 		if fbErr != nil {
 			return fmt.Errorf("failed to update last_login_at (fallback): %w", fbErr)
@@ -571,6 +586,9 @@ func (s *DeviceStore) UpdateLastLogin(ctx context.Context, id string, timestamp 
 	}
 
 	if rows == 0 {
+		if tenantID != "" && !allowUnscopedDeviceUpdate(ctx, id) {
+			return fmt.Errorf("%w: tenant mismatch or device not found", ErrNotFound)
+		}
 		return ErrNotFound
 	}
 
