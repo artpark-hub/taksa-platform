@@ -172,9 +172,9 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
                 },
                 {
                     name: 'Topic Browser',
-                    href: '/dashboard/topic-browser',
+                    href: '/dashboard/data-flows',
                     icon: BookOpen,
-                    matchPaths: ['/dashboard/topic-browser']
+                    matchPaths: ['/dashboard/data-flows']
                 }
             ]
         },
@@ -188,10 +188,10 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
                     matchPaths: ['/dashboard/Edge-devices', '/dashboard/instances']
                 },
                 {
-                    name: 'Data Flows',
-                    href: '/dashboard/data-flows',
+                    name: 'Bridges',
+                    href: '/bridges',
                     icon: Workflow,
-                    matchPaths: ['/dashboard/data-flows']
+                    matchPaths: ['/bridges']
                 },
                 {
                     name: 'Models',

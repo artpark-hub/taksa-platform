@@ -1,6 +1,6 @@
 import React from 'react';
 import AccessDeniedPage from '../../../components/AccessDeniedPage';
 
-export default function CopilotPage() {
+export default function DataFlowsPage() {
     return <AccessDeniedPage />;
 }

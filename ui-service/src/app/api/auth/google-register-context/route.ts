@@ -8,7 +8,7 @@ const MAX_AGE_MS = MAX_AGE_SECONDS * 1000;
 
 type PendingContext = {
     organization_name: string;
-    organization_id: string;
+    tenant_id: string;
     role: string;
     source: 'google';
     created_at: number;
@@ -27,16 +27,14 @@ const getSecret = (): string | undefined => {
     const configuredSecret = process.env.TAKSA_UI_CONTEXT_SECRET || process.env.NEXTAUTH_SECRET;
     if (configuredSecret) return configuredSecret;
 
-    if (process.env.NODE_ENV === 'production') {
-        return undefined;
-    }
-
     if (!devFallbackSecret) {
         devFallbackSecret = createFallbackSecret();
     }
 
     if (!hasWarnedAboutDevFallback) {
-        console.warn('Using generated dev fallback for Google register context secret. Set TAKSA_UI_CONTEXT_SECRET or NEXTAUTH_SECRET to avoid this warning.');
+        console.warn(
+            'Using generated fallback for Google register context secret. Set TAKSA_UI_CONTEXT_SECRET or NEXTAUTH_SECRET for deterministic behavior across restarts/instances.'
+        );
         hasWarnedAboutDevFallback = true;
     }
 
@@ -83,9 +81,10 @@ const decodeAndVerifyToken = async (token: string, secret: string): Promise<Pend
 
     try {
         const parsed = JSON.parse(fromBase64Url(payloadPart));
+
         if (
             typeof parsed?.organization_name !== 'string' ||
-            typeof parsed?.organization_id !== 'string' ||
+            typeof parsed?.tenant_id !== 'string' ||
             typeof parsed?.role !== 'string' ||
             parsed?.source !== 'google' ||
             typeof parsed?.created_at !== 'number'
@@ -117,15 +116,18 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const organizationName = String(body?.organizationName || '').trim();
-    const organizationId = String(body?.organizationId || '').trim();
+    const tenantId = String(body?.tenantId || body?.organizationId || '').trim();
 
-    if (!organizationName || !organizationId) {
-        return NextResponse.json({ message: 'organizationName and organizationId are required' }, { status: 400 });
+    if (!organizationName || !tenantId) {
+        return NextResponse.json(
+            { message: 'organizationName and tenantId are required' },
+            { status: 400 }
+        );
     }
 
     const pending: PendingContext = {
         organization_name: organizationName,
-        organization_id: organizationId,
+        tenant_id: tenantId,
         role: 'master',
         source: 'google',
         created_at: Date.now()

@@ -1,0 +1,259 @@
+:root{
+    --radius-md: clamp(0.4rem, 0.3vw + 0.2rem, 0.625rem);
+    --radius-lg: clamp(0.5rem, 0.5vw + 0.25rem, 0.875rem);
+
+    --shadow-card: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.08);
+
+    --space-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
+    --space-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+    --space-md: clamp(0.75rem, 0.6rem + 0.75vw, 1.25rem);
+    --space-lg: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+    --space-xl: clamp(1.25rem, 1rem + 1.5vw, 2.5rem);
+    --space-2xl: clamp(1.5rem, 1.2rem + 2vw, 3.5rem);
+
+    --text-sm: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+    --text-base: clamp(0.875rem, 0.8rem + 0.4vw, 1rem);
+    --text-lg: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+    --text-xl: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+    --text-2xl: clamp(1.25rem, 1rem + 1.5vw, 2rem);
+}
+
+.add-bridge-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    margin-bottom: 40px;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+.add-bridge-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-2xl);
+}
+
+.add-bridge-back-btn {
+    background: transparent;
+    border: none;
+    color: #000;
+    cursor: pointer;
+    padding: var(--space-xs);
+    margin-top: 0.2rem;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-bridge-back-btn:hover {
+    background-color: #f3f4f6;
+}
+
+.add-bridge-title {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: #000;
+    margin: 0 0 var(--space-sm) 0;
+    letter-spacing: -0.03em;
+}
+
+.add-bridge-subtitle {
+    color: #555;
+    font-size: var(--text-sm);
+    margin: 0;
+    line-height: 1.5;
+    font-weight: 500;
+}
+
+.bridge-stepper {
+    width: 70%;
+    margin: 0 auto var(--space-2xl);
+    display: flex;
+    align-items: flex-start;
+}
+
+.step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 10rem;
+    color: #777;
+}
+
+.step-circle {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 2px solid #b8b8b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    background-color: white;
+    color: #777;
+}
+
+.step-item.active .step-circle {
+    background-color: #222;
+    border-color: #222;
+    color: white;
+}
+
+.step-item p {
+    margin: var(--space-sm) 0 0 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: center;
+}
+
+.step-item.active p {
+    color: #000;
+}
+
+.step-line {
+    height: 2px;
+    background-color: #b8b8b8;
+    flex: 1;
+    margin-top: 1rem;
+    position: relative;
+}
+
+.step-line.half-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 2px;
+    width: 50%;
+    background-color: #000;
+}
+
+.bridge-options-wrapper {
+    width: 80%;
+    max-width: 75rem;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+.bridge-option-card {
+    display: grid;
+    grid-template-columns: 7rem 1fr auto;
+    align-items: center;
+    gap: var(--space-lg);
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl) var(--space-2xl);
+    box-shadow: var(--shadow-card);
+    margin-bottom: var(--space-lg);
+}
+
+.bridge-option-icon {
+    width: 5.25rem;
+    height: 5.25rem;
+    border: 1px solid #c9c9c9;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #777;
+}
+
+.bridge-option-content h2 {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: #000;
+    margin: 0 0 var(--space-sm) 0;
+    letter-spacing: -0.03em;
+}
+
+.bridge-option-content p {
+    color: #555;
+    font-size: var(--text-sm);
+    margin: 0 0 var(--space-md) 0;
+    line-height: 1.5;
+    font-weight: 500;
+}
+
+.bridge-option-content ul {
+    margin: 0;
+    padding-left: var(--space-lg);
+}
+
+.bridge-option-content li {
+    color: #222;
+    font-size: var(--text-sm);
+    line-height: 1.8;
+    font-weight: 500;
+}
+
+.bridge-option-btn {
+    background: #000;
+    color: #fff;
+    border: 2px solid #000;
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-lg);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-md);
+    white-space: nowrap;
+    width: 16rem;
+    transition: all 0.2s ease;
+}
+
+.bridge-option-btn:hover {
+    background-color: #222;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 64rem) {
+    .bridge-stepper,
+    .bridge-options-wrapper {
+        width: 100%;
+    }
+
+    .bridge-option-card {
+        grid-template-columns: 1fr;
+        align-items: flex-start;
+    }
+
+    .bridge-option-btn {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 48rem) {
+    .add-bridge-header {
+        gap: var(--space-sm);
+    }
+
+    .bridge-stepper {
+        overflow-x: auto;
+        padding-bottom: var(--space-sm);
+    }
+
+    .step-item {
+        min-width: 8rem;
+    }
+
+    .bridge-option-card {
+        padding: var(--space-lg);
+    }
+
+    .bridge-option-icon {
+        width: 4.5rem;
+        height: 4.5rem;
+    }
+}

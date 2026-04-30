@@ -1,0 +1,257 @@
+:root{
+    --radius-md: clamp(0.4rem, 0.3vw + 0.2rem, 0.625rem);
+    --radius-lg: clamp(0.5rem, 0.5vw + 0.25rem, 0.875rem);
+
+    --shadow-soft: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+
+    --space-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
+    --space-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+    --space-md: clamp(0.75rem, 0.6rem + 0.75vw, 1.25rem);
+    --space-lg: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+    --space-xl: clamp(1.25rem, 1rem + 1.5vw, 2.5rem);
+    --space-2xl: clamp(1.5rem, 1.2rem + 2vw, 3.5rem);
+
+    --text-xs: clamp(0.65rem, 0.6rem + 0.2vw, 0.75rem);
+    --text-sm: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+    --text-base: clamp(0.875rem, 0.8rem + 0.4vw, 1rem);
+    --text-lg: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+    --text-xl: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+    --text-2xl: clamp(1.25rem, 1rem + 1.5vw, 2rem);
+}
+
+.bridge-readflow-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+.bridge-readflow-config-card,
+.bridge-readflow-section-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    padding: var(--space-xl);
+}
+
+.bridge-readflow-config-card {
+    width: 100%;
+}
+
+.bridge-readflow-card-header {
+    margin-bottom: var(--space-xl);
+}
+
+.bridge-readflow-card-header h2,
+.bridge-readflow-section-card h2 {
+    color: #111827;
+    font-size: var(--text-xl);
+    font-weight: 700;
+    margin: 0 0 var(--space-sm) 0;
+    letter-spacing: -0.03em;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.bridge-readflow-card-header p,
+.bridge-readflow-section-card p {
+    color: #6b7280;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.bridge-readflow-section-card p {
+    max-width: 42rem;
+    margin-bottom: var(--space-xl);
+}
+
+.bridge-readflow-section-card button {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #111827;
+    text-decoration: underline;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 500;
+}
+
+.bridge-readflow-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.bridge-readflow-form-row {
+    display: grid;
+    grid-template-columns: 10rem 1fr;
+    align-items: center;
+    gap: var(--space-xl);
+}
+
+.bridge-readflow-form-row label {
+    color: #111827;
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.bridge-readflow-form-row label span {
+    margin-left: var(--space-md);
+}
+
+.bridge-readflow-select-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.bridge-readflow-select-wrapper select {
+    width: 100%;
+    box-sizing: border-box;
+    appearance: none;
+    padding: var(--space-md) 2.5rem var(--space-md) var(--space-md);
+    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-md);
+    background-color: #fff;
+    color: #111827;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+}
+
+.bridge-readflow-select-wrapper select:focus {
+    border-color: #000;
+}
+
+.bridge-readflow-select-icon {
+    position: absolute;
+    right: var(--space-md);
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+    pointer-events: none;
+}
+
+.bridge-readflow-select-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    width: 100%;
+    position: relative;
+}
+
+.bridge-readflow-select-row .bridge-readflow-select-wrapper {
+    flex: 1;
+}
+
+.bridge-readflow-info-icon {
+    color: #6b7280;
+    position: absolute;
+    right: calc(-1 * (var(--space-lg) + 0.5rem));
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.bridge-code-editor {
+    position: relative;
+    background-color: #202020;
+    border: 1px solid #2f3035;
+    border-radius: var(--radius-md);
+    min-height: 18rem;
+    overflow: hidden;
+    cursor: text;
+    display: flex;
+}
+
+.bridge-code-editor.large {
+    min-height: 24rem;
+}
+
+.bridge-code-textarea {
+    margin: 0;
+    padding: var(--space-md);
+    color: #d1d5db;
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    width: 100%;
+    min-height: inherit;
+    height: auto;
+    flex: 1;
+    border: none;
+    background-color: transparent;
+    resize: none;
+    box-sizing: border-box;
+    outline: none;
+    white-space: pre;
+    tab-size: 2;
+}
+
+.bridge-code-editor.large .bridge-code-textarea {
+    min-height: 24rem;
+}
+
+.bridge-code-edit-label {
+    position: absolute;
+    right: var(--space-md);
+    top: var(--space-md);
+    background-color: #2b2b2b;
+    color: #c7c7c7;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.bridge-code-expand-btn {
+    position: absolute;
+    right: var(--space-md);
+    bottom: var(--space-md);
+    background-color: #2b2b2b !important;
+    color: white !important;
+    border: none !important;
+    border-radius: var(--radius-md);
+    padding: var(--space-xs) !important;
+    text-decoration: none !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bridge-readflow-section-card textarea {
+    width: 100%;
+    min-height: 5rem;
+    resize: vertical;
+    box-sizing: border-box;
+    border: 1px solid #2f3035;
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    color: #d1d5db;
+    background-color: #1b1b1e;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    outline: none;
+}
+
+@media (max-width: 48rem) {
+    .bridge-readflow-form-row {
+        grid-template-columns: 1fr;
+        gap: var(--space-sm);
+    }
+
+    .bridge-readflow-select-wrapper {
+        width: 100%;
+    }
+
+    .bridge-readflow-info-icon {
+        right: var(--space-sm);
+    }
+}

@@ -1,19 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react'; 
 import LegalDocumentModal from './LegalDocumentModal';
 
 const GOOGLE_REGISTER_CONTEXT_KEY = 'taksa_google_register_context';
+const GOOGLE_REGISTER_ATTEMPT_KEY = 'taksa_google_register_attempt';
 const GOOGLE_LOGIN_ATTEMPT_KEY = 'taksa_google_login_attempt';
 const GOOGLE_LOGIN_ERROR_KEY = 'taksa_google_login_error';
 
 const Register = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const flowId = searchParams?.get('flow');
+    const flowId = searchParams?.get('flow') || '';
+
+    const handledFlowRef = useRef('');
 
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', email: '', orgName: '', password: '', confirmPassword: ''
@@ -44,18 +47,16 @@ const Register = () => {
         );
     };
 
-    const appendHiddenInput = (form, name, value) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = name;
-        input.value = value;
-        form.appendChild(input);
-    };
-
     const extractCsrfToken = (flow) => {
         const nodes = flow?.ui?.nodes || [];
         const csrfNode = nodes.find((node) => node?.attributes?.name === 'csrf_token');
         return csrfNode?.attributes?.value || '';
+    };
+
+    const getNodeValue = (flow, name) => {
+        const nodes = flow?.ui?.nodes || [];
+        const node = nodes.find((n) => n?.attributes?.name === name);
+        return node?.attributes?.value || '';
     };
 
     const storeUserInLocalStorage = (identity) => {
@@ -68,13 +69,51 @@ const Register = () => {
             last_name: traits.name?.last || '',
             role: traits.role || '',
             organization_name: traits.organization_name || '',
-            organization_id: traits.organization_id || '',
+            tenant_id: traits.tenant_id || '',
             identityId: identity.id,
             firstName: traits.name?.first || '',
             lastName: traits.name?.last || '',
             organizationName: traits.organization_name || '',
-            organizationId: traits.organization_id || ''
+            tenantId: traits.tenant_id || ''
         }));
+    };
+
+    const fetchSessionIdentity = async () => {
+        const response = await fetch('/sessions/whoami', {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            credentials: 'include'
+        });
+
+        if (!response.ok) return null;
+
+        const data = await response.json().catch(() => ({}));
+        return data?.identity || null;
+    };
+
+    const fetchJwt = async () => {
+        const jwtResponse = await fetch('/api/v1/um/token', {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            credentials: 'include'
+        });
+
+        const jwtData = await jwtResponse.json().catch(() => ({}));
+
+        if (!jwtResponse.ok) {
+            throw new Error(jwtData?.message || jwtData?.error?.message || 'Failed to retrieve JWT token');
+        }
+
+        const finalJwt =
+            jwtData?.data?.jwt_token ||
+            jwtData?.jwt_token ||
+            jwtData?.data?.jwtToken;
+
+        if (!finalJwt) {
+            throw new Error('No JWT token in response');
+        }
+
+        localStorage.setItem('taksa_jwt', finalJwt);
     };
 
     const setSecurePendingGoogleRegistration = async (pendingContext) => {
@@ -87,11 +126,14 @@ const Register = () => {
             credentials: 'include',
             body: JSON.stringify({
                 organizationName: pendingContext?.organization_name,
-                organizationId: pendingContext?.organization_id
+                tenantId: pendingContext?.tenant_id
             })
         });
 
-        return response.ok;
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data?.message || 'Failed to store secure Google registration context');
+        }
     };
 
     const getSecurePendingGoogleRegistration = async () => {
@@ -118,6 +160,13 @@ const Register = () => {
             });
         } catch {
         }
+    };
+
+    const clearGoogleTransientState = async () => {
+        await clearSecurePendingGoogleRegistration();
+        sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
+        sessionStorage.removeItem(GOOGLE_REGISTER_ATTEMPT_KEY);
+        sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
     };
 
     const handleChange = (e) => {
@@ -174,6 +223,10 @@ const Register = () => {
         }
 
         const organizationId =
+            orgIdData?.tenant_id ||
+            orgIdData?.tenantId ||
+            orgIdData?.data?.tenant_id ||
+            orgIdData?.data?.tenantId ||
             orgIdData?.organization_id ||
             orgIdData?.organizationId ||
             orgIdData?.data?.organization_id ||
@@ -187,16 +240,13 @@ const Register = () => {
     const storePendingGoogleRegistration = async ({ organizationName, organizationId }) => {
         const pendingContext = {
             organization_name: organizationName,
-            organization_id: organizationId,
+            tenant_id: organizationId,
             role: 'master',
             source: 'google',
             created_at: Date.now()
         };
 
-        try {
-            await setSecurePendingGoogleRegistration(pendingContext);
-        } catch {
-        }
+        await setSecurePendingGoogleRegistration(pendingContext);
         sessionStorage.setItem(GOOGLE_REGISTER_CONTEXT_KEY, JSON.stringify(pendingContext));
     };
 
@@ -245,46 +295,36 @@ const Register = () => {
                 typeof attributes?.name === 'string' &&
                 typeof attributes?.value !== 'undefined'
             ) {
-                appendHiddenInput(form, attributes.name, String(attributes.value));
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = attributes.name;
+                input.value = String(attributes.value);
+                form.appendChild(input);
             }
         });
 
         if (!form.querySelector('input[name="method"]')) {
-            appendHiddenInput(form, 'method', 'oidc');
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'method';
+            input.value = 'oidc';
+            form.appendChild(input);
         }
 
-        appendHiddenInput(form, 'provider', 'google');
+        const providerInput = document.createElement('input');
+        providerInput.type = 'hidden';
+        providerInput.name = 'provider';
+        providerInput.value = 'google';
+        form.appendChild(providerInput);
 
         document.body.appendChild(form);
         form.submit();
     };
 
-    const fetchJwt = async () => {
-        const jwtResponse = await fetch('/api/v1/um/token', {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-            credentials: 'include'
-        });
-
-        const jwtData = await jwtResponse.json().catch(() => ({}));
-
-        if (!jwtResponse.ok) {
-            throw new Error(jwtData?.message || jwtData?.error?.message || 'Failed to retrieve JWT token');
-        }
-
-        const finalJwt =
-            jwtData?.data?.jwt_token ||
-            jwtData?.jwt_token ||
-            jwtData?.data?.jwtToken;
-
-        if (!finalJwt) throw new Error('No JWT token in response');
-
-        localStorage.setItem('taksa_jwt', finalJwt);
-    };
-
     const handleGoogleContinue = async () => {
         setFormError('');
         setGoogleOrgError('');
+        setAgreementError('');
 
         if (!agreementChecked) {
             setAgreementError('Please agree to the Platform Agreement and Privacy Policy before continuing.');
@@ -299,6 +339,7 @@ const Register = () => {
         }
 
         setIsLoading(true);
+        sessionStorage.setItem(GOOGLE_REGISTER_ATTEMPT_KEY, String(Date.now()));
 
         try {
             const organizationId = await fetchOrganizationId();
@@ -311,19 +352,35 @@ const Register = () => {
             await startGoogleOidcRegistration();
         } catch (err) {
             console.error('Google Registration Error:', err);
+            sessionStorage.removeItem(GOOGLE_REGISTER_ATTEMPT_KEY);
             setFormError(err.message || 'Failed to continue with Google registration');
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        if (!flowId) return;
+        if (!flowId) {
+            handledFlowRef.current = '';
+            return;
+        }
+
+        if (handledFlowRef.current === flowId) {
+            return;
+        }
+
+        handledFlowRef.current = flowId;
 
         let cancelled = false;
 
         const completeOidcRegistration = async () => {
             const loginAttemptTs = Number(sessionStorage.getItem(GOOGLE_LOGIN_ATTEMPT_KEY) || 0);
-            const isRecentGoogleLoginAttempt = loginAttemptTs > 0 && (Date.now() - loginAttemptTs) < 10 * 60 * 1000;
+            const registerAttemptTs = Number(sessionStorage.getItem(GOOGLE_REGISTER_ATTEMPT_KEY) || 0);
+
+            const isRecentGoogleLoginAttempt =
+                loginAttemptTs > 0 && Date.now() - loginAttemptTs < 10 * 60 * 1000;
+
+            const isRecentGoogleRegisterAttempt =
+                registerAttemptTs > 0 && Date.now() - registerAttemptTs < 10 * 60 * 1000;
 
             let pending = null;
 
@@ -354,21 +411,27 @@ const Register = () => {
                 return;
             }
 
+            if (!pending && isRecentGoogleRegisterAttempt) {
+                sessionStorage.removeItem(GOOGLE_REGISTER_ATTEMPT_KEY);
+                if (!cancelled) {
+                    setFormError('Google registration context expired or was not found. Please start Google registration again.');
+                    setOpenSection('social');
+                    router.replace('/register');
+                }
+                return;
+            }
+
             if (!pending) {
-                if (cancelled) return;
-                setFormError('Google registration context expired or was not found. Please start Google registration again.');
-                setOpenSection('social');
-                router.replace('/register');
                 return;
             }
 
             if (!pending?.source || Date.now() - (pending.created_at || 0) > 10 * 60 * 1000) {
-                await clearSecurePendingGoogleRegistration();
-                sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
-                if (cancelled) return;
-                setFormError('Google registration context expired. Please start Google registration again.');
-                setOpenSection('social');
-                router.replace('/register');
+                await clearGoogleTransientState();
+                if (!cancelled) {
+                    setFormError('Google registration context expired. Please start Google registration again.');
+                    setOpenSection('social');
+                    router.replace('/register');
+                }
                 return;
             }
 
@@ -378,7 +441,7 @@ const Register = () => {
             setFormError('');
 
             try {
-                const flowRes = await fetch(`/self-service/registration/flows?id=${flowId}`, {
+                const flowRes = await fetch(`/self-service/registration/flows?id=${encodeURIComponent(flowId)}`, {
                     method: 'GET',
                     headers: { Accept: 'application/json' },
                     credentials: 'include'
@@ -390,80 +453,90 @@ const Register = () => {
                     throw new Error(getErrorMessage(flowData, 'Failed to fetch registration flow'));
                 }
 
-                const actionUrl = flowData?.ui?.action;
-                const actionMethod = (flowData?.ui?.method || 'POST').toUpperCase();
-                const nodes = flowData?.ui?.nodes || [];
+                const completeRes = await fetch(`/self-service/registration?flow=${encodeURIComponent(flowId)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        method: 'oidc',
+                        provider: 'google',
+                        csrf_token: extractCsrfToken(flowData),
+                        traits: {
+                            email: getNodeValue(flowData, 'traits.email'),
+                            name: {
+                                first: getNodeValue(flowData, 'traits.name.first'),
+                                last: getNodeValue(flowData, 'traits.name.last')
+                            },
+                            organization_name: pending.organization_name,
+                            tenant_id: pending.tenant_id,
+                            role: pending.role || 'master'
+                        }
+                    })
+                });
 
-                if (!actionUrl) {
-                    throw new Error('Registration action URL not found in flow');
-                }
+                const completeData = await completeRes.json().catch(() => ({}));
 
-                const form = document.createElement('form');
-                form.method = actionMethod;
-                form.action = actionUrl;
-                form.style.display = 'none';
+                if (!completeRes.ok) {
+                    const redirectTo =
+                        completeData?.redirect_browser_to ||
+                        completeData?.error?.redirect_browser_to ||
+                        completeData?.error?.details?.redirect_browser_to;
 
-                const addedNames = new Set();
+                    const errorMessage =
+                        completeData?.error?.message ||
+                        completeData?.ui?.messages?.[0]?.text ||
+                        completeData?.message ||
+                        '';
 
-                nodes.forEach((node) => {
-                    const attrs = node?.attributes || {};
                     if (
-                        attrs?.type === 'hidden' &&
-                        typeof attrs?.name === 'string' &&
-                        typeof attrs?.value !== 'undefined'
+                        completeRes.status === 422 &&
+                        redirectTo &&
+                        errorMessage.toLowerCase().includes('browser location change required')
                     ) {
-                        appendHiddenInput(form, attrs.name, String(attrs.value));
-                        addedNames.add(attrs.name);
+                        window.location.assign(redirectTo);
+                        return;
                     }
-                });
 
-                const nodeValue = (name) => {
-                    const node = nodes.find((n) => n?.attributes?.name === name);
-                    return node?.attributes?.value ?? '';
-                };
-
-                const traitFields = {
-                    'traits.email': nodeValue('traits.email'),
-                    'traits.name.first': nodeValue('traits.name.first'),
-                    'traits.name.last': nodeValue('traits.name.last'),
-                    'traits.organization_name': pending.organization_name,
-                    'traits.organization_id': pending.organization_id,
-                    'traits.role': pending.role || 'master',
-                };
-
-                Object.entries(traitFields).forEach(([name, value]) => {
-                    if (!addedNames.has(name)) {
-                        appendHiddenInput(form, name, String(value));
-                        addedNames.add(name);
-                    }
-                });
-
-                if (!addedNames.has('method')) {
-                    appendHiddenInput(form, 'method', 'oidc');
-                    addedNames.add('method');
+                    throw new Error(getErrorMessage(completeData, 'Google registration failed'));
                 }
 
-                if (!addedNames.has('provider')) {
-                    appendHiddenInput(form, 'provider', 'google');
-                    addedNames.add('provider');
+                let identity =
+                    completeData?.session?.identity ||
+                    completeData?.identity ||
+                    null;
+
+                if (!identity) {
+                    identity = await fetchSessionIdentity();
                 }
 
-                await clearSecurePendingGoogleRegistration();
-                sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
-                sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
+                if (!identity) {
+                    throw new Error('Google registration completed but no session was issued.');
+                }
+
+                await clearGoogleTransientState();
 
                 if (cancelled) return;
 
-                document.body.appendChild(form);
-                form.submit();
+                storeUserInLocalStorage(identity);
+
+                try {
+                    await fetchJwt();
+                } catch (jwtErr) {
+                    console.error('JWT fetch error:', jwtErr);
+                }
+
+                router.push('/dashboard');
             } catch (err) {
                 console.error('OIDC completion error:', err);
-                await clearSecurePendingGoogleRegistration();
-                sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
-                sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
+                await clearGoogleTransientState();
                 if (!cancelled) {
                     setFormError(err.message || 'Google registration failed. Please try again.');
                     setIsLoading(false);
+                    setOpenSection('social');
+                    router.replace('/register');
                 }
             }
         };
@@ -524,7 +597,7 @@ const Register = () => {
                     },
                     role: 'master',
                     organization_name: formData.orgName,
-                    organization_id: organizationId
+                    tenant_id: organizationId
                 },
                 csrf_token: extractCsrfToken(flowData)
             })
@@ -559,6 +632,7 @@ const Register = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setFormError('');
+        setAgreementError('');
 
         if (!agreementChecked) {
             setAgreementError('Please agree to the Platform Agreement and Privacy Policy before continuing.');
