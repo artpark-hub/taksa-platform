@@ -154,7 +154,8 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 	ctx = middleware.SetTenantID(ctx, tenantID)
 	ctx = middleware.SetDeviceID(ctx, deviceID)
 
-	// Record login activity and transition device to ACTIVE on first successful login
+	// Record login activity and transition the device to ACTIVE on successful login,
+	// unless it is currently SUSPENDED or DECOMMISSIONED.
 	now := time.Now()
 	if err := uc.store.Devices().UpdateLastLogin(ctx, deviceID, now); err != nil {
 		fmt.Printf("ERROR: login: failed to update last_login_at for device %s (tenant_id=%s): %v\n", deviceID, tenantID, err)
