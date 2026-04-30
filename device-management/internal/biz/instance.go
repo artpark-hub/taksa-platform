@@ -132,8 +132,9 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 		return nil, fmt.Errorf("token hash is empty")
 	}
 
-	// Keep an unscoped context for device reads. During login the tenant_id in auth_tokens
-	// can differ from devices (e.g., after migrations), so we must be able to read by id only.
+	// Keep an unscoped context for device reads.
+	// Login starts without tenant context; only after validating the auth token (system-wide)
+	// do we learn the device_id and tenant_id. Before that, reads must be by device id only.
 	ctxUnscoped := ctx
 
 	// Log hash preview (first 6 + last 6 chars) for debugging without exposing full credential
@@ -146,9 +147,9 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 		return nil, fmt.Errorf("invalid token: %w", err)
 	}
 
-	// Fetch device BEFORE setting tenant context — during login the tenant_id
-	// in auth_tokens may differ from devices (e.g., after migration). The device
-	// lookup must be by ID only; tenant scoping starts after login completes.
+	// Fetch device BEFORE setting tenant context.
+	// This ensures we can load device details using the validated device_id even though
+	// the request did not begin with tenant context.
 	device, err := uc.store.Devices().GetByID(ctxUnscoped, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("device not found: %w", err)
@@ -157,6 +158,12 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 	// Now inject tenant_id and device_id into context for downstream operations
 	ctx = middleware.SetTenantID(ctx, tenantID)
 	ctx = middleware.SetDeviceID(ctx, deviceID)
+
+	// Invariant check: after tenant context is established, the device must be readable
+	// with tenant scoping. If not, we treat it as a data-integrity issue.
+	if _, err := uc.store.Devices().GetByID(ctx, deviceID); err != nil {
+		return nil, fmt.Errorf("device not found for tenant (tenant_id=%s device_id=%s): %w", tenantID, deviceID, err)
+	}
 
 	// Record login activity and transition the device to ACTIVE on successful login,
 	// unless it is currently SUSPENDED or DECOMMISSIONED.
