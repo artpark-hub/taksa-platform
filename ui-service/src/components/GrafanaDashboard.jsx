@@ -5,19 +5,54 @@ import './GrafanaDashboard.css';
 
 const DEFAULT_GRAFANA_PATH = '/grafana/dashboards';
 
+const buildDefaultGrafanaPath = (deviceId = null) => {
+    const params = new URLSearchParams({
+        theme: 'light',
+        orgId: '1',
+        refresh: '10s',
+        kiosk: '1',
+        ...(deviceId ? { 'var-deviceId': deviceId } : {}),
+    });
+
+    return `${DEFAULT_GRAFANA_PATH}?${params.toString()}`;
+};
+
+const getGrafanaPathWithParams = (path, deviceId = null) => {
+    const grafanaUrl = new URL(path, window.location.origin);
+
+    if (!grafanaUrl.pathname.startsWith('/grafana')) {
+        return path;
+    }
+
+    if (!grafanaUrl.searchParams.has('theme')) {
+        grafanaUrl.searchParams.set('theme', 'light');
+    }
+
+    if (!grafanaUrl.searchParams.has('orgId')) {
+        grafanaUrl.searchParams.set('orgId', '1');
+    }
+
+    if (!grafanaUrl.searchParams.has('refresh')) {
+        grafanaUrl.searchParams.set('refresh', '10s');
+    }
+
+    grafanaUrl.searchParams.set('kiosk', '1');
+
+    if (deviceId) {
+        grafanaUrl.searchParams.set('var-deviceId', deviceId);
+    } else {
+        grafanaUrl.searchParams.delete('var-deviceId');
+    }
+
+    return `${grafanaUrl.pathname}${grafanaUrl.search}${grafanaUrl.hash}`;
+};
+
 const GrafanaDashboard = ({ deviceId = null }) => {
     const iframeRef = useRef(null);
     const [iframeSrc, setIframeSrc] = useState('');
 
     const defaultSrc = useMemo(() => {
-        const params = new URLSearchParams({
-            theme: 'light',
-            orgId: '1',
-            refresh: '10s',
-            ...(deviceId ? { 'var-deviceId': deviceId } : {}),
-        });
-
-        return `${DEFAULT_GRAFANA_PATH}?${params.toString()}`;
+        return buildDefaultGrafanaPath(deviceId);
     }, [deviceId]);
 
     useEffect(() => {
@@ -25,11 +60,11 @@ const GrafanaDashboard = ({ deviceId = null }) => {
         const savedGrafanaPath = url.searchParams.get('grafana');
 
         if (savedGrafanaPath && savedGrafanaPath.startsWith('/grafana')) {
-            setIframeSrc(savedGrafanaPath);
+            setIframeSrc(getGrafanaPathWithParams(savedGrafanaPath, deviceId));
         } else {
             setIframeSrc(defaultSrc);
         }
-    }, [defaultSrc]);
+    }, [defaultSrc, deviceId]);
 
     useEffect(() => {
         const url = new URL(window.location.href);
@@ -58,11 +93,18 @@ const GrafanaDashboard = ({ deviceId = null }) => {
 
                 if (!currentPath.startsWith('/grafana')) return;
 
+                const grafanaPath = getGrafanaPathWithParams(currentPath, deviceId);
+
+                if (grafanaPath !== currentPath) {
+                    setIframeSrc(grafanaPath);
+                    return;
+                }
+
                 const parentUrl = new URL(window.location.href);
                 const existingGrafanaPath = parentUrl.searchParams.get('grafana');
 
-                if (existingGrafanaPath !== currentPath) {
-                    parentUrl.searchParams.set('grafana', currentPath);
+                if (existingGrafanaPath !== grafanaPath) {
+                    parentUrl.searchParams.set('grafana', grafanaPath);
                     window.history.replaceState({}, '', parentUrl.toString());
                 }
             } catch {
@@ -77,7 +119,7 @@ const GrafanaDashboard = ({ deviceId = null }) => {
         return () => {
             if (interval) clearInterval(interval);
         };
-    }, []);
+    }, [deviceId]);
 
     const hideGrafanaMenuButton = () => {
         try {

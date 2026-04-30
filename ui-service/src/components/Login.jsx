@@ -86,7 +86,7 @@ const Login = () => {
     const hasRequiredOrgTraits = (traits = {}) => {
         return Boolean(
             String(traits?.organization_name || '').trim() &&
-            String(traits?.organization_id || '').trim()
+            String(traits?.tenant_id || '').trim()
         );
     };
 
@@ -102,12 +102,12 @@ const Login = () => {
                 last_name: traits.name?.last || '',
                 role: traits.role || '',
                 organization_name: traits.organization_name || '',
-                organization_id: traits.organization_id || '',
+                tenant_id: traits.tenant_id || '',
                 identityId: identity.id,
                 firstName: traits.name?.first || '',
                 lastName: traits.name?.last || '',
                 organizationName: traits.organization_name || '',
-                organizationId: traits.organization_id || ''
+                tenantId: traits.tenant_id || ''
             })
         );
     };
