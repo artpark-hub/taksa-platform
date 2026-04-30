@@ -141,6 +141,8 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                 button[aria-label*="navigation" i],
                 [data-testid="sidemenu-toggle"],
                 [data-testid="nav-toggle"],
+                [class*="powered-by"],
+                a[href*="grafana.com"],
                 [data-testid="menu-toggle"] {
                     display: none !important;
                 }
