@@ -42,6 +42,9 @@ type DeviceStore interface {
 
 	// UpdateLastLogin updates the last login timestamp
 	UpdateLastLogin(ctx context.Context, id string, timestamp time.Time) error
+
+	// UpdateAuthTokenExpiresAt updates only the auth_token_expires_at timestamp
+	UpdateAuthTokenExpiresAt(ctx context.Context, id string, timestamp time.Time) error
 }
 
 // DeviceListFilter defines filtering and pagination for device listing

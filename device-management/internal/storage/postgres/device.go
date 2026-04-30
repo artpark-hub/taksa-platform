@@ -283,27 +283,194 @@ func (s *DeviceStore) List(ctx context.Context, filters *storage.DeviceListFilte
 
 // ListSummaries retrieves device summaries with optional filtering and pagination
 func (s *DeviceStore) ListSummaries(ctx context.Context, filters *storage.DeviceListFilter) ([]*v1.DeviceSummary, error) {
-	// For PostgreSQL, we can reuse List and convert to summaries
-	// Or optimize by selecting only summary fields
-	devices, err := s.List(ctx, filters)
-	if err != nil {
-		return nil, err
+	if filters == nil {
+		filters = storage.DefaultDeviceListFilter()
 	}
-	
-	summaries := make([]*v1.DeviceSummary, 0, len(devices))
-	for _, device := range devices {
-		effectiveStatus := deriveEffectiveDeviceStatus(device)
-		summary := &v1.DeviceSummary{
-			Id:        device.Id,
-			CreatedBy: device.CreatedBy,
-			Name:      device.Name,
-			Location:  device.Location,
-			Status:    effectiveStatus,
-			CreatedAt: device.CreatedAt,
-			LastSeen:  device.LastSeen,
+
+	// Build WHERE clause (effective-status aware)
+	where := []string{}
+	args := []interface{}{}
+	paramCounter := 1
+
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID != "" {
+		where = append(where, fmt.Sprintf("tenant_id = $%d", paramCounter))
+		args = append(args, tenantID)
+		paramCounter++
+	}
+
+	// Effective status expression must match deriveEffectiveDeviceStatus rules.
+	// Use status ints directly in SQL.
+	activeWindowSeconds := int(deviceActiveWindow.Seconds())
+	effectiveStatusExpr := fmt.Sprintf(`(
+		CASE
+			WHEN status IN (%d, %d, %d) THEN status
+			WHEN last_seen IS NULL THEN %d
+			WHEN (NOW() - last_seen) <= make_interval(secs => %d) THEN %d
+			ELSE %d
+		END
+	)`, statusToInt(v1.DeviceStatus_PENDING), statusToInt(v1.DeviceStatus_SUSPENDED), statusToInt(v1.DeviceStatus_DECOMMISSIONED),
+		statusToInt(v1.DeviceStatus_INACTIVE),
+		activeWindowSeconds,
+		statusToInt(v1.DeviceStatus_ACTIVE),
+		statusToInt(v1.DeviceStatus_INACTIVE),
+	)
+
+	if len(filters.StatusFilters) > 0 {
+		placeholders := ""
+		for range filters.StatusFilters {
+			if placeholders != "" {
+				placeholders += ", "
+			}
+			placeholders += fmt.Sprintf("$%d", paramCounter)
+			paramCounter++
 		}
+		where = append(where, effectiveStatusExpr+" IN ("+placeholders+")")
+		for _, status := range filters.StatusFilters {
+			args = append(args, int(status))
+		}
+	}
+
+	if filters.LocationFilter != "" {
+		where = append(where, fmt.Sprintf("location_company ILIKE $%d", paramCounter))
+		args = append(args, "%"+filters.LocationFilter+"%")
+		paramCounter++
+	}
+
+	if filters.Search != "" {
+		where = append(where, fmt.Sprintf("name ILIKE $%d", paramCounter))
+		args = append(args, "%"+filters.Search+"%")
+		paramCounter++
+	}
+
+	if filters.CreatedBy != "" {
+		where = append(where, fmt.Sprintf("created_by ILIKE $%d", paramCounter))
+		args = append(args, "%"+filters.CreatedBy+"%")
+		paramCounter++
+	}
+
+	whereClause := ""
+	if len(where) > 0 {
+		whereClause = "WHERE " + strings.Join(where, " AND ")
+	}
+
+	// ORDER BY with whitelist; map status -> effective_status.
+	orderBy := "created_at"
+	allowedColumns := map[string]bool{
+		"id":               true,
+		"name":             true,
+		"created_at":       true,
+		"last_seen":        true,
+		"created_by":       true,
+		"status":           true,
+		"location_company": true,
+	}
+	if filters.SortBy != "" && allowedColumns[filters.SortBy] {
+		if filters.SortBy == "status" {
+			orderBy = "effective_status"
+		} else {
+			orderBy = filters.SortBy
+		}
+	}
+	orderDirection := "ASC"
+	if filters.SortDesc {
+		orderDirection = "DESC"
+	}
+
+	offset := filters.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	limit := filters.PageSize + 1
+
+	query := fmt.Sprintf(`
+		SELECT
+			id,
+			created_by,
+			name,
+			location_company, location_plant, location_area, location_zone, location_line, location_work_cell, location_work_unit,
+			%s AS effective_status,
+			created_at,
+			last_seen
+		FROM devices
+		%s
+		ORDER BY %s %s
+		LIMIT $%d OFFSET $%d
+	`, effectiveStatusExpr, whereClause, orderBy, orderDirection, paramCounter, paramCounter+1)
+
+	args = append(args, limit, offset)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query device summaries: %w", err)
+	}
+	defer rows.Close()
+
+	summaries := make([]*v1.DeviceSummary, 0, filters.PageSize+1)
+	for rows.Next() {
+		summary := &v1.DeviceSummary{}
+		var createdAt, lastSeen sql.NullString
+		var locCompany, locPlant, locArea, locZone sql.NullString
+		var locLine, locWorkCell, locWorkUnit sql.NullString
+		var effectiveStatus int32
+
+		if err := rows.Scan(
+			&summary.Id,
+			&summary.CreatedBy,
+			&summary.Name,
+			&locCompany, &locPlant, &locArea, &locZone, &locLine, &locWorkCell, &locWorkUnit,
+			&effectiveStatus,
+			&createdAt,
+			&lastSeen,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan device summary: %w", err)
+		}
+
+		// Location
+		summary.Location = &v1.DeviceLocation{Levels: map[string]string{}}
+		if locCompany.Valid && locCompany.String != "" {
+			summary.Location.Levels["0"] = locCompany.String
+		}
+		if locPlant.Valid && locPlant.String != "" {
+			summary.Location.Levels["1"] = locPlant.String
+		}
+		if locArea.Valid && locArea.String != "" {
+			summary.Location.Levels["2"] = locArea.String
+		}
+		if locZone.Valid && locZone.String != "" {
+			summary.Location.Levels["3"] = locZone.String
+		}
+		if locLine.Valid && locLine.String != "" {
+			summary.Location.Levels["4"] = locLine.String
+		}
+		if locWorkCell.Valid && locWorkCell.String != "" {
+			summary.Location.Levels["5"] = locWorkCell.String
+		}
+		if locWorkUnit.Valid && locWorkUnit.String != "" {
+			summary.Location.Levels["6"] = locWorkUnit.String
+		}
+
+		// Status
+		summary.Status = v1.DeviceStatus(effectiveStatus)
+
+		// Timestamps
+		if createdAt.Valid {
+			if t, err := time.Parse(time.RFC3339, createdAt.String); err == nil {
+				summary.CreatedAt = timestamppb.New(t)
+			}
+		}
+		if lastSeen.Valid {
+			if t, err := time.Parse(time.RFC3339, lastSeen.String); err == nil {
+				summary.LastSeen = timestamppb.New(t)
+			}
+		}
+
 		summaries = append(summaries, summary)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error reading device summaries: %w", err)
+	}
+
 	return summaries, nil
 }
 
@@ -355,6 +522,10 @@ func deriveEffectiveDeviceStatus(device *v1.Device) v1.DeviceStatus {
 
 	// No last_seen, but has logged in at least once.
 	return v1.DeviceStatus_INACTIVE
+}
+
+func statusToInt(s v1.DeviceStatus) int32 {
+	return int32(s)
 }
 
 // Update updates an existing device
@@ -443,6 +614,54 @@ func (s *DeviceStore) Update(ctx context.Context, device *v1.Device) error {
 	}
 
 	if rows == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+// UpdateAuthTokenExpiresAt updates only the auth_token_expires_at timestamp.
+func (s *DeviceStore) UpdateAuthTokenExpiresAt(ctx context.Context, id string, timestamp time.Time) error {
+	if id == "" {
+		return ErrInvalidInput
+	}
+
+	tenantID := middleware.GetTenantID(ctx)
+
+	query := "UPDATE devices SET auth_token_expires_at = $1 WHERE id = $2"
+	args := []interface{}{timestamp.Format(time.RFC3339), id}
+	if tenantID != "" {
+		query = "UPDATE devices SET auth_token_expires_at = $1 WHERE id = $2 AND tenant_id = $3"
+		args = []interface{}{timestamp.Format(time.RFC3339), id, tenantID}
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update auth_token_expires_at: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	// Tenant mismatch fallback, gated to device-authenticated calls only.
+	if rows == 0 && tenantID != "" && allowUnscopedDeviceUpdate(ctx, id) {
+		fallbackResult, fbErr := s.db.ExecContext(ctx, "UPDATE devices SET auth_token_expires_at = $1 WHERE id = $2", timestamp.Format(time.RFC3339), id)
+		if fbErr != nil {
+			return fmt.Errorf("failed to update auth_token_expires_at (fallback): %w", fbErr)
+		}
+		fallbackRows, fbErr := fallbackResult.RowsAffected()
+		if fbErr != nil {
+			return fmt.Errorf("failed to get rows affected (fallback): %w", fbErr)
+		}
+		rows = fallbackRows
+	}
+
+	if rows == 0 {
+		if tenantID != "" && !allowUnscopedDeviceUpdate(ctx, id) {
+			return fmt.Errorf("%w: tenant mismatch or device not found", ErrNotFound)
+		}
 		return ErrNotFound
 	}
 

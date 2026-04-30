@@ -132,6 +132,10 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 		return nil, fmt.Errorf("token hash is empty")
 	}
 
+	// Keep an unscoped context for device reads. During login the tenant_id in auth_tokens
+	// can differ from devices (e.g., after migrations), so we must be able to read by id only.
+	ctxUnscoped := ctx
+
 	// Log hash preview (first 6 + last 6 chars) for debugging without exposing full credential
 	hashPreview := redactHash(tokenHash)
 	fmt.Printf("DEBUG: Login attempt with tokenHash (preview: %s, length: %d)\n", hashPreview, len(tokenHash))
@@ -145,7 +149,7 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 	// Fetch device BEFORE setting tenant context — during login the tenant_id
 	// in auth_tokens may differ from devices (e.g., after migration). The device
 	// lookup must be by ID only; tenant scoping starts after login completes.
-	device, err := uc.store.Devices().GetByID(ctx, deviceID)
+	device, err := uc.store.Devices().GetByID(ctxUnscoped, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("device not found: %w", err)
 	}
@@ -172,7 +176,7 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 	// Re-read device row after login updates so later updates don't overwrite
 	// status/last_seen/last_login_at with stale values from the pre-login read.
 	var refreshedDevice *v1.Device
-	if refreshed, err := uc.store.Devices().GetByID(ctx, deviceID); err != nil {
+	if refreshed, err := uc.store.Devices().GetByID(ctxUnscoped, deviceID); err != nil {
 		fmt.Printf("ERROR: login: failed to re-read device %s (tenant_id=%s): %v\n", deviceID, tenantID, err)
 	} else if refreshed != nil {
 		refreshedDevice = refreshed
@@ -185,15 +189,16 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 	} else {
 		// Update device's auth token expiry to match the renewed token
 		newExpiryTime := time.Now().AddDate(50, 0, 0)
-		// IMPORTANT: use the refreshed device so we don't overwrite status/last_seen/last_login_at
-		// with stale values from the pre-login read.
+		if err := uc.store.Devices().UpdateAuthTokenExpiresAt(ctx, deviceID, newExpiryTime); err != nil {
+			fmt.Printf("ERROR: Failed to update device auth token expiry for device %s: %v\n", deviceID, err)
+		}
+
+		// Keep in-memory device consistent for callers of Login.
+		// If refresh succeeded, use it; otherwise update the known field only.
 		if refreshedDevice != nil {
 			device = refreshedDevice
 		}
 		device.AuthTokenExpiresAt = timestamppb.New(newExpiryTime)
-		if err := uc.store.Devices().Update(ctx, device); err != nil {
-			fmt.Printf("ERROR: Failed to update device auth token expiry for device %s: %v\n", deviceID, err)
-		}
 	}
 
 	// GenerateJWT reads tenant_id from context (set above) and includes it in JWT claims
