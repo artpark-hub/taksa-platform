@@ -143,6 +143,8 @@ const GrafanaExplore = ({ deviceId = null }) => {
                 [data-testid="nav-toggle"],
                 [class*="powered-by"],
                 a[href*="grafana.com"],
+                [role="contentinfo"] [class*="powered-by"],
+                [role="contentinfo"] a[href*="grafana.com"],
                 [data-testid="menu-toggle"] {
                     display: none !important;
                 }
