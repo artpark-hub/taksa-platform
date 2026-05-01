@@ -41,6 +41,8 @@ const AddInstance = () => {
 
     const handleBack = () => { router.back(); };
 
+    const sanitizeLocationName = (value) => value.replace(/\s+/g, '_');
+
     const getErrorMessage = (data, fallback) => {
         return (
             data?.error?.message ||
@@ -160,27 +162,8 @@ const AddInstance = () => {
     };
 
     const handleContinue = () => {
-        if (hasCopied && createdDeviceResponse?.device) {
-            try {
-                const existingInstances = JSON.parse(localStorage.getItem('taksa_demo_instances') || '[]');
-
-                const newInstance = {
-                    ...createdDeviceResponse.device,
-                    instructions: createdDeviceResponse.instructions,
-                    authToken: createdDeviceResponse.authToken,
-                    flows: 0,
-                    topics: 0,
-                    latency: 0,
-                    throughput: '0.00'
-                };
-
-                existingInstances.push(newInstance);
-                localStorage.setItem('taksa_demo_instances', JSON.stringify(existingInstances));
-                router.push('/dashboard/Edge-devices');
-            } catch (error) {
-                console.error('Failed to save Data Collecting Device (DCD):', error);
-                setCopyError('Failed to save Data Collecting Device (DCD). Please try again.');
-            }
+        if (hasCopied) {
+            router.push('/dashboard/Edge-devices');
         }
     };
 
@@ -223,7 +206,6 @@ const AddInstance = () => {
                                     if (formError) setFormError('');
                                 }}
                             />
-                            {errors.instanceName && <div className="error-text">{errors.instanceName}</div>}
                         </div>
                     </div>
 
@@ -256,7 +238,7 @@ const AddInstance = () => {
                                 className={`form-input ${errors.orgName ? 'input-error' : ''}`}
                                 value={orgName}
                                 onChange={(e) => {
-                                    setOrgName(e.target.value);
+                                    setOrgName(sanitizeLocationName(e.target.value));
                                     if (errors.orgName) setErrors({ ...errors, orgName: null });
                                     if (formError) setFormError('');
                                 }}
@@ -267,19 +249,19 @@ const AddInstance = () => {
 
                     <div className="location-row">
                         <div className="location-label-col">Level 1</div>
-                        <input type="text" className="form-input" placeholder="Your level 1 name" value={level1} onChange={(e) => setLevel1(e.target.value)} />
+                        <input type="text" className="form-input" placeholder="Your level 1 name" value={level1} onChange={(e) => setLevel1(sanitizeLocationName(e.target.value))} />
                     </div>
                     <div className="location-row">
                         <div className="location-label-col">Level 2</div>
-                        <input type="text" className="form-input" placeholder="Your level 2 name" value={level2} onChange={(e) => setLevel2(e.target.value)} />
+                        <input type="text" className="form-input" placeholder="Your level 2 name" value={level2} onChange={(e) => setLevel2(sanitizeLocationName(e.target.value))} />
                     </div>
                     <div className="location-row">
                         <div className="location-label-col">Level 3</div>
-                        <input type="text" className="form-input" placeholder="Your level 3 name" value={level3} onChange={(e) => setLevel3(e.target.value)} />
+                        <input type="text" className="form-input" placeholder="Your level 3 name" value={level3} onChange={(e) => setLevel3(sanitizeLocationName(e.target.value))} />
                     </div>
                     <div className="location-row">
                         <div className="location-label-col">Level 4</div>
-                        <input type="text" className="form-input" placeholder="Your level 4 name" value={level4} onChange={(e) => setLevel4(e.target.value)} />
+                        <input type="text" className="form-input" placeholder="Your level 4 name" value={level4} onChange={(e) => setLevel4(sanitizeLocationName(e.target.value))} />
                     </div>
                 </div>
             </div>

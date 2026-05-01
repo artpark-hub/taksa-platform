@@ -15,6 +15,8 @@ const Instances = () => {
     const [fetchError, setFetchError] = useState('');
     const [deleteModalConfig, setDeleteModalConfig] = useState({ isOpen: false, instance: null, isDeleting: false });
     const dropdownRef = useRef(null);
+    const isFetchingRef = useRef(false);
+    const lastFetchStartedAtRef = useRef(0);
 
     const getErrorMessage = (data, fallback) => {
         return (
@@ -26,15 +28,32 @@ const Instances = () => {
     };
 
     useEffect(() => {
-        const loadInstances = async () => {
+        let cancelled = false;
+
+        const loadInstances = async ({ force = false } = {}) => {
+            const now = Date.now();
+
+            if (isFetchingRef.current) {
+                return;
+            }
+
+            if (!force && now - lastFetchStartedAtRef.current < 5000) {
+                return;
+            }
+
+            isFetchingRef.current = true;
+            lastFetchStartedAtRef.current = now;
+
             try {
                 const storedData = localStorage.getItem('taksa_user');
                 const parsedUser = storedData ? JSON.parse(storedData) : null;
                 const createdBy = parsedUser?.email || '';
 
                 if (!createdBy) {
-                    setFetchError('User email not found. Please log in again.');
-                    setIsLoading(false);
+                    if (!cancelled) {
+                        setFetchError('User email not found. Please log in again.');
+                        setIsLoading(false);
+                    }
                     return;
                 }
 
@@ -56,28 +75,61 @@ const Instances = () => {
                     throw new Error(getErrorMessage(data, 'Failed to load Data Collecting Devices.'));
                 }
 
-                setFetchError('');
-                setInstances(Array.isArray(data?.devices) ? data.devices : []);
+                if (!cancelled) {
+                    setFetchError('');
+                    setInstances(Array.isArray(data?.devices) ? data.devices : []);
+                }
             } catch (error) {
-                console.error('Failed to load Data Collecting Devices:', error);
-                setFetchError(error.message || 'Failed to load Data Collecting Devices.');
+                if (!cancelled) {
+                    console.error('Failed to load Data Collecting Devices:', error);
+                    setFetchError(error.message || 'Failed to load Data Collecting Devices.');
+                }
             } finally {
-                setIsLoading(false);
+                isFetchingRef.current = false;
+
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
             }
         };
 
-        loadInstances();
+        loadInstances({ force: true });
 
-        const refreshInterval = setInterval(loadInstances, 180000);
+        const refreshInterval = setInterval(() => loadInstances(), 180000);
+
+        const handlePageShow = (event) => {
+            if (event.persisted) {
+                loadInstances({ force: true });
+            }
+        };
+
+        const handleWindowFocus = () => {
+            loadInstances();
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                loadInstances();
+            }
+        };
 
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setOpenDropdownId(null);
             }
         };
+
+        window.addEventListener('pageshow', handlePageShow);
+        window.addEventListener('focus', handleWindowFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
         document.addEventListener('mousedown', handleClickOutside);
+
         return () => {
+            cancelled = true;
             clearInterval(refreshInterval);
+            window.removeEventListener('pageshow', handlePageShow);
+            window.removeEventListener('focus', handleWindowFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
