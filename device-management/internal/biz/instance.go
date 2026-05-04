@@ -940,6 +940,14 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 							}
 						}
 					}
+					// umh-core SendActionReplyV2 also populates actionReplyPayloadV2.message; match correlateResponseByActionUUID
+					if errorMessage == "" {
+						if v2, ok := payload["actionReplyPayloadV2"].(map[string]interface{}); ok {
+							if msg, ok := v2["message"].(string); ok {
+								errorMessage = msg
+							}
+						}
+					}
 				} else if state == "action-success" {
 					finalStatus = models.ActionStatusCompleted
 				}
@@ -960,9 +968,15 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 	}
 
 	// Store error message in action for retrieval (for both FAILED and FAILED_PARSING_RESPONSE)
-	if (finalStatus == models.ActionStatusFailed || finalStatus == models.ActionStatusFailedParsingResponse) && errorMessage != "" {
-		if err := uc.store.Actions().UpdateErrorMessage(ctx, tenantID, track.ActionID, errorMessage); err != nil {
-			fmt.Printf("Warning: Failed to store error message: %v\n", err)
+	if finalStatus == models.ActionStatusFailed || finalStatus == models.ActionStatusFailedParsingResponse {
+		msg := errorMessage
+		if msg == "" && finalStatus == models.ActionStatusFailed {
+			msg = "Action failed on device, but no error text was found in the reply payload. Check umh-core communicator logs on the edge."
+		}
+		if msg != "" {
+			if err := uc.store.Actions().UpdateErrorMessage(ctx, tenantID, track.ActionID, msg); err != nil {
+				fmt.Printf("Warning: Failed to store error message: %v\n", err)
+			}
 		}
 	}
 
@@ -1047,10 +1061,21 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 					stateFound = true
 					if state == "action-failure" {
 						finalStatus = models.ActionStatusFailed
-						// Extract error message from actionReplyPayloadV2
+						// Prefer structured V2; fall back to legacy actionReplyPayload (string or {message})
 						if payloadV2, ok := payload["actionReplyPayloadV2"].(map[string]interface{}); ok {
 							if msg, ok := payloadV2["message"].(string); ok {
 								errorMessage = msg
+							}
+						}
+						if errorMessage == "" {
+							if replyPayload, ok := payload["actionReplyPayload"]; ok {
+								if msg, ok := replyPayload.(string); ok {
+									errorMessage = msg
+								} else if replyMap, ok := replyPayload.(map[string]interface{}); ok {
+									if msg, ok := replyMap["message"].(string); ok {
+										errorMessage = msg
+									}
+								}
 							}
 						}
 					} else if state == "action-success" {
@@ -1074,9 +1099,15 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 	}
 
 	// Store error message if action failed or parse failed
-	if (finalStatus == models.ActionStatusFailed || finalStatus == models.ActionStatusFailedParsingResponse) && errorMessage != "" {
-		if err := uc.store.Actions().UpdateErrorMessage(ctx, tenantID, action.Id, errorMessage); err != nil {
-			fmt.Printf("Warning: Failed to store error message: %v\n", err)
+	if finalStatus == models.ActionStatusFailed || finalStatus == models.ActionStatusFailedParsingResponse {
+		msg := errorMessage
+		if msg == "" && finalStatus == models.ActionStatusFailed {
+			msg = "Action failed on device, but no error text was found in the reply payload. Check umh-core communicator logs on the edge."
+		}
+		if msg != "" {
+			if err := uc.store.Actions().UpdateErrorMessage(ctx, tenantID, action.Id, msg); err != nil {
+				fmt.Printf("Warning: Failed to store error message: %v\n", err)
+			}
 		}
 	}
 
@@ -1379,8 +1410,8 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 			if converterType == "protocol-converter" && action.Payload != nil {
 				var requestPayload map[string]interface{}
 				if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
-					if readDfc, ok := requestPayload["readDfc"].(map[string]interface{}); ok {
-						if inputs, ok := readDfc["inputs"].(map[string]interface{}); ok {
+					if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
+						if inputs, ok := readDFC["inputs"].(map[string]interface{}); ok {
 							if inputType, ok := inputs["type"].(string); ok && inputType != "" {
 								converterType = inputType
 							}
@@ -1434,8 +1465,8 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				if converterType == "protocol-converter" && action.Payload != nil {
 					var requestPayload map[string]interface{}
 					if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
-						if readDfc, ok := requestPayload["readDfc"].(map[string]interface{}); ok {
-							if inputs, ok := readDfc["inputs"].(map[string]interface{}); ok {
+						if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
+							if inputs, ok := readDFC["inputs"].(map[string]interface{}); ok {
 								if inputType, ok := inputs["type"].(string); ok && inputType != "" {
 									converterType = inputType
 								}

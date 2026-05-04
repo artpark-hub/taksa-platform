@@ -66,11 +66,13 @@ func (s *ActionStore) GetByID(ctx context.Context, tenantID, id string) (*models
 	var payloadType, payloadData string
 	var status int32
 	var createdAt, expiresAt, deliveredAt, completedAt sql.NullString
+	var errorMessage sql.NullString
 
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, device_id, action_type, payload_type, payload_data,
 		        max_retries, retry_count, status,
-		        created_at, expires_at, delivered_at, completed_at
+		        created_at, expires_at, delivered_at, completed_at,
+		        error_message
 		 FROM actions WHERE tenant_id = $1 AND id = $2`, tenantID, id)
 
 	err := row.Scan(
@@ -78,6 +80,7 @@ func (s *ActionStore) GetByID(ctx context.Context, tenantID, id string) (*models
 		&payloadType, &payloadData,
 		&action.MaxRetries, &action.RetryCount, &status,
 		&createdAt, &expiresAt, &deliveredAt, &completedAt,
+		&errorMessage,
 	)
 
 	if err == sql.ErrNoRows {
@@ -114,6 +117,9 @@ func (s *ActionStore) GetByID(ctx context.Context, tenantID, id string) (*models
 	if completedAt.Valid {
 		t, _ := time.Parse(time.RFC3339, completedAt.String)
 		action.CompletedAt = t
+	}
+	if errorMessage.Valid {
+		action.ErrorMessage = errorMessage.String
 	}
 
 	return action, nil
@@ -175,7 +181,8 @@ func (s *ActionStore) ListForDevice(ctx context.Context, deviceID string, filter
 
 	query := fmt.Sprintf(`SELECT id, device_id, action_type, payload_type, payload_data,
 		max_retries, retry_count, status,
-		created_at, expires_at, delivered_at, completed_at
+		created_at, expires_at, delivered_at, completed_at,
+		error_message
 		FROM actions %s ORDER BY %s
 		LIMIT $%d OFFSET $%d`,
 		whereClause, orderBy, paramCounter, paramCounter+1)
@@ -194,12 +201,14 @@ func (s *ActionStore) ListForDevice(ctx context.Context, deviceID string, filter
 		var payloadType, payloadData string
 		var status int32
 		var createdAt, expiresAt, deliveredAt, completedAt sql.NullString
+		var errorMessage sql.NullString
 
 		err := rows.Scan(
 			&action.Id, &action.DeviceId, &action.Type,
 			&payloadType, &payloadData,
 			&action.MaxRetries, &action.RetryCount, &status,
 			&createdAt, &expiresAt, &deliveredAt, &completedAt,
+			&errorMessage,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan action: %w", err)
@@ -231,6 +240,9 @@ func (s *ActionStore) ListForDevice(ctx context.Context, deviceID string, filter
 		if completedAt.Valid {
 			t, _ := time.Parse(time.RFC3339, completedAt.String)
 			action.CompletedAt = t
+		}
+		if errorMessage.Valid {
+			action.ErrorMessage = errorMessage.String
 		}
 
 		actions = append(actions, action)
@@ -433,7 +445,8 @@ func (s *ActionStore) listActions(ctx context.Context, whereClause string, args 
 	query := `
 	SELECT id, device_id, action_type, payload_type, payload_data,
 	       max_retries, retry_count, status,
-	       created_at, expires_at, delivered_at, completed_at
+	       created_at, expires_at, delivered_at, completed_at,
+	       error_message
 	FROM actions ` + whereClause
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -448,12 +461,14 @@ func (s *ActionStore) listActions(ctx context.Context, whereClause string, args 
 		var payloadType, payloadData string
 		var status int32
 		var createdAt, expiresAt, deliveredAt, completedAt sql.NullString
+		var errorMessage sql.NullString
 
 		err := rows.Scan(
 			&action.Id, &action.DeviceId, &action.Type,
 			&payloadType, &payloadData,
 			&action.MaxRetries, &action.RetryCount, &status,
 			&createdAt, &expiresAt, &deliveredAt, &completedAt,
+			&errorMessage,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan action: %w", err)
@@ -485,6 +500,9 @@ func (s *ActionStore) listActions(ctx context.Context, whereClause string, args 
 		if completedAt.Valid {
 			t, _ := time.Parse(time.RFC3339, completedAt.String)
 			action.CompletedAt = t
+		}
+		if errorMessage.Valid {
+			action.ErrorMessage = errorMessage.String
 		}
 
 		actions = append(actions, action)
