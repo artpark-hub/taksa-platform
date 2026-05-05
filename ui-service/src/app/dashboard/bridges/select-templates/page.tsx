@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import SelectTemplates from '../../../components/SelectTemplates';
+import SelectTemplates from '../../../../components/SelectTemplates';
 
 export default function SelectTemplatesPage() {
     return (

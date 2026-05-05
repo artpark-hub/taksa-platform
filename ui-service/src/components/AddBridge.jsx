@@ -27,17 +27,17 @@ const AddBridge = () => {
 
     const handleBack = () => {
         const queryString = getDeviceQueryString();
-        router.push(queryString ? `/bridges/list?${queryString}` : '/bridges');
+        router.push(queryString ? `/dashboard/bridges/list?${queryString}` : '/dashboard/bridges');
     };
 
     const handleCreateFromScratch = () => {
         const queryString = getDeviceQueryString();
-        router.push(`/bridges/select-templates${queryString ? `?${queryString}` : ''}`);
+        router.push(`/dashboard/bridges/select-templates${queryString ? `?${queryString}` : ''}`);
     };
 
     const handleCreateFromExisting = () => {
         const queryString = getDeviceQueryString();
-        router.push(`/bridges/select-templates${queryString ? `?${queryString}` : ''}`);
+        router.push(`/dashboard/bridges/select-templates${queryString ? `?${queryString}` : ''}`);
     };
 
     return (
