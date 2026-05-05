@@ -1326,6 +1326,24 @@ components:
             description: |-
                 Device represents a managed edge device (runs UMH Core instance)
                  Contains full details including certificates. Use DeviceSummary for list/summary responses.
+        api.devicemgmt.v1.DeviceAgentLatencySummary:
+            type: object
+            properties:
+                avg_ms:
+                    type: number
+                    format: double
+                max_ms:
+                    type: number
+                    format: double
+                min_ms:
+                    type: number
+                    format: double
+                p95_ms:
+                    type: number
+                    format: double
+                p99_ms:
+                    type: number
+                    format: double
         api.devicemgmt.v1.DeviceConfigActionResponse:
             type: object
             properties:
@@ -1343,24 +1361,59 @@ components:
                     $ref: '#/components/schemas/api.umh_core.v2.GetConfigFileResponse'
                 setConfigResponse:
                     $ref: '#/components/schemas/api.umh_core.v2.SetConfigFileResponse'
+        api.devicemgmt.v1.DeviceCoreHealthSummary:
+            type: object
+            properties:
+                message:
+                    type: string
+                state:
+                    type: string
+                desired_state:
+                    type: string
+                category:
+                    type: string
+                    description: 'Category: "active" | "degraded" | "neutral"'
         api.devicemgmt.v1.DeviceHealthResponse:
             type: object
             properties:
                 deviceId:
                     type: string
-                lastUpdated:
+                last_seen:
                     type: string
+                    description: |-
+                        Last time the device communicated with device-management (Pull heartbeat).
+                         Note: this replaces the former last_updated field (same tag = 2).
                     format: date-time
                 status:
-                    $ref: '#/components/schemas/api.umh_core.v2.StatusMessage'
+                    allOf:
+                        - $ref: '#/components/schemas/api.umh_core.v2.StatusMessage'
+                    description: 'Deprecated: intentionally not populated by server to keep /health summary-only.'
                 statusB64:
                     type: string
+                    description: 'Deprecated: intentionally not populated by server to keep /health summary-only.'
                 deviceTimestamp:
                     type: string
                     format: date-time
                 errorMessage:
                     type: string
-            description: DeviceHealthResponse contains health metrics from latest Push API data
+                deviceStatus:
+                    type: integer
+                    description: Effective device status derived from last_seen (ACTIVE/INACTIVE), matching ListDevices.
+                    format: enum
+                core_health:
+                    allOf:
+                        - $ref: '#/components/schemas/api.devicemgmt.v1.DeviceCoreHealthSummary'
+                    description: Latest device-reported health summaries (when the device sends StatusMessage heartbeats)
+                agent_latency:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceAgentLatencySummary'
+                resources:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceResourcesSummary'
+                release:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.DeviceReleaseSummary'
+            description: |-
+                DeviceHealthResponse contains health metrics from latest Push API data.
+                 This endpoint is intentionally summary-only: it avoids returning the full device StatusMessage payload
+                 (which may include large blobs like UNS bundles, or detailed per-component inventories).
         api.devicemgmt.v1.DeviceLocation:
             type: object
             properties:
@@ -1403,6 +1456,45 @@ components:
                 macAddress:
                     type: string
             description: DeviceMetadata contains hardware and software information
+        api.devicemgmt.v1.DeviceReleaseSummary:
+            type: object
+            properties:
+                version:
+                    type: string
+                channel:
+                    type: string
+        api.devicemgmt.v1.DeviceResourcesSummary:
+            type: object
+            properties:
+                cpu_total_usage_m_cpu:
+                    type: number
+                    description: CPU
+                    format: double
+                cpu_core_count:
+                    type: integer
+                    format: int32
+                cpu_cgroup_cores:
+                    type: number
+                    format: double
+                cpu_throttle_ratio:
+                    type: number
+                    format: double
+                cpu_is_throttled:
+                    type: boolean
+                memory_used_bytes:
+                    type: string
+                    description: Memory / Disk
+                memory_total_bytes:
+                    type: string
+                disk_used_bytes:
+                    type: string
+                disk_total_bytes:
+                    type: string
+                hwid:
+                    type: string
+                    description: Hardware / runtime info
+                architecture:
+                    type: string
         api.devicemgmt.v1.DeviceSummary:
             type: object
             properties:

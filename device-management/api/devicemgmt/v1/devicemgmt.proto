@@ -463,14 +463,69 @@ message GetDeviceHealthRequest {
   string device_id = 1;
 }
 
-// DeviceHealthResponse contains health metrics from latest Push API data
+message DeviceCoreHealthSummary {
+  string message       = 1;
+  string state         = 2;
+  string desired_state = 3 [json_name = "desired_state"];
+  // Category: "active" | "degraded" | "neutral"
+  string category      = 4;
+}
+
+message DeviceAgentLatencySummary {
+  double avg_ms = 1 [json_name = "avg_ms"];
+  double max_ms = 2 [json_name = "max_ms"];
+  double min_ms = 3 [json_name = "min_ms"];
+  double p95_ms = 4 [json_name = "p95_ms"];
+  double p99_ms = 5 [json_name = "p99_ms"];
+}
+
+message DeviceResourcesSummary {
+  // CPU
+  double cpu_total_usage_m_cpu = 1 [json_name = "cpu_total_usage_m_cpu"];
+  int32  cpu_core_count        = 2 [json_name = "cpu_core_count"];
+  double cpu_cgroup_cores      = 3 [json_name = "cpu_cgroup_cores"];
+  double cpu_throttle_ratio    = 4 [json_name = "cpu_throttle_ratio"];
+  bool   cpu_is_throttled      = 5 [json_name = "cpu_is_throttled"];
+
+  // Memory / Disk
+  int64 memory_used_bytes  = 6 [json_name = "memory_used_bytes"];
+  int64 memory_total_bytes = 7 [json_name = "memory_total_bytes"];
+  int64 disk_used_bytes    = 8 [json_name = "disk_used_bytes"];
+  int64 disk_total_bytes   = 9 [json_name = "disk_total_bytes"];
+
+  // Hardware / runtime info
+  string hwid         = 10;
+  string architecture = 11;
+}
+
+message DeviceReleaseSummary {
+  string version = 1;
+  string channel = 2;
+}
+
+// DeviceHealthResponse contains health metrics from latest Push API data.
+// This endpoint is intentionally summary-only: it avoids returning the full device StatusMessage payload
+// (which may include large blobs like UNS bundles, or detailed per-component inventories).
 message DeviceHealthResponse {
   string                        device_id        = 1;
-  google.protobuf.Timestamp     last_updated     = 2; // When health data was last received from device
-  api.umh_core.v2.StatusMessage status           = 3; // Complete device status from Push API
-  string                        status_b64       = 4; // Base64-encoded StatusMessage (fallback if status fails to unmarshal)
+  // Last time the device communicated with device-management (Pull heartbeat).
+  // Note: this replaces the former last_updated field (same tag = 2).
+  google.protobuf.Timestamp     last_seen        = 2 [json_name = "last_seen"];
+  // Deprecated: intentionally not populated by server to keep /health summary-only.
+  api.umh_core.v2.StatusMessage status           = 3;
+  // Deprecated: intentionally not populated by server to keep /health summary-only.
+  string                        status_b64       = 4;
   google.protobuf.Timestamp     device_timestamp = 5; // Device's own timestamp from status message
   string                        error_message    = 6; // Error message if health data unavailable
+  // Effective device status derived from last_seen (ACTIVE/INACTIVE), matching ListDevices.
+  DeviceStatus                  device_status    = 8;
+  // Latest device-reported health summaries (when the device sends StatusMessage heartbeats)
+  DeviceCoreHealthSummary       core_health      = 9 [json_name = "core_health"];
+  DeviceAgentLatencySummary     agent_latency    = 10 [json_name = "agent_latency"];
+  DeviceResourcesSummary        resources        = 11;
+  DeviceReleaseSummary          release          = 12;
+
+  reserved 7, 13;
 }
 
 // UpdateDeviceRequest updates device information

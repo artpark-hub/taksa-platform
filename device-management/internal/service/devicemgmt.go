@@ -327,6 +327,12 @@ func (s *DeviceMgmtService) GetDeviceHealth(ctx context.Context, req *v1.GetDevi
 		return nil, status.Error(codes.InvalidArgument, "device_id is required")
 	}
 
+	// Ensure the edge has a "subscriber" so it emits periodic status heartbeats (MessageType "status").
+	// This is best-effort; the health call still succeeds without summaries.
+	if s.instanceUc != nil {
+		s.instanceUc.EnsureStatusSubscription(ctx, req.DeviceId)
+	}
+
 	// Call business logic
 	resp, err := s.deviceUc.GetDeviceHealth(ctx, req.DeviceId)
 	if err != nil {
@@ -336,11 +342,16 @@ func (s *DeviceMgmtService) GetDeviceHealth(ctx context.Context, req *v1.GetDevi
 	// Map response
 	return &v1.DeviceHealthResponse{
 		DeviceId:        resp.DeviceId,
-		LastUpdated:     resp.LastUpdated,
+		DeviceStatus:    resp.DeviceStatus,
+		LastSeen:        resp.LastSeen,
 		Status:          resp.Status,
 		StatusB64:       resp.StatusB64,
 		DeviceTimestamp: resp.DeviceTimestamp,
 		ErrorMessage:    resp.ErrorMessage,
+		CoreHealth:      resp.CoreHealth,
+		AgentLatency:    resp.AgentLatency,
+		Resources:       resp.Resources,
+		Release:         resp.Release,
 	}, nil
 }
 
