@@ -12,6 +12,7 @@ import (
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/utils"
 )
 
 // DeviceStore implements storage.DeviceStore for PostgreSQL
@@ -489,39 +490,7 @@ func allowUnscopedDeviceUpdate(ctx context.Context, id string) bool {
 // - Subsequently toggles between ACTIVE/INACTIVE based on last_seen activity.
 // - SUSPENDED/DECOMMISSIONED are terminal admin states.
 func deriveEffectiveDeviceStatus(device *v1.Device) v1.DeviceStatus {
-	if device == nil {
-		return v1.DeviceStatus_DEVICE_STATUS_UNSPECIFIED
-	}
-
-	switch device.Status {
-	case v1.DeviceStatus_SUSPENDED, v1.DeviceStatus_DECOMMISSIONED:
-		return device.Status
-	case v1.DeviceStatus_PENDING:
-		// Registration state always shows as PENDING until login flips status to ACTIVE.
-		// Do NOT use last_seen to infer ACTIVE/INACTIVE while still administratively PENDING
-		// (older rows or DB defaults may have last_seen initialized).
-		return v1.DeviceStatus_PENDING
-	default:
-		// Derive only for statuses that represent "logged in at least once" state
-		// (ACTIVE/INACTIVE) or legacy/unspecified rows. Keep other admin statuses as-is.
-		if device.Status != v1.DeviceStatus_ACTIVE &&
-			device.Status != v1.DeviceStatus_INACTIVE &&
-			device.Status != v1.DeviceStatus_DEVICE_STATUS_UNSPECIFIED {
-			return device.Status
-		}
-	}
-
-	// If we have a heartbeat timestamp, use it as the primary activity signal.
-	if device.LastSeen != nil {
-		lastSeen := device.LastSeen.AsTime()
-		if time.Since(lastSeen) <= deviceActiveWindow {
-			return v1.DeviceStatus_ACTIVE
-		}
-		return v1.DeviceStatus_INACTIVE
-	}
-
-	// No last_seen, but has logged in at least once.
-	return v1.DeviceStatus_INACTIVE
+	return utils.DeriveEffectiveDeviceStatus(device, deviceActiveWindow)
 }
 
 func statusToInt(s v1.DeviceStatus) int32 {

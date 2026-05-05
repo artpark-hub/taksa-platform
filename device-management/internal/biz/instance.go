@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -166,6 +167,7 @@ const (
 	subscribeActionType = "subscribe"
 	// subscribeActionDefaultTTLSeconds should be <= edge subscriber TTL to avoid stale subscribe actions piling up.
 	subscribeActionDefaultTTLSeconds int32 = 120
+	subscribeActionPayloadTypeURL          = "type.googleapis.com/taksa.edge.SubscribeMessagePayload"
 )
 
 // EnsureStatusSubscription queues a lightweight "subscribe" action for the device (if not already pending).
@@ -178,6 +180,10 @@ func (uc *InstanceUsecase) EnsureStatusSubscription(ctx context.Context, deviceI
 	if tenantID == "" {
 		return
 	}
+
+	mu := uc.subscribeActionMutex(deviceID)
+	mu.Lock()
+	defer mu.Unlock()
 
 	// Avoid spamming: if there's already a pending subscribe action, don't add another.
 	pending, err := uc.store.Actions().ListPending(ctx, tenantID, deviceID)
@@ -201,7 +207,7 @@ func (uc *InstanceUsecase) EnsureStatusSubscription(ctx context.Context, deviceI
 		Id:         generateUUID(),
 		DeviceId:   deviceID,
 		Type:       subscribeActionType,
-		Payload:    &anypb.Any{Value: payloadJSON},
+		Payload:    &anypb.Any{TypeUrl: subscribeActionPayloadTypeURL, Value: payloadJSON},
 		MaxRetries: 0,
 		RetryCount: 0,
 		Status:     models.ActionStatusQueued,
@@ -221,6 +227,8 @@ type InstanceUsecase struct {
 	protocolConverterRepo *data.ProtocolConverterRepo
 	dataModelRepo         *data.DataModelRepo
 	streamProcessorRepo   *data.StreamProcessorRepo
+
+	subscribeActionLocks sync.Map // map[deviceID]*sync.Mutex
 }
 
 // NewInstanceUsecase creates a new InstanceUsecase with the given storage and authentication backends.
@@ -232,6 +240,18 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 		dataModelRepo:         dataModelRepo,
 		streamProcessorRepo:   streamProcessorRepo,
 	}
+}
+
+func (uc *InstanceUsecase) subscribeActionMutex(deviceID string) *sync.Mutex {
+	if deviceID == "" {
+		return &sync.Mutex{}
+	}
+	if v, ok := uc.subscribeActionLocks.Load(deviceID); ok {
+		return v.(*sync.Mutex)
+	}
+	m := &sync.Mutex{}
+	actual, _ := uc.subscribeActionLocks.LoadOrStore(deviceID, m)
+	return actual.(*sync.Mutex)
 }
 
 // Login authenticates a device using a double-hashed token.
@@ -794,7 +814,7 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 		// Log summary of message types received in this push batch
 		fmt.Printf("DEBUG: Push batch summary - Total messages: %d, Type breakdown: %v\n", len(protoMsgs), messageTypeCount)
 		if messageTypeCount["status-message"] == 0 && messageTypeCount["StatusMessage"] == 0 && messageTypeCount["status"] == 0 {
-			fmt.Printf("WARNING: No StatusMessage in push batch. Device must send StatusMessage (1-second heartbeat) to update health_status. Message types: %v\n", messageTypeCount)
+			fmt.Printf("WARNING: No heartbeat status message in push batch. Device must send one of status-message, StatusMessage, or status (1-second heartbeat) to update health_status. Message types: %v\n", messageTypeCount)
 		}
 		
 		return nil

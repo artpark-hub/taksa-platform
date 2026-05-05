@@ -16,6 +16,7 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/pkg/cert"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/utils"
 )
 
 // DeviceUsecase handles device business logic (registration, listing, updates)
@@ -166,23 +167,10 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 	if err != nil {
 		return nil, fmt.Errorf("device not found: %w", err)
 	}
-	effectiveStatus := deriveEffectiveDeviceStatus(device)
+	effectiveStatus := utils.DeriveEffectiveDeviceStatus(device, deviceActiveWindow)
 
-	// Get the latest message (any type) to determine if device is communicating
-	// The Pull API heartbeat updates last_seen timestamp regularly
-	// The Push API sends action-reply and other messages
-	filter := &storage.MessageListFilter{
-		DeviceID: deviceID,
-		PageSize: 25,
-		SortDesc: true, // Most recent first
-	}
-
-	messages, _, err := uc.store.Messages().ListHistory(ctx, filter)
-	listErr := err
-	if listErr != nil {
-		// Non-fatal: health summary will degrade to device snapshot + last_seen based messaging.
-		messages = nil
-	}
+	// Get recent messages (avoid ListHistory COUNT query; health only needs latest N)
+	messages, listErr := uc.store.Messages().GetRecentByDevice(ctx, deviceID, 25)
 
 	// Build response based on device's current state
 	resp := &GetDeviceHealthResponse{
@@ -190,8 +178,6 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 		DeviceStatus: effectiveStatus,
 		LastSeen:    device.LastSeen, // Use device's last_seen from Pull API heartbeat
 		// /health is intentionally summary-only; we do not surface full StatusMessage payloads here.
-		Status:    nil,
-		StatusB64: "",
 	}
 	if listErr != nil {
 		resp.ErrorMessage = "failed to load device message history for status heartbeat"
@@ -249,38 +235,6 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 	return resp, nil
 }
 
-// deriveEffectiveDeviceStatus mirrors the device listing rule used by ListDevices:
-// - PENDING stays PENDING until first login flips it
-// - SUSPENDED/DECOMMISSIONED are terminal admin statuses
-// - ACTIVE/INACTIVE are derived from last_seen within a 1 minute window
-func deriveEffectiveDeviceStatus(device *v1.Device) v1.DeviceStatus {
-	if device == nil {
-		return v1.DeviceStatus_DEVICE_STATUS_UNSPECIFIED
-	}
-
-	switch device.Status {
-	case v1.DeviceStatus_SUSPENDED, v1.DeviceStatus_DECOMMISSIONED:
-		return device.Status
-	case v1.DeviceStatus_PENDING:
-		return v1.DeviceStatus_PENDING
-	default:
-		// Only derive for ACTIVE/INACTIVE/UNSPECIFIED. Preserve any other admin states.
-		if device.Status != v1.DeviceStatus_ACTIVE &&
-			device.Status != v1.DeviceStatus_INACTIVE &&
-			device.Status != v1.DeviceStatus_DEVICE_STATUS_UNSPECIFIED {
-			return device.Status
-		}
-	}
-
-	if device.LastSeen != nil {
-		if time.Since(device.LastSeen.AsTime()) <= deviceActiveWindow {
-			return v1.DeviceStatus_ACTIVE
-		}
-		return v1.DeviceStatus_INACTIVE
-	}
-	return v1.DeviceStatus_INACTIVE
-}
-
 func extractDeviceHealthSummariesFromStatusContent(content string) (*v1.DeviceCoreHealthSummary, *v1.DeviceAgentLatencySummary, *v1.DeviceResourcesSummary, *v1.DeviceReleaseSummary, *timestamppb.Timestamp) {
 	decoded := content
 	if b, err := base64.StdEncoding.DecodeString(content); err == nil && len(b) > 0 {
@@ -291,7 +245,9 @@ func extractDeviceHealthSummariesFromStatusContent(content string) (*v1.DeviceCo
 	}
 
 	var root map[string]interface{}
-	if err := json.Unmarshal([]byte(decoded), &root); err != nil || root == nil {
+	dec := json.NewDecoder(strings.NewReader(decoded))
+	dec.UseNumber()
+	if err := dec.Decode(&root); err != nil || root == nil {
 		return nil, nil, nil, nil, nil
 	}
 
@@ -353,12 +309,12 @@ func extractDeviceHealthSummariesFromStatusContent(content string) (*v1.DeviceCo
 			outResources.CpuIsThrottled = jsonBool(cpu, "isThrottled", "cpu_is_throttled", "IsThrottled")
 		}
 		if mem := jsonMap(container, "memory", "Memory"); mem != nil {
-			outResources.MemoryUsedBytes = int64(jsonFloat(mem, "cGroupUsedBytes", "cgroupUsedBytes", "memory_used_bytes", "CGroupUsedBytes"))
-			outResources.MemoryTotalBytes = int64(jsonFloat(mem, "cGroupTotalBytes", "cgroupTotalBytes", "memory_total_bytes", "CGroupTotalBytes"))
+			outResources.MemoryUsedBytes = jsonInt64(mem, "cGroupUsedBytes", "cgroupUsedBytes", "memory_used_bytes", "CGroupUsedBytes")
+			outResources.MemoryTotalBytes = jsonInt64(mem, "cGroupTotalBytes", "cgroupTotalBytes", "memory_total_bytes", "CGroupTotalBytes")
 		}
 		if disk := jsonMap(container, "disk", "Disk"); disk != nil {
-			outResources.DiskUsedBytes = int64(jsonFloat(disk, "dataPartitionUsedBytes", "disk_used_bytes", "DataPartitionUsedBytes"))
-			outResources.DiskTotalBytes = int64(jsonFloat(disk, "dataPartitionTotalBytes", "disk_total_bytes", "DataPartitionTotalBytes"))
+			outResources.DiskUsedBytes = jsonInt64(disk, "dataPartitionUsedBytes", "disk_used_bytes", "DataPartitionUsedBytes")
+			outResources.DiskTotalBytes = jsonInt64(disk, "dataPartitionTotalBytes", "disk_total_bytes", "DataPartitionTotalBytes")
 		}
 		if outResources.Hwid == "" &&
 			outResources.Architecture == "" &&
@@ -438,6 +394,37 @@ func jsonFloat(m map[string]interface{}, keys ...string) float64 {
 	return 0
 }
 
+func jsonInt64(m map[string]interface{}, keys ...string) int64 {
+	if m == nil {
+		return 0
+	}
+	for _, k := range keys {
+		switch v := m[k].(type) {
+		case int64:
+			return v
+		case int:
+			return int64(v)
+		case int32:
+			return int64(v)
+		case float64:
+			// Best-effort fallback (should be avoided for large integers)
+			return int64(v)
+		case json.Number:
+			if i, err := v.Int64(); err == nil {
+				return i
+			}
+			if f, err := v.Float64(); err == nil {
+				return int64(f)
+			}
+		case string:
+			if i, err := json.Number(v).Int64(); err == nil {
+				return i
+			}
+		}
+	}
+	return 0
+}
+
 func jsonBool(m map[string]interface{}, keys ...string) bool {
 	if m == nil {
 		return false
@@ -455,8 +442,6 @@ type GetDeviceHealthResponse struct {
 	DeviceId        string
 	DeviceStatus    v1.DeviceStatus
 	LastSeen        *timestamppb.Timestamp
-	Status          *v2.StatusMessage
-	StatusB64       string // Base64-encoded StatusMessage fallback
 	DeviceTimestamp *timestamppb.Timestamp
 	ErrorMessage    string
 	CoreHealth      *v1.DeviceCoreHealthSummary

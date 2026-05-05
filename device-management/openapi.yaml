@@ -1378,19 +1378,12 @@ components:
             properties:
                 deviceId:
                     type: string
-                last_seen:
+                lastSeen:
                     type: string
                     description: |-
                         Last time the device communicated with device-management (Pull heartbeat).
                          Note: this replaces the former last_updated field (same tag = 2).
                     format: date-time
-                status:
-                    allOf:
-                        - $ref: '#/components/schemas/api.umh_core.v2.StatusMessage'
-                    description: 'Deprecated: intentionally not populated by server to keep /health summary-only.'
-                statusB64:
-                    type: string
-                    description: 'Deprecated: intentionally not populated by server to keep /health summary-only.'
                 deviceTimestamp:
                     type: string
                     format: date-time
@@ -1400,11 +1393,11 @@ components:
                     type: integer
                     description: Effective device status derived from last_seen (ACTIVE/INACTIVE), matching ListDevices.
                     format: enum
-                core_health:
+                coreHealth:
                     allOf:
                         - $ref: '#/components/schemas/api.devicemgmt.v1.DeviceCoreHealthSummary'
                     description: Latest device-reported health summaries (when the device sends StatusMessage heartbeats)
-                agent_latency:
+                agentLatency:
                     $ref: '#/components/schemas/api.devicemgmt.v1.DeviceAgentLatencySummary'
                 resources:
                     $ref: '#/components/schemas/api.devicemgmt.v1.DeviceResourcesSummary'
@@ -1826,38 +1819,6 @@ components:
                 location:
                     $ref: '#/components/schemas/api.devicemgmt.v1.DeviceLocation'
             description: UpdateDeviceRequest updates device information
-        api.umh_core.v2.Agent:
-            type: object
-            properties:
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                latency:
-                    $ref: '#/components/schemas/api.umh_core.v2.Latency'
-                location:
-                    type: object
-                    additionalProperties:
-                        type: string
-            description: 'Agent: Device agent state and configuration'
-        api.umh_core.v2.CPU:
-            type: object
-            properties:
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                totalUsageMCpu:
-                    type: number
-                    format: double
-                coreCount:
-                    type: integer
-                    format: int32
-                cgroupCores:
-                    type: number
-                    format: double
-                throttleRatio:
-                    type: number
-                    format: double
-                isThrottled:
-                    type: boolean
-            description: 'CPU: CPU metrics with cgroup limits'
         api.umh_core.v2.CdcfMeta:
             type: object
             properties:
@@ -1909,76 +1870,6 @@ components:
                 data:
                     type: string
             description: 'CommonDataFlowComponentRawYamlConfig: Raw YAML configuration fallback'
-        api.umh_core.v2.Connection:
-            type: object
-            properties:
-                uuid:
-                    type: string
-                name:
-                    type: string
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                uri:
-                    type: string
-                lastLatencyMs:
-                    type: number
-                    format: double
-            description: 'Connection: External system connection state'
-        api.umh_core.v2.Container:
-            type: object
-            properties:
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                cpu:
-                    $ref: '#/components/schemas/api.umh_core.v2.CPU'
-                disk:
-                    $ref: '#/components/schemas/api.umh_core.v2.Disk'
-                memory:
-                    $ref: '#/components/schemas/api.umh_core.v2.Memory'
-                hwid:
-                    type: string
-                architecture:
-                    type: string
-            description: 'Container: Hardware and resource information'
-        api.umh_core.v2.Core:
-            type: object
-            properties:
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                agent:
-                    $ref: '#/components/schemas/api.umh_core.v2.Agent'
-                container:
-                    $ref: '#/components/schemas/api.umh_core.v2.Container'
-                release:
-                    $ref: '#/components/schemas/api.umh_core.v2.Release'
-                dfcs:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/api.umh_core.v2.Dfc'
-                redpanda:
-                    $ref: '#/components/schemas/api.umh_core.v2.Redpanda'
-                topicBrowser:
-                    $ref: '#/components/schemas/api.umh_core.v2.TopicBrowser'
-                dataModels:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/api.umh_core.v2.DataModel'
-                dataContracts:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/api.umh_core.v2.DataContract'
-            description: 'Core: Root system state container'
-        api.umh_core.v2.DataContract:
-            type: object
-            properties:
-                name:
-                    type: string
-                dataModel:
-                    $ref: '#/components/schemas/api.umh_core.v2.DataContractRef'
-                flows:
-                    type: integer
-                    format: int32
-            description: 'DataContract: Data contract definition'
         api.umh_core.v2.DataContractInfo:
             type: object
             properties:
@@ -1989,14 +1880,6 @@ components:
                 status:
                     type: string
             description: 'DataContractInfo: Data contract created by data model operations'
-        api.umh_core.v2.DataContractRef:
-            type: object
-            properties:
-                name:
-                    type: string
-                version:
-                    type: string
-            description: 'DataContractRef: Reference to a data model'
         api.umh_core.v2.DataFlowComponent:
             type: object
             properties:
@@ -2054,18 +1937,6 @@ components:
                 data:
                     type: string
             description: 'DataFlowComponentProcessor: Individual processor configuration'
-        api.umh_core.v2.DataModel:
-            type: object
-            properties:
-                name:
-                    type: string
-                description:
-                    type: string
-                latestVersion:
-                    type: string
-                hash:
-                    type: string
-            description: 'DataModel: Data model metadata'
         api.umh_core.v2.DataModelOperationResult:
             type: object
             properties:
@@ -2104,57 +1975,6 @@ components:
                 ignoreHealthCheck:
                     type: boolean
             description: 'DeployDataFlowComponentPayload: Deploy a data flow component'
-        api.umh_core.v2.Dfc:
-            type: object
-            properties:
-                uuid:
-                    type: string
-                name:
-                    type: string
-                dfcType:
-                    type: string
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                metrics:
-                    $ref: '#/components/schemas/api.umh_core.v2.DfcMetrics'
-                connections:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/api.umh_core.v2.Connection'
-                bridge:
-                    $ref: '#/components/schemas/api.umh_core.v2.DfcBridgeInfo'
-                isInitialized:
-                    type: boolean
-                currentVersionUUID:
-                    type: string
-            description: 'Dfc: Data Flow Component state'
-        api.umh_core.v2.DfcBridgeInfo:
-            type: object
-            properties:
-                dataContract:
-                    type: string
-                inputType:
-                    type: string
-                outputType:
-                    type: string
-            description: 'DfcBridgeInfo: Bridge-specific metadata'
-        api.umh_core.v2.DfcMetrics:
-            type: object
-            properties:
-                avgInputThroughputPerMinuteInMsgSec:
-                    type: number
-                    format: double
-            description: 'DfcMetrics: Data Flow Component performance metrics'
-        api.umh_core.v2.Disk:
-            type: object
-            properties:
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                dataPartitionUsedBytes:
-                    type: string
-                dataPartitionTotalBytes:
-                    type: string
-            description: 'Disk: Storage metrics'
         api.umh_core.v2.EditDataFlowComponentPayload:
             type: object
             properties:
@@ -2227,37 +2047,6 @@ components:
                         Component UUID - REQUIRED if type is: dfc, protocol-converter, stream-processor
                          For other types, this field is ignored
             description: 'GetMetricsPayload: Retrieve metrics from various services'
-        api.umh_core.v2.Health:
-            type: object
-            properties:
-                message:
-                    type: string
-                state:
-                    type: string
-                desiredState:
-                    type: string
-                category:
-                    type: string
-            description: 'Health: Health state with category'
-        api.umh_core.v2.Latency:
-            type: object
-            properties:
-                avgMs:
-                    type: number
-                    format: double
-                maxMs:
-                    type: number
-                    format: double
-                minMs:
-                    type: number
-                    format: double
-                p95Ms:
-                    type: number
-                    format: double
-                p99Ms:
-                    type: number
-                    format: double
-            description: 'Latency: Latency metrics with percentiles'
         api.umh_core.v2.LoginResponse:
             type: object
             properties:
@@ -2277,16 +2066,6 @@ components:
                     type: string
                     format: date-time
             description: "LoginResponse returns device information and authentication token\n Matches umh-core's InstanceLoginResponse (backend_api_structs/backend_api_struct.go:119-125)\n but includes jwtToken for device-management client convenience\n \n CRITICAL: Uses common.CompanyDetails and common.LicenseStatus for wire protocol compatibility\n These are the exact types that umh-core sends, ensuring 100% compatibility"
-        api.umh_core.v2.Memory:
-            type: object
-            properties:
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                cGroupUsedBytes:
-                    type: string
-                cGroupTotalBytes:
-                    type: string
-            description: 'Memory: Memory metrics'
         api.umh_core.v2.ProtocolConverter:
             type: object
             properties:
@@ -2398,36 +2177,6 @@ components:
                     items:
                         $ref: '#/components/schemas/api.umh_core.v2.UMHMessage'
             description: PushRequest sends device status/telemetry to console
-        api.umh_core.v2.Redpanda:
-            type: object
-            properties:
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                avgIncomingThroughputPerMinuteInBytesSec:
-                    type: number
-                    format: double
-                avgOutgoingThroughputPerMinuteInBytesSec:
-                    type: number
-                    format: double
-            description: 'Redpanda: Message broker state'
-        api.umh_core.v2.Release:
-            type: object
-            properties:
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                version:
-                    type: string
-                channel:
-                    type: string
-                supportedFeatures:
-                    type: array
-                    items:
-                        type: string
-                versions:
-                    type: array
-                    items:
-                        $ref: '#/components/schemas/api.umh_core.v2.Version'
-            description: 'Release: Version and feature information'
         api.umh_core.v2.SetConfigFilePayload:
             type: object
             properties:
@@ -2451,17 +2200,6 @@ components:
                 SetConfigFileResponse: Response from SetConfigFile action
                  Matches umh-core's models.SetConfigFileResponse exactly (pkg/models/action_models.go:618-622)
                  Note: content field echoes back the entire file that was written (for confirmation/audit purposes)
-        api.umh_core.v2.StatusMessage:
-            type: object
-            properties:
-                core:
-                    $ref: '#/components/schemas/api.umh_core.v2.Core'
-                plugins:
-                    type: object
-                    additionalProperties:
-                        type: string
-                        format: bytes
-            description: 'StatusMessage: Complete system state sent by device (via Push API)'
         api.umh_core.v2.StreamProcessorModelRef:
             type: object
             properties:
@@ -2470,20 +2208,6 @@ components:
                 version:
                     type: string
             description: 'StreamProcessorModelRef: Reference to a data model'
-        api.umh_core.v2.TopicBrowser:
-            type: object
-            properties:
-                health:
-                    $ref: '#/components/schemas/api.umh_core.v2.Health'
-                unsBundles:
-                    type: object
-                    additionalProperties:
-                        type: string
-                        format: bytes
-                topicCount:
-                    type: integer
-                    format: int32
-            description: 'TopicBrowser: Topic catalog state'
         api.umh_core.v2.UMHMessage:
             type: object
             properties:
@@ -2500,14 +2224,6 @@ components:
                  MUST match umh-core's models.UMHMessage exactly (pkg/models/action_models.go:79-84)
                  Wire protocol - clean, simple, compatible with umh-core
                  Internal correlation tracking is handled separately in device-management
-        api.umh_core.v2.Version:
-            type: object
-            properties:
-                name:
-                    type: string
-                version:
-                    type: string
-            description: 'Version: Component version information'
 tags:
     - name: DeviceMgmtService
       description: |-

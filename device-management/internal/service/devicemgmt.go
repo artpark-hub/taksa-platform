@@ -328,9 +328,14 @@ func (s *DeviceMgmtService) GetDeviceHealth(ctx context.Context, req *v1.GetDevi
 	}
 
 	// Ensure the edge has a "subscriber" so it emits periodic status heartbeats (MessageType "status").
-	// This is best-effort; the health call still succeeds without summaries.
+	// This is best-effort; do not block the health call on subscription maintenance.
 	if s.instanceUc != nil {
-		s.instanceUc.EnsureStatusSubscription(ctx, req.DeviceId)
+		deviceID := req.DeviceId
+		go func() {
+			subscriptionCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			defer cancel()
+			s.instanceUc.EnsureStatusSubscription(subscriptionCtx, deviceID)
+		}()
 	}
 
 	// Call business logic
@@ -344,8 +349,6 @@ func (s *DeviceMgmtService) GetDeviceHealth(ctx context.Context, req *v1.GetDevi
 		DeviceId:        resp.DeviceId,
 		DeviceStatus:    resp.DeviceStatus,
 		LastSeen:        resp.LastSeen,
-		Status:          resp.Status,
-		StatusB64:       resp.StatusB64,
 		DeviceTimestamp: resp.DeviceTimestamp,
 		ErrorMessage:    resp.ErrorMessage,
 		CoreHealth:      resp.CoreHealth,
