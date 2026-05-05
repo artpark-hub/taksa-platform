@@ -1,5 +1,10 @@
+import { Suspense } from 'react';
 import AddBridge from '../../../components/AddBridge';
 
 export default function AddBridgePage() {
-    return <AddBridge />;
+    return (
+        <Suspense>
+            <AddBridge />
+        </Suspense>
+    );
 }

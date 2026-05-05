@@ -70,8 +70,7 @@
     margin-left: var(--space-md);
 }
 
-.bridge-general-form-row input,
-.bridge-general-select-wrapper select {
+.bridge-general-form-row input {
     width: 100%;
     box-sizing: border-box;
     padding: var(--space-md);
@@ -85,54 +84,76 @@
     outline: none;
 }
 
-.bridge-general-form-row input:focus,
-.bridge-general-select-wrapper select:focus {
+.bridge-general-form-row input:focus {
     border-color: #000;
 }
 
-.bridge-general-select-wrapper {
-    position: relative;
+.bridge-general-level-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    width: 100%;
 }
 
-.bridge-general-select-wrapper select {
-    appearance: none;
-    padding-right: 2.5rem;
+.bridge-general-level-input-wrap input {
+    flex: 1;
+}
+
+.bridge-general-level-trash-btn {
+    border: none;
+    background: transparent;
+    color: #dc2626;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
     cursor: pointer;
+    flex-shrink: 0;
 }
 
-.bridge-general-select-icon {
-    position: absolute;
-    right: var(--space-md);
-    top: 50%;
-    transform: translateY(-50%);
-    color: #6b7280;
-    pointer-events: none;
+.bridge-general-level-trash-btn:hover {
+    background-color: #fee2e2;
+    color: #b91c1c;
 }
 
 .bridge-general-add-level-btn {
     width: 100%;
-    background: #f3f4f6;
-    color: #111827;
     border: 1px solid #e5e7eb;
+    background-color: #f3f4f6;
+    color: #111827;
     border-radius: var(--radius-md);
-    padding: var(--space-md);
-    font-size: var(--text-sm);
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-    display: flex;
+    min-height: 2.75rem;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--space-sm);
+    font-size: var(--text-base);
+    font-weight: 600;
+    cursor: pointer;
 }
 
 .bridge-general-add-level-btn:hover {
     background-color: #e5e7eb;
 }
 
+.bridge-general-form-row input:disabled {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    border-color: #e5e7eb;
+    cursor: not-allowed;
+    opacity: 1;
+}
+
 @media (max-width: 48rem) {
     .bridge-general-form-row {
         grid-template-columns: 1fr;
+        gap: var(--space-sm);
+    }
+
+    .bridge-general-level-input-wrap {
         gap: var(--space-sm);
     }
 }

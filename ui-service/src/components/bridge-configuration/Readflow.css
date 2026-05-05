@@ -68,7 +68,7 @@
     margin-bottom: var(--space-xl);
 }
 
-.bridge-readflow-section-card button {
+.bridge-readflow-section-card p button {
     background: transparent;
     border: none;
     padding: 0;
@@ -126,6 +126,16 @@
 
 .bridge-readflow-select-wrapper select:focus {
     border-color: #000;
+}
+
+.bridge-readflow-select-wrapper select:disabled {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    cursor: not-allowed;
+}
+
+.bridge-readflow-select-wrapper select:disabled + .bridge-readflow-select-icon {
+    color: #9ca3af;
 }
 
 .bridge-readflow-select-icon {
@@ -253,5 +263,454 @@
 
     .bridge-readflow-info-icon {
         right: var(--space-sm);
+    }
+}
+
+.bridge-processing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+
+.bridge-processing-title h2 {
+    margin-bottom: var(--space-sm);
+}
+
+.bridge-processing-title p {
+    margin-bottom: 0;
+}
+
+.bridge-processing-toggle {
+    display: flex;
+    gap: var(--space-sm);
+    background-color: #f3f4f6;
+    border-radius: var(--radius-md);
+    padding: 0.25rem;
+}
+
+.toggle-btn {
+    padding: 0.375rem 1rem;
+    border: none !important;
+    background-color: transparent;
+    text-decoration: none;
+    color: #6b7280;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    border-radius: calc(var(--radius-md) - 0.125rem);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggle-btn.active {
+    background-color: white;
+    color: #111827;
+    box-shadow: var(--shadow-soft);
+}
+
+.bridge-processing-visual {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.bridge-processing-visual-shell {
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+}
+
+.bridge-processing-conditions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
+}
+
+.bridge-processing-section {
+    border: 1px solid #eceff3;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background-color: #fff;
+}
+
+.bridge-processing-condition-row {
+    display: flex;
+    align-items: stretch;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.bridge-processing-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0 var(--space-sm);
+    border-right: 1px solid #eceff3;
+    background-color: #f7f7f8;
+}
+
+.bridge-processing-icon-btn {
+    border: none !important;
+    background: transparent;
+    color: #374151;
+    border-radius: 0.375rem;
+    width: 1.9rem;
+    height: 1.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.bridge-processing-icon-btn:hover {
+    background-color: #eceff3;
+}
+
+.bridge-processing-section-header {
+    width: 100%;
+    padding: var(--space-md) var(--space-lg);
+    background-color: #f9fafb;
+    border: none !important;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: #111827;
+    transition: background-color 0.2s ease;
+}
+
+.bridge-processing-section-header:hover {
+    background-color: #f3f4f6;
+}
+
+.bridge-processing-condition-row .bridge-processing-section-header {
+    border-bottom: none;
+}
+
+.bridge-processing-section-header .chevron {
+    transition: transform 0.2s ease;
+}
+
+.bridge-processing-section-header .chevron.open {
+    transform: rotate(180deg);
+}
+
+.bridge-condition-preview {
+    margin-left: auto;
+    font-size: var(--text-xs);
+    color: #6b7280;
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 42rem;
+    text-align: left;
+}
+
+.bridge-processing-section-content {
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.bridge-code-block {
+    background-color: #202020;
+    color: #d1d5db;
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    margin: 0;
+    max-height: 20rem;
+    overflow-y: auto;
+}
+
+.bridge-processing-editor {
+    min-height: 16rem;
+}
+
+.bridge-condition-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.bridge-condition-field label {
+    color: #374151;
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.bridge-condition-input,
+.bridge-condition-textarea {
+    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    font-size: var(--text-sm);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: #111827;
+    background-color: #fff;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.bridge-condition-input:focus,
+.bridge-condition-textarea:focus {
+    border-color: #000;
+}
+
+.bridge-condition-input {
+    padding: var(--space-md);
+}
+
+.bridge-condition-textarea {
+    resize: vertical;
+    min-height: 6rem;
+    font-size: var(--text-xs);
+    line-height: 1.6;
+}
+
+.bridge-delete-condition-btn,
+.bridge-add-condition-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg);
+    border: 1px solid #fecaca;
+    background-color: #fef2f2;
+    color: #dc2626;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bridge-delete-condition-btn {
+    display: none;
+}
+
+.bridge-delete-condition-btn:hover {
+    background-color: #fee2e2;
+    border-color: #fca5a5;
+}
+
+.bridge-add-condition-btn {
+    border: 1px solid #d1d5db;
+    background-color: #111827;
+    color: #ffffff;
+    align-self: flex-start;
+    margin-top: var(--space-lg);
+}
+
+.bridge-add-condition-btn:hover {
+    background-color: #1f2937;
+    border-color: #4b5563;
+    color: #ffffff;
+}
+
+.bridge-processing-code {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    max-height: none;
+    overflow: visible;
+}
+
+.bridge-processing-code .bridge-code-block {
+    background-color: transparent;
+    max-height: none;
+}
+
+.bridge-code-modal-overlay,
+.bridge-delete-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(17, 24, 39, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 70;
+    padding: var(--space-xl);
+}
+
+.bridge-code-modal {
+    width: min(90vw, 72rem);
+    height: min(86vh, 48rem);
+    background-color: #1b1b1e;
+    border: 1px solid #2f3035;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 0.75rem 3rem rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.bridge-code-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid #2f3035;
+    background-color: #18181b;
+}
+
+.bridge-code-modal-header h3 {
+    margin: 0;
+    color: #f3f4f6;
+    font-size: var(--text-lg);
+    font-weight: 700;
+}
+
+.bridge-code-modal-close {
+    border: none;
+    background: transparent;
+    color: #d1d5db;
+    cursor: pointer;
+    padding: 0;
+    line-height: 0;
+    text-decoration: none;
+}
+
+.bridge-code-modal-editor {
+    display: grid;
+    grid-template-columns: 3.5rem 1fr;
+    flex: 1;
+    min-height: 0;
+}
+
+.bridge-code-modal-lines {
+    margin: 0;
+    padding: var(--space-md) var(--space-sm);
+    background-color: #111217;
+    border-right: 1px solid #2f3035;
+    color: #60a5fa;
+    font-size: var(--text-sm);
+    line-height: 1.75;
+    text-align: right;
+    overflow: hidden;
+    user-select: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.bridge-code-modal-textarea {
+    border: none;
+    outline: none;
+    resize: none;
+    padding: var(--space-md);
+    color: #d1d5db;
+    font-size: var(--text-sm);
+    line-height: 1.75;
+    background-color: #202020;
+    overflow: auto;
+    white-space: pre;
+    tab-size: 2;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.bridge-delete-modal {
+    width: 100%;
+    max-width: clamp(18rem, 30vw + 8rem, 25rem);
+    background-color: #ffffff;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 0.75rem 3rem rgba(0, 0, 0, 0.25);
+    padding: var(--space-2xl) var(--space-xl) var(--space-xl);
+    position: relative;
+    text-align: center;
+}
+
+.bridge-delete-modal h3 {
+    margin: 0 0 var(--space-sm) 0;
+    color: #111827;
+    font-size: var(--text-xl);
+    font-weight: 700;
+}
+
+.bridge-delete-modal p {
+    margin: 0 0 var(--space-xl) 0;
+    color: #6b7280;
+    font-size: var(--text-base);
+    line-height: 1.5;
+}
+
+.bridge-delete-modal-close {
+    position: absolute;
+    top: var(--space-xl);
+    right: var(--space-xl);
+    border: none;
+    background: transparent;
+    color: #4b5563;
+    cursor: pointer;
+    padding: 0;
+    line-height: 0;
+    text-decoration: none;
+}
+
+.bridge-delete-modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-sm);
+    margin-top: 0;
+}
+
+.bridge-modal-cancel-btn,
+.bridge-modal-delete-btn {
+    border: 1px solid #d1d5db;
+    background-color: #f3f4f6;
+    color: #111827;
+    padding: var(--space-md) var(--space-xl);
+    border-radius: var(--radius-md);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.bridge-modal-delete-btn {
+    border-color: #b91c1c;
+    background-color: #dc2626;
+    color: #ffffff;
+}
+
+.bridge-modal-delete-btn:hover {
+    background-color: #b91c1c;
+}
+
+@media (max-width: 48rem) {
+    .bridge-code-modal-overlay,
+    .bridge-delete-modal-overlay {
+        padding: var(--space-md);
+    }
+
+    .bridge-code-modal {
+        width: 100%;
+        height: min(90vh, 40rem);
+    }
+
+    .bridge-delete-modal {
+        width: 100%;
+        padding: var(--space-xl);
+    }
+
+    .bridge-delete-modal-actions {
+        justify-content: stretch;
+    }
+
+    .bridge-modal-cancel-btn,
+    .bridge-modal-delete-btn {
+        flex: 1;
+        font-size: var(--text-base);
     }
 }

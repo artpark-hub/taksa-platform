@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { ArrowLeft, ChevronRight, Filter, Search } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import React from 'react';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import './SelectTemplates.css';
 
 const templates = [
@@ -24,32 +24,42 @@ const templates = [
 
 const SelectTemplates = () => {
     const router = useRouter();
-    const [searchQuery, setSearchQuery] = useState('');
+    const searchParams = useSearchParams();
+    const deviceId = searchParams?.get('deviceId') || '';
+    const deviceName = searchParams?.get('deviceName') || '';
 
-    const filteredTemplates = useMemo(() => {
-        const query = searchQuery.trim().toLowerCase();
+    const getDeviceQueryString = () => {
+        const query = new URLSearchParams();
 
-        if (!query) {
-            return templates;
+        if (deviceId) {
+            query.set('deviceId', deviceId);
         }
 
-        return templates.filter((template) =>
-            template.title.toLowerCase().includes(query) ||
-            template.description.toLowerCase().includes(query) ||
-            template.protocol.toLowerCase().includes(query)
-        );
-    }, [searchQuery]);
+        if (deviceName) {
+            query.set('deviceName', deviceName);
+        }
+
+        return query.toString();
+    };
 
     const handleBack = () => {
-        router.push('/dashboard/bridge/add');
+        const queryString = getDeviceQueryString();
+        router.push(`/bridges/add${queryString ? `?${queryString}` : ''}`);
     };
 
     const handleTemplateSelect = (template) => {
-        router.push(`/dashboard/bridge/configure?protocol=${encodeURIComponent(template.protocol)}`);
-    };
+        const query = new URLSearchParams();
+        query.set('protocol', template.protocol);
 
-    const handleFilter = () => {
-        // Filter logic will be added later
+        if (deviceId) {
+            query.set('deviceId', deviceId);
+        }
+
+        if (deviceName) {
+            query.set('deviceName', deviceName);
+        }
+
+        router.push(`/bridges/configure?${query.toString()}`);
     };
 
     return (
@@ -73,7 +83,7 @@ const SelectTemplates = () => {
                     <p>Choose Starting Point</p>
                 </div>
 
-                <div className="template-step-line half-active"></div>
+                <div className="template-step-line progress-68"></div>
 
                 <div className="template-step-item">
                     <div className="template-step-circle">2</div>
@@ -88,59 +98,33 @@ const SelectTemplates = () => {
                 </div>
             </div>
 
-            <div className="template-divider"></div>
-
             <div className="template-controls-row">
                 <div className="template-section-title">
                     <h2>Available Templates</h2>
                     <span>({templates.length} templates)</span>
                 </div>
-
-                <div className="template-actions">
-                    <div className="template-search-wrapper">
-                        <Search size={20} className="template-search-icon" />
-                        <input
-                            type="text"
-                            placeholder="Search templates..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="template-search-input"
-                        />
-                    </div>
-
-                    <button className="template-filter-btn" onClick={handleFilter}>
-                        <Filter size={20} />
-                        Filter
-                    </button>
-                </div>
             </div>
 
             <div className="template-list">
-                {filteredTemplates.length > 0 ? (
-                    filteredTemplates.map((template) => (
-                        <button
-                            key={template.id}
-                            className="template-card"
-                            onClick={() => handleTemplateSelect(template)}
-                        >
-                            <div className="template-card-content">
-                                <h3>{template.title}</h3>
-                                <p>{template.description}</p>
+                {templates.map((template) => (
+                    <button
+                        key={template.id}
+                        className="template-card"
+                        onClick={() => handleTemplateSelect(template)}
+                    >
+                        <div className="template-card-content">
+                            <h3>{template.title}</h3>
+                            <p>{template.description}</p>
 
-                                <div className="template-tags">
-                                    <span>{template.flowType}</span>
-                                    <span>{template.protocol}</span>
-                                </div>
+                            <div className="template-tags">
+                                <span>{template.flowType}</span>
+                                <span>{template.protocol}</span>
                             </div>
+                        </div>
 
-                            <ChevronRight size={30} className="template-chevron" />
-                        </button>
-                    ))
-                ) : (
-                    <div className="template-empty-state">
-                        No templates found.
-                    </div>
-                )}
+                        <ChevronRight size={30} className="template-chevron" />
+                    </button>
+                ))}
             </div>
         </div>
     );

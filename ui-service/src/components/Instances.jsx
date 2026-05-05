@@ -59,7 +59,6 @@ const Instances = () => {
 
                 const params = new URLSearchParams();
                 params.set('created_by', createdBy);
-                params.set('page_size', '20');
 
                 const response = await fetch(`/api/v1/devicemgmt/devices?${params.toString()}`, {
                     method: 'GET',

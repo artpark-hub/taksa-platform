@@ -75,6 +75,17 @@
     font-weight: 500;
 }
 
+.bridge-config-error-msg {
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    margin-bottom: var(--space-md);
+}
+
 .bridge-config-save-btn {
     background-color: #000;
     color: #fff;
@@ -257,6 +268,55 @@
 
 .bridge-config-body > *:last-child {
     margin-bottom: 40px;
+}
+
+.bridge-config-queue-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.bridge-config-queue-modal {
+    width: min(90vw, 28rem);
+    background: #ffffff;
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+    text-align: center;
+}
+
+.bridge-config-loader {
+    width: 3rem;
+    height: 3rem;
+    border: 4px solid #e5e7eb;
+    border-top-color: #111827;
+    border-radius: 999px;
+    margin: 0 auto var(--space-md) auto;
+    animation: bridge-config-spin 0.8s linear infinite;
+}
+
+.bridge-config-queue-modal h3 {
+    margin: 0 0 var(--space-xs) 0;
+    color: #111827;
+    font-size: var(--text-lg);
+    font-weight: 700;
+}
+
+.bridge-config-queue-modal p {
+    margin: 0;
+    color: #6b7280;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+}
+
+@keyframes bridge-config-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @media (max-width: 48rem) {
