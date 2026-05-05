@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -181,20 +180,6 @@ func (uc *InstanceUsecase) EnsureStatusSubscription(ctx context.Context, deviceI
 		return
 	}
 
-	mu := uc.subscribeActionMutex(deviceID)
-	mu.Lock()
-	defer mu.Unlock()
-
-	// Avoid spamming: if there's already a pending subscribe action, don't add another.
-	pending, err := uc.store.Actions().ListPending(ctx, tenantID, deviceID)
-	if err == nil {
-		for _, a := range pending {
-			if a != nil && a.Type == subscribeActionType {
-				return
-			}
-		}
-	}
-
 	payloadJSON, err := json.Marshal(map[string]any{
 		"resubscribed": true,
 	})
@@ -215,6 +200,10 @@ func (uc *InstanceUsecase) EnsureStatusSubscription(ctx context.Context, deviceI
 		ExpiresAt:  now.Add(time.Duration(subscribeActionDefaultTTLSeconds) * time.Second),
 	}
 	if err := uc.store.Actions().Save(ctx, tenantID, action); err != nil {
+		// Ignore "already exists" for idempotency across replicas (db-level uniqueness).
+		if err.Error() == "record already exists" {
+			return
+		}
 		// Non-fatal: health still works without summaries.
 		fmt.Printf("Warning: failed to queue subscribe action for device %s: %v\n", deviceID, err)
 	}
@@ -227,8 +216,6 @@ type InstanceUsecase struct {
 	protocolConverterRepo *data.ProtocolConverterRepo
 	dataModelRepo         *data.DataModelRepo
 	streamProcessorRepo   *data.StreamProcessorRepo
-
-	subscribeActionLocks sync.Map // map[deviceID]*sync.Mutex
 }
 
 // NewInstanceUsecase creates a new InstanceUsecase with the given storage and authentication backends.
@@ -242,17 +229,6 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 	}
 }
 
-func (uc *InstanceUsecase) subscribeActionMutex(deviceID string) *sync.Mutex {
-	if deviceID == "" {
-		return &sync.Mutex{}
-	}
-	if v, ok := uc.subscribeActionLocks.Load(deviceID); ok {
-		return v.(*sync.Mutex)
-	}
-	m := &sync.Mutex{}
-	actual, _ := uc.subscribeActionLocks.LoadOrStore(deviceID, m)
-	return actual.(*sync.Mutex)
-}
 
 // Login authenticates a device using a double-hashed token.
 // CRITICAL: Used by /v2/instance/login endpoint

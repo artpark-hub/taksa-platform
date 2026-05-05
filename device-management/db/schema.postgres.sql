@@ -110,6 +110,12 @@ CREATE INDEX IF NOT EXISTS idx_actions_device_status ON actions(device_id, statu
 CREATE INDEX IF NOT EXISTS idx_actions_tenant_status ON actions(tenant_id, status);
 CREATE INDEX IF NOT EXISTS idx_actions_tenant_device ON actions(tenant_id, device_id);
 
+-- Idempotency for edge status subscription: at most one QUEUED subscribe action per device+tenant.
+-- This supports running multiple device-management replicas without enqueueing duplicate subscribe actions.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_actions_subscribe_queued
+  ON actions(tenant_id, device_id, action_type)
+  WHERE action_type = 'subscribe' AND status = 1;
+
 -- Messages table: Stores message history for auditing and debugging
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY,
