@@ -2,22 +2,42 @@
 
 import React from 'react';
 import { ArrowLeft, ArrowRight, FilePlus, CopyPlus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import './AddBridge.css';
 
 const AddBridge = () => {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const deviceId = searchParams?.get('deviceId') || '';
+    const deviceName = searchParams?.get('deviceName') || '';
+
+    const getDeviceQueryString = () => {
+        const query = new URLSearchParams();
+
+        if (deviceId) {
+            query.set('deviceId', deviceId);
+        }
+
+        if (deviceName) {
+            query.set('deviceName', deviceName);
+        }
+
+        return query.toString();
+    };
 
     const handleBack = () => {
-        router.push('/bridges');
+        const queryString = getDeviceQueryString();
+        router.push(queryString ? `/bridges/list?${queryString}` : '/bridges');
     };
 
     const handleCreateFromScratch = () => {
-        router.push('/bridges/configure');
+        const queryString = getDeviceQueryString();
+        router.push(`/bridges/select-templates${queryString ? `?${queryString}` : ''}`);
     };
 
     const handleCreateFromExisting = () => {
-        // API / navigation logic will be added later
+        const queryString = getDeviceQueryString();
+        router.push(`/bridges/select-templates${queryString ? `?${queryString}` : ''}`);
     };
 
     return (
@@ -41,7 +61,7 @@ const AddBridge = () => {
                     <p>Choose Starting Point</p>
                 </div>
 
-                <div className="step-line half-active"></div>
+                <div className="step-line progress-34"></div>
 
                 <div className="step-item">
                     <div className="step-circle">2</div>

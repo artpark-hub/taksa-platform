@@ -212,6 +212,13 @@
     width: 100%;
 }
 
+.location-input-with-action {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex: 1;
+}
+
 .location-label-col {
     width: var(--location-label-col-width);
     min-width: var(--location-label-col-width);
@@ -220,6 +227,47 @@
     font-size: var(--text-base);
     font-weight: 600;
     color: #000;
+}
+
+.location-trash-btn {
+    border: none;
+    background: transparent;
+    color: #dc2626;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.location-trash-btn:hover {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+.location-add-level-btn {
+    width: 100%;
+    border: 1px solid #e5e7eb;
+    background-color: #f3f4f6;
+    color: #111827;
+    font-size: var(--text-lg);
+    font-weight: 600;
+    min-height: var(--input-height);
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    cursor: pointer;
+    margin-top: var(--space-sm);
+}
+
+.location-add-level-btn:hover {
+    background-color: #e5e7eb;
 }
 
 .modal-overlay {

@@ -1,5 +1,5 @@
-import Bridges from '../../components/Bridges';
+import SelectDCD from '../../components/SelectDCD';
 
 export default function BridgePage() {
-    return <Bridges />;
+    return <SelectDCD />;
 }

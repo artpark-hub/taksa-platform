@@ -1,0 +1,183 @@
+:root {
+    --radius-sm: clamp(0.2rem, 0.2vw + 0.1rem, 0.375rem);
+    --radius-md: clamp(0.4rem, 0.3vw + 0.2rem, 0.625rem);
+    --radius-lg: clamp(0.5rem, 0.5vw + 0.25rem, 0.875rem);
+    --radius-xl: clamp(0.6rem, 0.6vw + 0.3rem, 1rem);
+
+    --shadow-table: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.08);
+
+    --space-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
+    --space-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+    --space-md: clamp(0.75rem, 0.6rem + 0.75vw, 1.25rem);
+    --space-lg: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+    --space-xl: clamp(1.25rem, 1rem + 1.5vw, 2.5rem);
+    --space-2xl: clamp(1.5rem, 1.2rem + 2vw, 3.5rem);
+
+    --text-sm: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+    --text-base: clamp(0.875rem, 0.8rem + 0.4vw, 1rem);
+    --text-lg: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+    --text-2xl: clamp(1.25rem, 1rem + 1.5vw, 2rem);
+}
+
+.select-dcd-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    margin-bottom: 40px;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    background-color: white;
+}
+
+.select-dcd-header {
+    margin-bottom: var(--space-xl);
+}
+
+.select-dcd-title {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: #000;
+    margin: 0 0 var(--space-sm) 0;
+    letter-spacing: -0.03em;
+}
+
+.select-dcd-subtitle {
+    color: #555;
+    font-size: var(--text-sm);
+    margin: 0;
+    max-width: 100%;
+    line-height: 1.5;
+    font-weight: 500;
+}
+
+.select-dcd-error-msg {
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    margin-bottom: var(--space-md);
+}
+
+.select-dcd-empty-state {
+    flex: 1;
+    width: 100%;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: var(--radius-xl);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow: var(--shadow-table);
+    min-height: 22rem;
+}
+
+.select-dcd-empty-bold {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: #000;
+    margin-bottom: var(--space-xs);
+}
+
+.select-dcd-empty-sub {
+    color: #444;
+    font-size: var(--text-base);
+}
+
+.select-dcd-empty-loading {
+    color: #6b7280;
+    font-size: var(--text-base);
+    font-weight: 500;
+}
+
+.select-dcd-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+}
+
+.select-dcd-card {
+    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-xl);
+    background: #fff;
+    box-shadow: var(--shadow-table);
+    padding: var(--space-lg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.select-dcd-card:hover {
+    border-color: #9ca3af;
+    transform: translateY(-1px);
+}
+
+.select-dcd-card-content {
+    min-width: 0;
+}
+
+.select-dcd-card-top {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.select-dcd-card-top h3 {
+    margin: 0;
+    font-size: var(--text-lg);
+    color: #111827;
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.select-dcd-card-id {
+    margin: 0;
+    color: #6b7280;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.select-dcd-status-pill {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.select-dcd-status-active {
+    background: #dcfce7;
+    color: #166534;
+    border-radius: 999px;
+    padding: 0.25rem 0.625rem;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.select-dcd-chevron {
+    color: #4b5563;
+    flex-shrink: 0;
+}
+
+@media (max-width: 48rem) {
+    .select-dcd-empty-state {
+        min-height: 18rem;
+    }
+
+    .select-dcd-card {
+        padding: var(--space-md);
+    }
+
+    .select-dcd-card-top {
+        flex-wrap: wrap;
+    }
+}

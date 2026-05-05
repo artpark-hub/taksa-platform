@@ -2,17 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Copy, Check, AlertCircle, X } from 'lucide-react';
+import { ChevronLeft, Copy, Check, AlertCircle, Plus, Trash2, X } from 'lucide-react';
 import './AddInstance.css';
 
 const AddInstance = () => {
     const router = useRouter();
     const [instanceName, setInstanceName] = useState('');
     const [orgName, setOrgName] = useState('');
-    const [level1, setLevel1] = useState('');
-    const [level2, setLevel2] = useState('');
-    const [level3, setLevel3] = useState('');
-    const [level4, setLevel4] = useState('');
+    const [locationLevels, setLocationLevels] = useState([{ id: 1, value: '' }]);
     const [createdBy, setCreatedBy] = useState('');
 
     const [showModal, setShowModal] = useState(false);
@@ -40,6 +37,30 @@ const AddInstance = () => {
     }, []);
 
     const handleBack = () => { router.back(); };
+
+    const sanitizeLocationName = (value) => value.replace(/\s+/g, '_');
+
+    const handleAddLevel = () => {
+        const nextId = Math.max(0, ...locationLevels.map((level) => level.id)) + 1;
+        setLocationLevels((prev) => [...prev, { id: nextId, value: '' }]);
+    };
+
+    const handleRemoveLevel = (id) => {
+        setLocationLevels((prev) => prev.filter((level) => level.id !== id));
+    };
+
+    const handleLocationLevelChange = (id, value) => {
+        const sanitized = sanitizeLocationName(value);
+        setLocationLevels((prev) => prev.map((level) => (level.id === id ? { ...level, value: sanitized } : level)));
+    };
+
+    const isLastLocationLevel = (id) => {
+        if (locationLevels.length === 0) {
+            return false;
+        }
+
+        return locationLevels[locationLevels.length - 1]?.id === id;
+    };
 
     const getErrorMessage = (data, fallback) => {
         return (
@@ -76,10 +97,11 @@ const AddInstance = () => {
                 "0": orgName.trim()
             };
 
-            if (level1.trim()) levels["1"] = level1.trim();
-            if (level2.trim()) levels["2"] = level2.trim();
-            if (level3.trim()) levels["3"] = level3.trim();
-            if (level4.trim()) levels["4"] = level4.trim();
+            locationLevels.forEach((level, index) => {
+                if (String(level?.value || '').trim()) {
+                    levels[String(index + 1)] = String(level.value).trim();
+                }
+            });
 
             const requestBody = {
                 name: instanceName.trim(),
@@ -265,22 +287,39 @@ const AddInstance = () => {
                         </div>
                     </div>
 
-                    <div className="location-row">
-                        <div className="location-label-col">Level 1</div>
-                        <input type="text" className="form-input" placeholder="Your level 1 name" value={level1} onChange={(e) => setLevel1(e.target.value)} />
-                    </div>
-                    <div className="location-row">
-                        <div className="location-label-col">Level 2</div>
-                        <input type="text" className="form-input" placeholder="Your level 2 name" value={level2} onChange={(e) => setLevel2(e.target.value)} />
-                    </div>
-                    <div className="location-row">
-                        <div className="location-label-col">Level 3</div>
-                        <input type="text" className="form-input" placeholder="Your level 3 name" value={level3} onChange={(e) => setLevel3(e.target.value)} />
-                    </div>
-                    <div className="location-row">
-                        <div className="location-label-col">Level 4</div>
-                        <input type="text" className="form-input" placeholder="Your level 4 name" value={level4} onChange={(e) => setLevel4(e.target.value)} />
-                    </div>
+                    {locationLevels.map((level, index) => (
+                        <div className="location-row" key={level.id}>
+                            <div className="location-label-col">Level {index + 1}</div>
+                            <div className="location-input-with-action">
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder={`Your level ${index + 1} name`}
+                                    value={level.value}
+                                    onChange={(event) => handleLocationLevelChange(level.id, event.target.value)}
+                                />
+                                {isLastLocationLevel(level.id) && (
+                                    <button
+                                        type="button"
+                                        className="location-trash-btn"
+                                        onClick={() => handleRemoveLevel(level.id)}
+                                        aria-label={`Remove level ${index + 1}`}
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+
+                    <button
+                        type="button"
+                        className="location-add-level-btn"
+                        onClick={handleAddLevel}
+                    >
+                        <Plus size={20} />
+                        Add Level {locationLevels.length + 1}
+                    </button>
                 </div>
             </div>
 

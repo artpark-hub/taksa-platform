@@ -132,6 +132,16 @@
     background-color: #000;
 }
 
+.step-line.progress-34::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 2px;
+    width: 34%;
+    background-color: #000;
+}
+
 .bridge-options-wrapper {
     width: 80%;
     max-width: 75rem;
