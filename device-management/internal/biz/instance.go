@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,6 +86,77 @@ func decompressIfNeeded(data []byte) ([]byte, error) {
 
 	// Not compressed, return as-is
 	return data, nil
+}
+
+// actionFailedFallbackMessage is persisted when umh-core reports action-failure without parseable text.
+const actionFailedFallbackMessage = "Action failed on device, but no error text was found in the reply payload. Check umh-core communicator logs on the edge."
+
+// extractActionFailureMessageFromReplyPayload extracts human-readable failure text from a decoded action-reply
+// Payload map (same shape for trace_id and action-UUID correlation).
+// Canonical order (single place — both correlation paths use this): structured actionReplyPayloadV2.message from
+// umh-core SendActionReplyV2, then legacy actionReplyPayload (string or {message}). When V2 exposes a non-empty
+// errorCode string, it is appended as " [<code>]" after the message.
+func extractActionFailureMessageFromReplyPayload(payload map[string]interface{}) string {
+	if payload == nil {
+		return ""
+	}
+	if v2, ok := payload["actionReplyPayloadV2"].(map[string]interface{}); ok {
+		if m, ok := v2["message"].(string); ok {
+			msg := strings.TrimSpace(m)
+			if msg != "" {
+				code := jsonMapString(v2["errorCode"])
+				if code != "" {
+					return msg + " [" + code + "]"
+				}
+				return msg
+			}
+		}
+	}
+	if replyPayload, ok := payload["actionReplyPayload"]; ok {
+		if s, ok := replyPayload.(string); ok {
+			msg := strings.TrimSpace(s)
+			if msg != "" {
+				return msg
+			}
+		}
+		if replyMap, ok := replyPayload.(map[string]interface{}); ok {
+			if m, ok := replyMap["message"].(string); ok {
+				msg := strings.TrimSpace(m)
+				if msg != "" {
+					return msg
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func jsonMapString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(s)
+}
+
+// persistActionErrorMessageIfFailed stores error_message for terminal failure statuses (shared by correlateResponseByTraceId and correlateResponseByActionUUID).
+func (uc *InstanceUsecase) persistActionErrorMessageIfFailed(ctx context.Context, tenantID, actionID string, finalStatus models.ActionStatus, errorMessage string) {
+	if finalStatus != models.ActionStatusFailed && finalStatus != models.ActionStatusFailedParsingResponse {
+		return
+	}
+	msg := errorMessage
+	if msg == "" && finalStatus == models.ActionStatusFailed {
+		msg = actionFailedFallbackMessage
+	}
+	if msg == "" {
+		return
+	}
+	if err := uc.store.Actions().UpdateErrorMessage(ctx, tenantID, actionID, msg); err != nil {
+		fmt.Printf("Warning: Failed to store error message: %v\n", err)
+	}
 }
 
 // InstanceUsecase handles device-facing operations: authentication, message polling, and status reporting.
@@ -928,18 +1000,7 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 				stateFound = true
 				if state == "action-failure" {
 					finalStatus = models.ActionStatusFailed
-					// Extract error message from actionReplyPayload (can be string or object)
-					if replyPayload, ok := payload["actionReplyPayload"]; ok {
-						// Try as string first
-						if msg, ok := replyPayload.(string); ok {
-							errorMessage = msg
-						} else if replyMap, ok := replyPayload.(map[string]interface{}); ok {
-							// Try as object with message field
-							if msg, ok := replyMap["message"].(string); ok {
-								errorMessage = msg
-							}
-						}
-					}
+					errorMessage = extractActionFailureMessageFromReplyPayload(payload)
 				} else if state == "action-success" {
 					finalStatus = models.ActionStatusCompleted
 				}
@@ -959,12 +1020,7 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 		return fmt.Errorf("failed to update action status: %w", err)
 	}
 
-	// Store error message in action for retrieval (for both FAILED and FAILED_PARSING_RESPONSE)
-	if (finalStatus == models.ActionStatusFailed || finalStatus == models.ActionStatusFailedParsingResponse) && errorMessage != "" {
-		if err := uc.store.Actions().UpdateErrorMessage(ctx, tenantID, track.ActionID, errorMessage); err != nil {
-			fmt.Printf("Warning: Failed to store error message: %v\n", err)
-		}
-	}
+	uc.persistActionErrorMessageIfFailed(ctx, tenantID, track.ActionID, finalStatus, errorMessage)
 
 	// 6. Sync protocol converter and data model state if action completed
 	// Use RESULT payload from device (resultPayload), not the REQUEST payload (action.Payload)
@@ -1025,15 +1081,15 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 	}
 
 	// Get the message content to extract actionReplyState and error info
-	msg, err := uc.store.Messages().GetByID(ctx, messageID)
+	deviceMsg, err := uc.store.Messages().GetByID(ctx, messageID)
 	finalStatus := models.ActionStatusCompleted
 	errorMessage := ""
 	stateFound := false
 
-	if err == nil && msg != nil {
+	if err == nil && deviceMsg != nil {
 		// Parse message to extract state and error details
-		decodedPayload := msg.Content
-		if decoded, err := base64.StdEncoding.DecodeString(msg.Content); err == nil {
+		decodedPayload := deviceMsg.Content
+		if decoded, err := base64.StdEncoding.DecodeString(deviceMsg.Content); err == nil {
 			decodedPayload = string(decoded)
 		}
 		if decompressed, err := decompressIfNeeded([]byte(decodedPayload)); err == nil {
@@ -1047,12 +1103,7 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 					stateFound = true
 					if state == "action-failure" {
 						finalStatus = models.ActionStatusFailed
-						// Extract error message from actionReplyPayloadV2
-						if payloadV2, ok := payload["actionReplyPayloadV2"].(map[string]interface{}); ok {
-							if msg, ok := payloadV2["message"].(string); ok {
-								errorMessage = msg
-							}
-						}
+						errorMessage = extractActionFailureMessageFromReplyPayload(payload)
 					} else if state == "action-success" {
 						finalStatus = models.ActionStatusCompleted
 					}
@@ -1073,25 +1124,26 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 		return fmt.Errorf("failed to update action status: %w", err)
 	}
 
-	// Store error message if action failed or parse failed
-	if (finalStatus == models.ActionStatusFailed || finalStatus == models.ActionStatusFailedParsingResponse) && errorMessage != "" {
-		if err := uc.store.Actions().UpdateErrorMessage(ctx, tenantID, action.Id, errorMessage); err != nil {
-			fmt.Printf("Warning: Failed to store error message: %v\n", err)
-		}
-	}
+	uc.persistActionErrorMessageIfFailed(ctx, tenantID, action.Id, finalStatus, errorMessage)
 
 	// 6. Sync state if this is a protocol converter or data model action
 	// This mirrors the logic in correlateResponseByTraceId to ensure DB persistence
 	// regardless of which correlation method (trace_id vs actionUUID) is used
 	if finalStatus == models.ActionStatusCompleted && action != nil {
-		msg, err := uc.store.Messages().GetByID(ctx, messageID)
-		if err == nil && msg != nil {
+		syncMsg := deviceMsg
+		if syncMsg == nil {
+			syncMsg, err = uc.store.Messages().GetByID(ctx, messageID)
+			if err != nil {
+				syncMsg = nil
+			}
+		}
+		if syncMsg != nil {
 			// Create a copy of action with updated status for sync
 			actionWithStatus := *action
 			actionWithStatus.Status = finalStatus
-			_ = uc.syncProtocolConverterActionResult(ctx, &actionWithStatus, []byte(msg.Content))
-			_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, []byte(msg.Content))
-			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(msg.Content))
+			_ = uc.syncProtocolConverterActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
+			_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
+			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
 		}
 	}
 
@@ -1379,8 +1431,8 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 			if converterType == "protocol-converter" && action.Payload != nil {
 				var requestPayload map[string]interface{}
 				if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
-					if readDfc, ok := requestPayload["readDfc"].(map[string]interface{}); ok {
-						if inputs, ok := readDfc["inputs"].(map[string]interface{}); ok {
+					if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
+						if inputs, ok := readDFC["inputs"].(map[string]interface{}); ok {
 							if inputType, ok := inputs["type"].(string); ok && inputType != "" {
 								converterType = inputType
 							}
@@ -1434,8 +1486,8 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				if converterType == "protocol-converter" && action.Payload != nil {
 					var requestPayload map[string]interface{}
 					if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
-						if readDfc, ok := requestPayload["readDfc"].(map[string]interface{}); ok {
-							if inputs, ok := readDfc["inputs"].(map[string]interface{}); ok {
+						if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
+							if inputs, ok := readDFC["inputs"].(map[string]interface{}); ok {
 								if inputType, ok := inputs["type"].(string); ok && inputType != "" {
 									converterType = inputType
 								}
