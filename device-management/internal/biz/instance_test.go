@@ -200,3 +200,57 @@ func TestDecompressIfNeededGzip(t *testing.T) {
 		t.Errorf("Data should be decompressed correctly")
 	}
 }
+
+func TestExtractActionFailureMessageFromReplyPayload(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		payload  map[string]interface{}
+		expected string
+	}{
+		{
+			name: "v2 message with errorCode",
+			payload: map[string]interface{}{
+				"actionReplyPayloadV2": map[string]interface{}{
+					"message":   "boom",
+					"errorCode": "E42",
+				},
+			},
+			expected: "boom [E42]",
+		},
+		{
+			name: "v2 preferred over legacy when both present",
+			payload: map[string]interface{}{
+				"actionReplyPayloadV2": map[string]interface{}{"message": "from-v2"},
+				"actionReplyPayload":   "from-legacy",
+			},
+			expected: "from-v2",
+		},
+		{
+			name:     "legacy string",
+			payload:  map[string]interface{}{"actionReplyPayload": "legacy-text"},
+			expected: "legacy-text",
+		},
+		{
+			name: "legacy object message",
+			payload: map[string]interface{}{
+				"actionReplyPayload": map[string]interface{}{"message": "nested"},
+			},
+			expected: "nested",
+		},
+		{
+			name:     "nil payload",
+			payload:  nil,
+			expected: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := extractActionFailureMessageFromReplyPayload(tt.payload)
+			if got != tt.expected {
+				t.Errorf("got %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}

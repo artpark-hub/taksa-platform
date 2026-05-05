@@ -866,7 +866,7 @@ func (s *DeviceMgmtService) EditProtocolConverter(ctx context.Context, req *v1.E
 	// At least one field must be provided for editing (besides uuid)
 	// Note: All fields except UUID are optional for partial updates
 	if req.Payload.Name == "" && req.Payload.Connection == nil &&
-		req.Payload.ReadDfc == nil && req.Payload.WriteDfc == nil &&
+		req.Payload.ReadDFC == nil && req.Payload.WriteDFC == nil &&
 		req.Payload.TemplateInfo == nil && req.Payload.Meta == nil &&
 		len(req.Payload.Location) == 0 {
 		return nil, status.Error(codes.InvalidArgument,

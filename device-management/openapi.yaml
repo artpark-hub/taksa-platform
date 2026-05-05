@@ -2208,9 +2208,9 @@ components:
                     type: object
                     additionalProperties:
                         type: string
-                readDfc:
+                readDFC:
                     $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterDFC'
-                writeDfc:
+                writeDFC:
                     $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterDFC'
                 templateInfo:
                     $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterTemplateInfo'
@@ -2254,7 +2254,7 @@ components:
                 ProtocolConverterDFC: Data Flow Component configuration for a protocol converter
                  MUST match umh-core's models.ProtocolConverterDFC exactly
                  (pkg/models/action_models.go:764-769)
-                 NOTE: For DeployProtocolConverter, readDfc and writeDfc should be null/empty.
+                 NOTE: For DeployProtocolConverter, readDFC and writeDFC should be null/empty.
                  DFC configurations are added later via EditProtocolConverter action.
         api.umh_core.v2.ProtocolConverterMeta:
             type: object

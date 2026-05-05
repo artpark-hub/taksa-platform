@@ -182,27 +182,8 @@ const AddInstance = () => {
     };
 
     const handleContinue = () => {
-        if (hasCopied && createdDeviceResponse?.device) {
-            try {
-                const existingInstances = JSON.parse(localStorage.getItem('taksa_demo_instances') || '[]');
-
-                const newInstance = {
-                    ...createdDeviceResponse.device,
-                    instructions: createdDeviceResponse.instructions,
-                    authToken: createdDeviceResponse.authToken,
-                    flows: 0,
-                    topics: 0,
-                    latency: 0,
-                    throughput: '0.00'
-                };
-
-                existingInstances.push(newInstance);
-                localStorage.setItem('taksa_demo_instances', JSON.stringify(existingInstances));
-                router.push('/dashboard/Edge-devices');
-            } catch (error) {
-                console.error('Failed to save Data Collecting Device (DCD):', error);
-                setCopyError('Failed to save Data Collecting Device (DCD). Please try again.');
-            }
+        if (hasCopied) {
+            router.push('/dashboard/Edge-devices');
         }
     };
 
@@ -245,7 +226,6 @@ const AddInstance = () => {
                                     if (formError) setFormError('');
                                 }}
                             />
-                            {errors.instanceName && <div className="error-text">{errors.instanceName}</div>}
                         </div>
                     </div>
 
@@ -278,7 +258,7 @@ const AddInstance = () => {
                                 className={`form-input ${errors.orgName ? 'input-error' : ''}`}
                                 value={orgName}
                                 onChange={(e) => {
-                                    setOrgName(e.target.value);
+                                    setOrgName(sanitizeLocationName(e.target.value));
                                     if (errors.orgName) setErrors({ ...errors, orgName: null });
                                     if (formError) setFormError('');
                                 }}

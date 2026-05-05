@@ -325,7 +325,7 @@ message ProtocolConverterTemplateInfo {
 // ProtocolConverterDFC: Data Flow Component configuration for a protocol converter
 // MUST match umh-core's models.ProtocolConverterDFC exactly
 // (pkg/models/action_models.go:764-769)
-// NOTE: For DeployProtocolConverter, readDfc and writeDfc should be null/empty.
+// NOTE: For DeployProtocolConverter, readDFC and writeDFC should be null/empty.
 // DFC configurations are added later via EditProtocolConverter action.
 message ProtocolConverterDFC {
   // Pipeline processor configuration
@@ -349,8 +349,8 @@ message ProtocolConverter {
   string name = 2; // Bridge name (required)
   ProtocolConverterConnection connection = 3; // Connection details (required: IP + Port)
   map<int32, string> location = 4; // Hierarchical location (level → name)
-  ProtocolConverterDFC readDfc = 5; // Read data flow component (optional)
-  ProtocolConverterDFC writeDfc = 6; // Write data flow component (optional)
+  ProtocolConverterDFC readDFC = 5; // Read data flow component (optional)
+  ProtocolConverterDFC writeDFC = 6; // Write data flow component (optional)
   ProtocolConverterTemplateInfo templateInfo = 7; // Template variables (optional)
   ProtocolConverterMeta meta = 8; // Metadata (optional)
 }
