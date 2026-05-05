@@ -98,11 +98,11 @@ const Bridges = () => {
             query.set('deviceName', deviceName);
         }
 
-        router.push(`/bridges/add${query.toString() ? `?${query.toString()}` : ''}`);
+        router.push(`/dashboard/bridges/add${query.toString() ? `?${query.toString()}` : ''}`);
     };
 
     const handleBackToSelectDcd = () => {
-        router.push('/bridges');
+        router.push('/dashboard/bridges');
     };
 
     const fetchBridges = async () => {

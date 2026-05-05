@@ -44,7 +44,7 @@ const SelectTemplates = () => {
 
     const handleBack = () => {
         const queryString = getDeviceQueryString();
-        router.push(`/bridges/add${queryString ? `?${queryString}` : ''}`);
+        router.push(`/dashboard/bridges/add${queryString ? `?${queryString}` : ''}`);
     };
 
     const handleTemplateSelect = (template) => {
@@ -59,7 +59,7 @@ const SelectTemplates = () => {
             query.set('deviceName', deviceName);
         }
 
-        router.push(`/bridges/configure?${query.toString()}`);
+        router.push(`/dashboard/bridges/configure?${query.toString()}`);
     };
 
     return (

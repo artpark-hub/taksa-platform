@@ -294,7 +294,7 @@ const BridgeConfiguration = () => {
             query.set('deviceName', deviceName);
         }
 
-        router.push(`/bridges/select-templates${query.toString() ? `?${query.toString()}` : ''}`);
+        router.push(`/dashboard/bridges/select-templates${query.toString() ? `?${query.toString()}` : ''}`);
     };
 
     const handleSaveDeploy = () => {
@@ -420,7 +420,7 @@ const BridgeConfiguration = () => {
                     query.set('deviceName', selectedDeviceName);
                 }
 
-                router.push(`/bridges/list${query.toString() ? `?${query.toString()}` : ''}`);
+                router.push(`/dashboard/bridges/list${query.toString() ? `?${query.toString()}` : ''}`);
             } catch (error) {
                 setDeployError(error.message || 'Failed to deploy bridge.');
             } finally {

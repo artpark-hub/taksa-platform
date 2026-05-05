@@ -53,7 +53,7 @@ const SelectDCD = () => {
             deviceName: getDeviceName(device)
         });
 
-        router.push(`/bridges/list?${query.toString()}`);
+        router.push(`/dashboard/bridges/list?${query.toString()}`);
     };
 
     useEffect(() => {

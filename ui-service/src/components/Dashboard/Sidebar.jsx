@@ -189,9 +189,9 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
                 },
                 {
                     name: 'Bridges',
-                    href: '/bridges',
+                    href: '/dashboard/bridges',
                     icon: Workflow,
-                    matchPaths: ['/bridges']
+                    matchPaths: ['/dashboard/bridges']
                 },
                 {
                     name: 'Models',

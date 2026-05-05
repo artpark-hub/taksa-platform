@@ -1,4 +1,4 @@
-import SelectDCD from '../../components/SelectDCD';
+import SelectDCD from '../../../components/SelectDCD';
 
 export default function BridgePage() {
     return <SelectDCD />;
