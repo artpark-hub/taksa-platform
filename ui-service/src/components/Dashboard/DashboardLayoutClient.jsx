@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -9,6 +9,7 @@ import './Dashboard.css';
 export default function DashboardLayoutClient({ children }) {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isAuthorizing, setIsAuthorizing] = useState(true);
+    const hasValidatedOnceRef = useRef(false);
     const pathname = usePathname();
     const router = useRouter();
 
@@ -21,8 +22,43 @@ export default function DashboardLayoutClient({ children }) {
             localStorage.removeItem('taksa_user');
         };
 
+        const storeUserFromIdentity = (identity) => {
+            if (!identity || !identity.traits) {
+                return;
+            }
+
+            const traits = identity.traits;
+
+            localStorage.setItem(
+                'taksa_user',
+                JSON.stringify({
+                    identity_id: identity.id || '',
+                    email: traits.email || '',
+                    first_name: traits.name?.first || '',
+                    last_name: traits.name?.last || '',
+                    role: traits.role || '',
+                    organization_name: traits.organization_name || '',
+                    tenant_id: traits.tenant_id || '',
+                    identityId: identity.id || '',
+                    firstName: traits.name?.first || '',
+                    lastName: traits.name?.last || '',
+                    organizationName: traits.organization_name || '',
+                    tenantId: traits.tenant_id || ''
+                })
+            );
+        };
+
+        const redirectToLogin = () => {
+            clearStoredAuth();
+            if (!cancelled) {
+                router.replace('/');
+            }
+        };
+
         const validateSession = async () => {
-            setIsAuthorizing(true);
+            if (!hasValidatedOnceRef.current) {
+                setIsAuthorizing(true);
+            }
 
             try {
                 const response = await fetch('/sessions/whoami', {
@@ -34,20 +70,32 @@ export default function DashboardLayoutClient({ children }) {
                 });
 
                 const data = await response.json().catch(() => ({}));
+                const identity = data?.identity;
+                const isAuthFailure = response.status === 401 || response.status === 403;
 
-                if (!response.ok || !data?.identity) {
-                    throw new Error('Invalid user session');
+                if (isAuthFailure || (response.ok && !identity)) {
+                    redirectToLogin();
+                    return;
                 }
+
+                if (!response.ok) {
+                    if (!cancelled) {
+                        setIsAuthorizing(false);
+                    }
+                    return;
+                }
+
+                storeUserFromIdentity(identity);
 
                 if (!cancelled) {
                     setIsAuthorizing(false);
                 }
             } catch (error) {
-                clearStoredAuth();
-
                 if (!cancelled) {
-                    router.replace('/');
+                    setIsAuthorizing(false);
                 }
+            } finally {
+                hasValidatedOnceRef.current = true;
             }
         };
 
