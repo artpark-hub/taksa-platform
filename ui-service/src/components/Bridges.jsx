@@ -129,7 +129,6 @@ const Bridges = () => {
 
             const params = new URLSearchParams();
             params.set('created_by', createdBy);
-            params.set('page_size', '20');
 
             const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(deviceId)}/protocol-converters?${params.toString()}`, {
                 method: 'GET',
@@ -228,7 +227,14 @@ const Bridges = () => {
                                             </span>
                                         </td>
                                         <td>
-                                            <span className={`bridge-health-dot health-${healthStatus.key}`} title={healthStatus.label}></span>
+                                            <span aria-label={`Health: ${healthStatus.label}`}>
+                                                <span
+                                                    className={`bridge-health-dot health-${healthStatus.key}`}
+                                                    aria-hidden="true"
+                                                ></span>
+                                                {' '}
+                                                <span className="bridge-health-label">{healthStatus.label}</span>
+                                            </span>
                                         </td>
                                     </tr>
                                 );

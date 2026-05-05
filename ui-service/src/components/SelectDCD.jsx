@@ -79,7 +79,6 @@ const SelectDCD = () => {
                 const params = new URLSearchParams();
                 params.set('created_by', createdBy);
                 params.set('status', 'ACTIVE');
-                params.set('page_size', '50');
 
                 const response = await fetch(`/api/v1/devicemgmt/devices?${params.toString()}`, {
                     method: 'GET',

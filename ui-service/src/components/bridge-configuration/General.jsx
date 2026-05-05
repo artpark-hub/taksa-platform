@@ -83,9 +83,7 @@ const General = ({ bridgeConfig, setBridgeConfig }) => {
     const normalizedLevels = getNormalizedLevels(bridgeConfig);
     const level0 = normalizedLevels.find((level) => level.index === 0) || { key: 'level0', index: 0, label: 'Level 0', value: '' };
     const dynamicLevels = normalizedLevels.filter((level) => level.index > 0);
-    const renderedDynamicLevels = dynamicLevels.length > 0
-        ? dynamicLevels
-        : [{ key: 'level1', index: 1, label: 'Level 1', value: '', isUserAdded: true }];
+    const renderedDynamicLevels = dynamicLevels;
     const lastLevelIndex = renderedDynamicLevels.length > 0
         ? Math.max(...renderedDynamicLevels.map((level) => level.index))
         : null;

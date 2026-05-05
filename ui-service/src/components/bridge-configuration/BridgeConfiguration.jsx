@@ -90,8 +90,18 @@ const BridgeConfiguration = () => {
     };
 
     const getLocationPathValue = (location) => {
-        const level0 = String(location?.['0'] || '').trim();
-        return level0 || 'default-location';
+        if (!location || typeof location !== 'object') {
+            return 'default-location';
+        }
+
+        const locationPath = Object.entries(location)
+            .filter(([key]) => /^\d+$/.test(String(key)))
+            .sort((a, b) => Number(a[0]) - Number(b[0]))
+            .map(([, value]) => String(value ?? '').trim())
+            .filter(Boolean)
+            .join('/');
+
+        return locationPath || 'default-location';
     };
 
     const extractActionId = (data) => {
@@ -204,20 +214,7 @@ const BridgeConfiguration = () => {
             }
 
             try {
-                const storedData = localStorage.getItem('taksa_user');
-                const parsedUser = storedData ? JSON.parse(storedData) : null;
-                const createdBy = parsedUser?.email || '';
-
-                if (!createdBy) {
-                    return;
-                }
-
-                const params = new URLSearchParams();
-                params.set('created_by', createdBy);
-                params.set('status', 'ACTIVE');
-                params.set('page_size', '100');
-
-                const response = await fetch(`/api/v1/devicemgmt/devices?${params.toString()}`, {
+                const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}`, {
                     method: 'GET',
                     headers: {
                         Accept: 'application/json'
@@ -231,10 +228,9 @@ const BridgeConfiguration = () => {
                     throw new Error(getErrorMessage(data, 'Failed to load selected device details.'));
                 }
 
-                const devices = getDeviceListFromResponse(data);
-                const selectedDevice = devices.find((device) =>
+                const selectedDevice = Array.isArray(data) ? data.find((device) =>
                     String(device?.id || device?.uuid || '') === String(selectedDeviceId)
-                );
+                ) : data?.device || data?.data || data;
 
                 const resolvedDeviceName =
                     selectedDevice?.name ||
@@ -381,7 +377,7 @@ const BridgeConfiguration = () => {
                         port: Number.isFinite(parsedPort) ? parsedPort : 0
                     },
                     location,
-                    readDFC: {
+                    readDfc: {
                         inputs: {
                             type: String(bridgeConfig?.readInputType || bridgeConfig?.protocol || 'modbus').toLowerCase(),
                             data: toMultilineString(bridgeConfig?.readInputYaml)
@@ -402,8 +398,17 @@ const BridgeConfiguration = () => {
                     }
                 };
 
-                const editActionId = await queueProtocolConverterUpdate(converterUuid, editPayload);
-                await pollProtocolConverterActionResult(editActionId);
+                try {
+                    const editActionId = await queueProtocolConverterUpdate(converterUuid, editPayload);
+                    await pollProtocolConverterActionResult(editActionId);
+                } catch (editError) {
+                    await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(converterUuid)}`, {
+                        method: 'DELETE',
+                        headers: { Accept: 'application/json' },
+                        credentials: 'include'
+                    }).catch(() => {});
+                    throw editError;
+                }
 
                 const query = new URLSearchParams();
 

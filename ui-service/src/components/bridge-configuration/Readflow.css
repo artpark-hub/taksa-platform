@@ -621,26 +621,27 @@
 }
 
 .bridge-delete-modal {
-    width: min(90vw, 64rem);
+    width: 100%;
+    max-width: clamp(18rem, 30vw + 8rem, 25rem);
     background-color: #ffffff;
     border-radius: var(--radius-lg);
     box-shadow: 0 0.75rem 3rem rgba(0, 0, 0, 0.25);
-    padding: var(--space-2xl);
+    padding: var(--space-2xl) var(--space-xl) var(--space-xl);
     position: relative;
+    text-align: center;
 }
 
 .bridge-delete-modal h3 {
-    margin: 0 0 var(--space-lg) 0;
+    margin: 0 0 var(--space-sm) 0;
     color: #111827;
-    font-size: clamp(1.5rem, 1.2rem + 0.5vw, 2.25rem);
+    font-size: var(--text-xl);
     font-weight: 700;
 }
 
 .bridge-delete-modal p {
-    margin: 0;
-    max-width: 44rem;
+    margin: 0 0 var(--space-xl) 0;
     color: #6b7280;
-    font-size: clamp(1rem, 0.9rem + 0.35vw, 1.15rem);
+    font-size: var(--text-base);
     line-height: 1.5;
 }
 
@@ -659,9 +660,9 @@
 
 .bridge-delete-modal-actions {
     display: flex;
-    justify-content: flex-end;
-    gap: var(--space-md);
-    margin-top: var(--space-2xl);
+    justify-content: center;
+    gap: var(--space-sm);
+    margin-top: 0;
 }
 
 .bridge-modal-cancel-btn,
