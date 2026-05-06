@@ -37,6 +37,11 @@ func (s *ActionStore) Save(ctx context.Context, tenantID string, action *models.
 		max_retries, retry_count, status, created_at, expires_at
 	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
+	// For subscribe actions we want DB-level idempotency across replicas: only one QUEUED subscribe per device.
+	// This relies on the partial unique index uq_actions_subscribe_queued.
+	if action.Type == "subscribe" && action.Status == models.ActionStatusQueued {
+		query += ` ON CONFLICT (tenant_id, device_id, action_type) WHERE status = 1 DO NOTHING`
+	}
 
 	_, err := s.db.ExecContext(ctx, query,
 		action.Id, tenantID, action.DeviceId, action.Type,

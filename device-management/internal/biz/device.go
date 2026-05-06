@@ -2,6 +2,8 @@ package biz
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/pkg/cert"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/utils"
 )
 
 // DeviceUsecase handles device business logic (registration, listing, updates)
@@ -23,6 +26,8 @@ type DeviceUsecase struct {
 	baseURL            string
 	umhCoreDockerImage string
 }
+
+const deviceActiveWindow = 1 * time.Minute
 
 // NewDeviceUsecase creates a new device use case
 func NewDeviceUsecase(store storage.Store, authUc *AuthUsecase, baseURL, umhCoreDockerImage string) *DeviceUsecase {
@@ -162,24 +167,20 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 	if err != nil {
 		return nil, fmt.Errorf("device not found: %w", err)
 	}
+	effectiveStatus := utils.DeriveEffectiveDeviceStatus(device, deviceActiveWindow)
 
-	// Get the latest message (any type) to determine if device is communicating
-	// The Pull API heartbeat updates last_seen timestamp regularly
-	// The Push API sends action-reply and other messages
-	filter := &storage.MessageListFilter{
-		DeviceID: deviceID,
-		PageSize: 1,
-		SortDesc: true, // Most recent first
-	}
-
-	messages, _, err := uc.store.Messages().ListHistory(ctx, filter)
+	// Get recent messages (avoid ListHistory COUNT query; health only needs latest N)
+	messages, listErr := uc.store.Messages().GetRecentByDevice(ctx, deviceID, 25)
 
 	// Build response based on device's current state
 	resp := &GetDeviceHealthResponse{
 		DeviceId:    deviceID,
-		LastUpdated: device.LastSeen, // Use device's last_seen from Pull API heartbeat
-		Status:      nil,             // Status message not yet implemented
-		StatusB64:   "",              // Will be populated when Status message is sent
+		DeviceStatus: effectiveStatus,
+		LastSeen:    device.LastSeen, // Use device's last_seen from Pull API heartbeat
+		// /health is intentionally summary-only; we do not surface full StatusMessage payloads here.
+	}
+	if listErr != nil {
+		resp.ErrorMessage = "failed to load device message history for status heartbeat"
 	}
 
 	// Check if device has recent activity (within last 30 seconds)
@@ -198,30 +199,255 @@ func (uc *DeviceUsecase) GetDeviceHealth(ctx context.Context, deviceID string) (
 		resp.ErrorMessage = "no Pull API activity recorded (device may be newly registered)"
 	}
 
-	// If device has sent messages, extract health data if available
-	// Currently looking for status-type messages (future enhancement)
-	if len(messages) > 0 && messages[0] != nil {
-		msg := messages[0]
-
-		// Look for StatusMessage in message content
-		// The Content field contains base64-encoded JSON with the message payload
-		if msg.Content != "" && msg.Type == "StatusMessage" {
-			resp.StatusB64 = msg.Content
-			// TODO: Implement proper protobuf unmarshaling of StatusMessage from Content field
+	// If device has sent messages, extract summary health data from the most recent status heartbeat.
+	// We cannot assume the newest message is a status heartbeat (action-replies may arrive more frequently).
+	foundStatusHeartbeat := false
+	for _, msg := range messages {
+		if msg == nil {
+			continue
+		}
+		if msg.Content == "" {
+			continue
+		}
+		// taksa-edge-umh sends MessageType "status" (not "status-message")
+		if msg.Type != "StatusMessage" && msg.Type != "status-message" && msg.Type != "status" {
+			continue
+		}
+		foundStatusHeartbeat = true
+		core, latency, resources, release, deviceTs := extractDeviceHealthSummariesFromStatusContent(msg.Content)
+		resp.CoreHealth = core
+		resp.AgentLatency = latency
+		resp.Resources = resources
+		resp.Release = release
+		resp.DeviceTimestamp = deviceTs
+		break
+	}
+	if len(messages) > 0 && !foundStatusHeartbeat {
+		// Most likely: device isn't pushing StatusMessage heartbeats into DM (or message_type differs).
+		// Keep endpoint summary-only but make the gap visible to clients/operators.
+		if resp.ErrorMessage == "" {
+			resp.ErrorMessage = "no status heartbeat message found in recent device messages (expected message_type: status/status-message/StatusMessage)"
+		} else {
+			resp.ErrorMessage = resp.ErrorMessage + "; no status heartbeat message found in recent device messages (expected message_type: status/status-message/StatusMessage)"
 		}
 	}
 
 	return resp, nil
 }
 
+func extractDeviceHealthSummariesFromStatusContent(content string) (*v1.DeviceCoreHealthSummary, *v1.DeviceAgentLatencySummary, *v1.DeviceResourcesSummary, *v1.DeviceReleaseSummary, *timestamppb.Timestamp) {
+	decoded := content
+	if b, err := base64.StdEncoding.DecodeString(content); err == nil && len(b) > 0 {
+		decoded = string(b)
+	}
+	if decompressed, err := decompressIfNeeded([]byte(decoded)); err == nil && len(decompressed) > 0 {
+		decoded = string(decompressed)
+	}
+
+	var root map[string]interface{}
+	dec := json.NewDecoder(strings.NewReader(decoded))
+	dec.UseNumber()
+	if err := dec.Decode(&root); err != nil || root == nil {
+		return nil, nil, nil, nil, nil
+	}
+
+	// The status heartbeat may be either the StatusMessage object itself or a wrapper with "Payload".
+	payload := root
+	if p, ok := root["Payload"].(map[string]interface{}); ok && p != nil {
+		payload = p
+	}
+
+	core := jsonMap(payload, "core", "Core")
+	if core == nil {
+		return nil, nil, nil, nil, nil
+	}
+
+	coreHealth := jsonMap(core, "health", "Health")
+	outCoreHealth := &v1.DeviceCoreHealthSummary{}
+	if coreHealth != nil {
+		outCoreHealth.Message = jsonString(coreHealth, "message", "Message")
+		outCoreHealth.State = jsonString(coreHealth, "state", "State")
+		outCoreHealth.DesiredState = jsonString(coreHealth, "desiredState", "desired_state", "DesiredState")
+		outCoreHealth.Category = jsonString(coreHealth, "category", "Category")
+		if outCoreHealth.Message == "" && outCoreHealth.State == "" && outCoreHealth.DesiredState == "" && outCoreHealth.Category == "" {
+			outCoreHealth = nil
+		}
+	} else {
+		outCoreHealth = nil
+	}
+
+	agent := jsonMap(core, "agent", "Agent")
+	outLatency := (*v1.DeviceAgentLatencySummary)(nil)
+	if agent != nil {
+		lat := jsonMap(agent, "latency", "Latency")
+		if lat != nil {
+			outLatency = &v1.DeviceAgentLatencySummary{
+				AvgMs: jsonFloat(lat, "avgMs", "avg_ms", "AvgMs"),
+				MaxMs: jsonFloat(lat, "maxMs", "max_ms", "MaxMs"),
+				MinMs: jsonFloat(lat, "minMs", "min_ms", "MinMs"),
+				P95Ms: jsonFloat(lat, "p95Ms", "p95_ms", "P95Ms"),
+				P99Ms: jsonFloat(lat, "p99Ms", "p99_ms", "P99Ms"),
+			}
+			if outLatency.AvgMs == 0 && outLatency.MaxMs == 0 && outLatency.MinMs == 0 && outLatency.P95Ms == 0 && outLatency.P99Ms == 0 {
+				outLatency = nil
+			}
+		}
+	}
+
+	container := jsonMap(core, "container", "Container")
+	outResources := (*v1.DeviceResourcesSummary)(nil)
+	if container != nil {
+		outResources = &v1.DeviceResourcesSummary{
+			Hwid:         jsonString(container, "hwid", "Hwid"),
+			Architecture: jsonString(container, "architecture", "Architecture"),
+		}
+		if cpu := jsonMap(container, "cpu", "CPU"); cpu != nil {
+			outResources.CpuTotalUsageMCpu = jsonFloat(cpu, "totalUsageMCpu", "cpu_total_usage_m_cpu", "TotalUsageMCpu")
+			outResources.CpuCoreCount = int32(jsonFloat(cpu, "coreCount", "cpu_core_count", "CoreCount"))
+			outResources.CpuCgroupCores = jsonFloat(cpu, "cgroupCores", "cpu_cgroup_cores", "CgroupCores")
+			outResources.CpuThrottleRatio = jsonFloat(cpu, "throttleRatio", "cpu_throttle_ratio", "ThrottleRatio")
+			outResources.CpuIsThrottled = jsonBool(cpu, "isThrottled", "cpu_is_throttled", "IsThrottled")
+		}
+		if mem := jsonMap(container, "memory", "Memory"); mem != nil {
+			outResources.MemoryUsedBytes = jsonInt64(mem, "cGroupUsedBytes", "cgroupUsedBytes", "memory_used_bytes", "CGroupUsedBytes")
+			outResources.MemoryTotalBytes = jsonInt64(mem, "cGroupTotalBytes", "cgroupTotalBytes", "memory_total_bytes", "CGroupTotalBytes")
+		}
+		if disk := jsonMap(container, "disk", "Disk"); disk != nil {
+			outResources.DiskUsedBytes = jsonInt64(disk, "dataPartitionUsedBytes", "disk_used_bytes", "DataPartitionUsedBytes")
+			outResources.DiskTotalBytes = jsonInt64(disk, "dataPartitionTotalBytes", "disk_total_bytes", "DataPartitionTotalBytes")
+		}
+		if outResources.Hwid == "" &&
+			outResources.Architecture == "" &&
+			outResources.CpuTotalUsageMCpu == 0 &&
+			outResources.CpuCoreCount == 0 &&
+			outResources.CpuCgroupCores == 0 &&
+			outResources.CpuThrottleRatio == 0 &&
+			!outResources.CpuIsThrottled &&
+			outResources.MemoryUsedBytes == 0 &&
+			outResources.MemoryTotalBytes == 0 &&
+			outResources.DiskUsedBytes == 0 &&
+			outResources.DiskTotalBytes == 0 {
+			outResources = nil
+		}
+	}
+
+	release := jsonMap(core, "release", "Release")
+	outRelease := (*v1.DeviceReleaseSummary)(nil)
+	if release != nil {
+		outRelease = &v1.DeviceReleaseSummary{
+			Version: jsonString(release, "version", "Version"),
+			Channel: jsonString(release, "channel", "Channel"),
+		}
+		if outRelease.Version == "" && outRelease.Channel == "" {
+			outRelease = nil
+		}
+	}
+
+	// DeviceTimestamp: status payload does not currently include an explicit timestamp field in v2.StatusMessage.
+	return outCoreHealth, outLatency, outResources, outRelease, nil
+}
+
+func jsonMap(m map[string]interface{}, keys ...string) map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	for _, k := range keys {
+		if v, ok := m[k].(map[string]interface{}); ok {
+			return v
+		}
+	}
+	return nil
+}
+
+func jsonString(m map[string]interface{}, keys ...string) string {
+	if m == nil {
+		return ""
+	}
+	for _, k := range keys {
+		if s, ok := m[k].(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func jsonFloat(m map[string]interface{}, keys ...string) float64 {
+	if m == nil {
+		return 0
+	}
+	for _, k := range keys {
+		switch v := m[k].(type) {
+		case float64:
+			return v
+		case int:
+			return float64(v)
+		case int32:
+			return float64(v)
+		case int64:
+			return float64(v)
+		case json.Number:
+			if f, err := v.Float64(); err == nil {
+				return f
+			}
+		}
+	}
+	return 0
+}
+
+func jsonInt64(m map[string]interface{}, keys ...string) int64 {
+	if m == nil {
+		return 0
+	}
+	for _, k := range keys {
+		switch v := m[k].(type) {
+		case int64:
+			return v
+		case int:
+			return int64(v)
+		case int32:
+			return int64(v)
+		case float64:
+			// Best-effort fallback (should be avoided for large integers)
+			return int64(v)
+		case json.Number:
+			if i, err := v.Int64(); err == nil {
+				return i
+			}
+			if f, err := v.Float64(); err == nil {
+				return int64(f)
+			}
+		case string:
+			if i, err := json.Number(v).Int64(); err == nil {
+				return i
+			}
+		}
+	}
+	return 0
+}
+
+func jsonBool(m map[string]interface{}, keys ...string) bool {
+	if m == nil {
+		return false
+	}
+	for _, k := range keys {
+		if b, ok := m[k].(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
 // GetDeviceHealthResponse contains health metrics
 type GetDeviceHealthResponse struct {
 	DeviceId        string
-	LastUpdated     *timestamppb.Timestamp
-	Status          *v2.StatusMessage
-	StatusB64       string // Base64-encoded StatusMessage fallback
+	DeviceStatus    v1.DeviceStatus
+	LastSeen        *timestamppb.Timestamp
 	DeviceTimestamp *timestamppb.Timestamp
 	ErrorMessage    string
+	CoreHealth      *v1.DeviceCoreHealthSummary
+	AgentLatency    *v1.DeviceAgentLatencySummary
+	Resources       *v1.DeviceResourcesSummary
+	Release         *v1.DeviceReleaseSummary
 }
 
 // deviceToSummary converts a full Device to a DeviceSummary (lightweight version)

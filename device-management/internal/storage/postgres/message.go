@@ -145,7 +145,7 @@ func (s *MessageStore) ListHistory(ctx context.Context, filters *storage.Message
 	// Count total
 	countQuery := "SELECT COUNT(*) FROM messages " + whereClause
 	var total int32
-	err := s.db.QueryRowContext(ctx, countQuery, args[:len(args)-1]...).Scan(&total)
+	err := s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count messages: %w", err)
 	}

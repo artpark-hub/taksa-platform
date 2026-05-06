@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
 
@@ -159,6 +160,55 @@ func (uc *InstanceUsecase) persistActionErrorMessageIfFailed(ctx context.Context
 	}
 }
 
+const (
+	// subscribeActionType is a taksa-edge-umh compatible message that registers a "subscriber" so the edge emits periodic status heartbeats.
+	// In the taksa-edge-umh fork, status heartbeats are only emitted while at least one subscriber exists.
+	subscribeActionType = "subscribe"
+	// subscribeActionDefaultTTLSeconds should be <= edge subscriber TTL to avoid stale subscribe actions piling up.
+	subscribeActionDefaultTTLSeconds int32 = 120
+	subscribeActionPayloadTypeURL          = "type.googleapis.com/taksa.edge.SubscribeMessagePayload"
+)
+
+// EnsureStatusSubscription queues a lightweight "subscribe" action for the device (if not already pending).
+// This is used so that taksa-edge-umh will emit MessageType "status" heartbeats even when no UI is open.
+func (uc *InstanceUsecase) EnsureStatusSubscription(ctx context.Context, deviceID string) {
+	if deviceID == "" {
+		return
+	}
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return
+	}
+
+	payloadJSON, err := json.Marshal(map[string]any{
+		"resubscribed": true,
+	})
+	if err != nil {
+		return
+	}
+
+	now := time.Now()
+	action := &models.Action{
+		Id:         generateUUID(),
+		DeviceId:   deviceID,
+		Type:       subscribeActionType,
+		Payload:    &anypb.Any{TypeUrl: subscribeActionPayloadTypeURL, Value: payloadJSON},
+		MaxRetries: 0,
+		RetryCount: 0,
+		Status:     models.ActionStatusQueued,
+		CreatedAt:  now,
+		ExpiresAt:  now.Add(time.Duration(subscribeActionDefaultTTLSeconds) * time.Second),
+	}
+	if err := uc.store.Actions().Save(ctx, tenantID, action); err != nil {
+		// Ignore "already exists" for idempotency across replicas (db-level uniqueness).
+		if err.Error() == "record already exists" {
+			return
+		}
+		// Non-fatal: health still works without summaries.
+		fmt.Printf("Warning: failed to queue subscribe action for device %s: %v\n", deviceID, err)
+	}
+}
+
 // InstanceUsecase handles device-facing operations: authentication, message polling, and status reporting.
 type InstanceUsecase struct {
 	store                 storage.Store
@@ -178,6 +228,7 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 		streamProcessorRepo:   streamProcessorRepo,
 	}
 }
+
 
 // Login authenticates a device using a double-hashed token.
 // CRITICAL: Used by /v2/instance/login endpoint
@@ -285,6 +336,9 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate JWT: %w", err)
 	}
+
+	// Queue a subscribe so the edge starts emitting status heartbeats.
+	uc.EnsureStatusSubscription(ctx, deviceID)
 
 	return &LoginResponse{
 		JwtToken:            jwtToken,
@@ -726,7 +780,8 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 			}
 
 			// TASK 2: Sync protocol converters and stream processors from StatusMessage
-			if msgType == "status-message" || msgType == "StatusMessage" {
+			// taksa-edge-umh sends MessageType "status" (not "status-message")
+			if msgType == "status-message" || msgType == "StatusMessage" || msgType == "status" {
 				_ = uc.syncProtocolConvertersFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
 				_ = uc.syncStreamProcessorsFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
 			}
@@ -734,8 +789,8 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 		
 		// Log summary of message types received in this push batch
 		fmt.Printf("DEBUG: Push batch summary - Total messages: %d, Type breakdown: %v\n", len(protoMsgs), messageTypeCount)
-		if messageTypeCount["status-message"] == 0 && messageTypeCount["StatusMessage"] == 0 {
-			fmt.Printf("WARNING: No StatusMessage in push batch. Device must send StatusMessage (1-second heartbeat) to update health_status. Message types: %v\n", messageTypeCount)
+		if messageTypeCount["status-message"] == 0 && messageTypeCount["StatusMessage"] == 0 && messageTypeCount["status"] == 0 {
+			fmt.Printf("WARNING: No heartbeat status message in push batch. Device must send one of status-message, StatusMessage, or status (1-second heartbeat) to update health_status. Message types: %v\n", messageTypeCount)
 		}
 		
 		return nil
