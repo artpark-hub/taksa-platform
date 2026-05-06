@@ -3,10 +3,12 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
@@ -31,34 +33,69 @@ func (s *ActionStore) Save(ctx context.Context, tenantID string, action *models.
 		payloadData = string(action.Payload.Value)
 	}
 
-	query := `
-	INSERT INTO actions (
-		id, tenant_id, device_id, action_type, payload_type, payload_data,
-		max_retries, retry_count, status, created_at, expires_at
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-	`
-	// For subscribe actions we want DB-level idempotency across replicas: only one QUEUED subscribe per device.
-	// This relies on the partial unique index uq_actions_subscribe_queued.
-	if action.Type == "subscribe" && action.Status == models.ActionStatusQueued {
-		query += ` ON CONFLICT (tenant_id, device_id, action_type) WHERE status = 1 DO NOTHING`
-	}
-
-	_, err := s.db.ExecContext(ctx, query,
+	args := []interface{}{
 		action.Id, tenantID, action.DeviceId, action.Type,
 		payloadType, payloadData,
 		action.MaxRetries, action.RetryCount, int32(action.Status),
 		action.CreatedAt.Format(time.RFC3339),
 		optionalTimeValue(action.ExpiresAt),
-	)
+	}
 
-	if err != nil {
+	// For subscribe actions we want DB-level idempotency across replicas: only one QUEUED subscribe per device.
+	// Predicate must exactly match partial unique index uq_actions_subscribe_queued in db/schema.postgres.sql.
+	if action.Type == "subscribe" && action.Status == models.ActionStatusQueued {
+		query := `
+	INSERT INTO actions (
+		id, tenant_id, device_id, action_type, payload_type, payload_data,
+		max_retries, retry_count, status, created_at, expires_at
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	ON CONFLICT (tenant_id, device_id, action_type)
+	WHERE action_type = 'subscribe' AND status = 1
+	DO NOTHING
+	`
+		_, err := s.db.ExecContext(ctx, query, args...)
+		if err == nil {
+			return nil
+		}
+		// Rolling deploy before migration, or mismatched DDL: Postgres returns 42P10 when no matching constraint exists.
+		if pqErrCode(err) == "42P10" {
+			return s.saveActionPlainInsert(ctx, args)
+		}
 		if strings.Contains(err.Error(), "duplicate key") {
 			return ErrAlreadyExists
 		}
 		return fmt.Errorf("failed to save action: %w", err)
 	}
 
+	return s.saveActionPlainInsert(ctx, args)
+}
+
+func (s *ActionStore) saveActionPlainInsert(ctx context.Context, args []interface{}) error {
+	query := `
+	INSERT INTO actions (
+		id, tenant_id, device_id, action_type, payload_type, payload_data,
+		max_retries, retry_count, status, created_at, expires_at
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`
+	_, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") {
+			return ErrAlreadyExists
+		}
+		return fmt.Errorf("failed to save action: %w", err)
+	}
 	return nil
+}
+
+func pqErrCode(err error) string {
+	for err != nil {
+		var pe *pq.Error
+		if errors.As(err, &pe) {
+			return string(pe.Code)
+		}
+		err = errors.Unwrap(err)
+	}
+	return ""
 }
 
 // GetByID retrieves an action by its ID
