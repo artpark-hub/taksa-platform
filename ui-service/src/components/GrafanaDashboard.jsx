@@ -76,6 +76,26 @@ const GrafanaDashboard = ({ deviceId = null }) => {
     }, [deviceId, defaultSrc]);
 
     useEffect(() => {
+        const syncIframeFromParentUrl = () => {
+            const url = new URL(window.location.href);
+            const savedGrafanaPath = url.searchParams.get('grafana');
+
+            if (savedGrafanaPath && savedGrafanaPath.startsWith('/grafana')) {
+                setIframeSrc(getGrafanaPathWithParams(savedGrafanaPath, deviceId));
+                return;
+            }
+
+            setIframeSrc(defaultSrc);
+        };
+
+        window.addEventListener('popstate', syncIframeFromParentUrl);
+
+        return () => {
+            window.removeEventListener('popstate', syncIframeFromParentUrl);
+        };
+    }, [defaultSrc, deviceId]);
+
+    useEffect(() => {
         let interval = null;
         let crossOriginBlocked = false;
 
@@ -93,19 +113,12 @@ const GrafanaDashboard = ({ deviceId = null }) => {
 
                 if (!currentPath.startsWith('/grafana')) return;
 
-                const grafanaPath = getGrafanaPathWithParams(currentPath, deviceId);
-
-                if (grafanaPath !== currentPath) {
-                    setIframeSrc(grafanaPath);
-                    return;
-                }
-
                 const parentUrl = new URL(window.location.href);
                 const existingGrafanaPath = parentUrl.searchParams.get('grafana');
 
-                if (existingGrafanaPath !== grafanaPath) {
-                    parentUrl.searchParams.set('grafana', grafanaPath);
-                    window.history.replaceState({}, '', parentUrl.toString());
+                if (existingGrafanaPath !== currentPath) {
+                    parentUrl.searchParams.set('grafana', currentPath);
+                    window.history.pushState({}, '', parentUrl.toString());
                 }
             } catch {
                 crossOriginBlocked = true;
