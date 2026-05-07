@@ -215,6 +215,7 @@
     width: 100%;
     padding: var(--space-xs) var(--space-sm);
     font-size: var(--text-sm);
+    white-space: nowrap;
     color: #667085;
     cursor: pointer;
     background: transparent;
@@ -409,6 +410,7 @@
     font-size: var(--text-sm);
     font-weight: 500;
     line-height: 1.5;
+    white-space: nowrap;
     margin: 0;
 }
 
@@ -432,6 +434,13 @@
     color: #0056b3;
     font-weight: 600;
     text-decoration: none;
+}
+
+@media (max-width: 28rem) {
+    .register-auth-mode-btn,
+    .register-auth-form .legal-consent-title {
+        white-space: normal;
+    }
 }
 
 @media (max-width: 56.25rem) {                  

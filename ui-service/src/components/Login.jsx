@@ -15,8 +15,6 @@ const Login = () => {
     const [emailError, setEmailError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [formError, setFormError] = useState('');
-    const [agreementChecked, setAgreementChecked] = useState(false);
-    const [agreementError, setAgreementError] = useState('');
     const [openSection, setOpenSection] = useState('social');
 
     const router = useRouter();
@@ -253,11 +251,6 @@ const Login = () => {
     const handleGoogleLogin = async () => {
         setFormError('');
 
-        if (!agreementChecked) {
-            setAgreementError('Please agree to the Platform Agreement and Privacy Policy before continuing.');
-            return;
-        }
-
         setIsLoading(true);
 
         try {
@@ -337,11 +330,6 @@ const Login = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         setFormError('');
-
-        if (!agreementChecked) {
-            setAgreementError('Please agree to the Platform Agreement and Privacy Policy before continuing.');
-            return;
-        }
 
         if (!email) {
             setEmailError('Email is required');
@@ -542,38 +530,16 @@ const Login = () => {
 
                     <div className="login-form-divider" />
 
-                    <div className="legal-consent-row">
-                        <input
-                            id="login-agreement"
-                            type="checkbox"
-                            className="legal-consent-checkbox"
-                            checked={agreementChecked}
-                            onChange={(e) => {
-                                setAgreementChecked(e.target.checked);
-                                if (e.target.checked) setAgreementError('');
-                            }}
-                        />
-                        <label htmlFor="login-agreement" className="legal-consent-label-copy">
-                            I agree to the{' '}
-                            <Link href="/terms" target="_blank" className="legal-consent-link-button">
-                                Platform Agreement
-                            </Link>{' '}
-                            &{' '}
-                            <Link href="/privacy" target="_blank" className="legal-consent-link-button">
-                                Privacy Policy
-                            </Link>
-                        </label>
-                        {agreementError && <p className="legal-consent-error">{agreementError}</p>}
-                    </div>
-
-                    <button
-                        type="submit"
-                        form="local-login-form"
-                        className="login-submit-btn"
-                        disabled={openSection !== 'local' || isLoading || !email.trim() || !password.trim() || !agreementChecked}
-                    >
-                        {isLoading ? 'Signing In...' : 'Sign In'}
-                    </button>
+                    {openSection === 'local' && (
+                        <button
+                            type="submit"
+                            form="local-login-form"
+                            className="login-submit-btn"
+                            disabled={isLoading || !email.trim() || !password.trim()}
+                        >
+                            {isLoading ? 'Signing In...' : 'Sign In'}
+                        </button>
+                    )}
 
                     <div className="login-footer-section">
                         <span>Don't have an account? <Link href="/register">Sign up now</Link></span>
