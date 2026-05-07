@@ -541,7 +541,7 @@ const Login = () => {
                         </button>
                     )}
 
-                    <div className="login-footer-section">
+                    <div className={`login-footer-section${openSection === 'local' ? ' has-top-margin' : ''}`}>
                         <span>Don't have an account? <Link href="/register">Sign up now</Link></span>
                         <Link href="/recovery" style={{ fontSize: '0.85rem' }}>Forgot Password?</Link>
                     </div>

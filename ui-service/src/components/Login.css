@@ -216,13 +216,16 @@
 .login-submit-btn:hover { background-color: #333; }
 
 .login-footer-section {
-    margin-top: var(--space-xl);       
     text-align: center;
     font-size: var(--text-sm);         
     color: #666;
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);              
+}
+
+.login-footer-section.has-top-margin {
+    margin-top: var(--space-xl);
 }
 
 .login-footer-section a {
