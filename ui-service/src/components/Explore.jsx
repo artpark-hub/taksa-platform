@@ -10,7 +10,6 @@ const buildDefaultGrafanaPath = (deviceId = null) => {
         theme: 'light',
         orgId: '1',
         refresh: '10s',
-        kiosk: '1',
         ...(deviceId ? { 'var-deviceId': deviceId } : {}),
     });
 
@@ -36,7 +35,7 @@ const getGrafanaPathWithParams = (path, deviceId = null) => {
         grafanaUrl.searchParams.set('refresh', '10s');
     }
 
-    grafanaUrl.searchParams.set('kiosk', '1');
+    grafanaUrl.searchParams.delete('kiosk');
 
     if (deviceId) {
         grafanaUrl.searchParams.set('var-deviceId', deviceId);
@@ -113,11 +112,18 @@ const GrafanaExplore = ({ deviceId = null }) => {
 
                 if (!currentPath.startsWith('/grafana')) return;
 
+                const sanitizedPath = getGrafanaPathWithParams(currentPath, deviceId);
+
+                if (sanitizedPath !== currentPath) {
+                    setIframeSrc(sanitizedPath);
+                    return;
+                }
+
                 const parentUrl = new URL(window.location.href);
                 const existingGrafanaPath = parentUrl.searchParams.get('grafana');
 
-                if (existingGrafanaPath !== currentPath) {
-                    parentUrl.searchParams.set('grafana', currentPath);
+                if (existingGrafanaPath !== sanitizedPath) {
+                    parentUrl.searchParams.set('grafana', sanitizedPath);
                     window.history.pushState({}, '', parentUrl.toString());
                 }
             } catch {
@@ -134,13 +140,13 @@ const GrafanaExplore = ({ deviceId = null }) => {
         };
     }, [deviceId]);
 
-    const hideGrafanaMenuButton = () => {
+    const hideGrafanaNavigationOnly = () => {
         try {
             const iframe = iframeRef.current;
             const doc = iframe?.contentDocument || iframe?.contentWindow?.document;
             if (!doc) return;
 
-            const styleId = 'taksa-hide-grafana-menu-button';
+            const styleId = 'taksa-hide-grafana-navigation-only';
             let style = doc.getElementById(styleId);
 
             if (!style) {
@@ -150,20 +156,42 @@ const GrafanaExplore = ({ deviceId = null }) => {
             }
 
             style.textContent = `
-                button[aria-label*="menu" i],
-                button[aria-label*="navigation" i],
+                [data-testid="sidemenu"],
                 [data-testid="sidemenu-toggle"],
                 [data-testid="nav-toggle"],
+                [data-testid="menu-toggle"],
+                nav[aria-label*="navigation" i],
+                nav[aria-label*="main" i],
+                [class*="sidemenu"],
+                [class*="SideMenu"],
                 [class*="powered-by"],
                 a[href*="grafana.com"],
-                [role="contentinfo"] [class*="powered-by"],
-                [role="contentinfo"] a[href*="grafana.com"],
-                [data-testid="menu-toggle"] {
+                [role="contentinfo"] {
+                    display: none !important;
+                }
+
+                header:has(button[aria-label*="menu" i]),
+                header:has(button[aria-label*="navigation" i]),
+                header:has(a[href*="/grafana/login"]),
+                header:has(a[href*="/login"]),
+                header:has(nav[aria-label*="breadcrumb" i]),
+                [role="banner"]:has(button[aria-label*="menu" i]),
+                [role="banner"]:has(button[aria-label*="navigation" i]),
+                [role="banner"]:has(a[href*="/grafana/login"]),
+                [role="banner"]:has(a[href*="/login"]),
+                [role="banner"]:has(nav[aria-label*="breadcrumb" i]) {
+                    display: none !important;
+                }
+
+                a[href*="/grafana/login"],
+                a[href*="/login"],
+                button[aria-label*="help" i],
+                button[aria-label*="search" i] {
                     display: none !important;
                 }
             `;
         } catch (error) {
-            console.warn('Could not hide Grafana menu button:', error);
+            console.warn('Could not hide Grafana navigation:', error);
         }
     };
 
@@ -175,7 +203,7 @@ const GrafanaExplore = ({ deviceId = null }) => {
         let menuInterval = null;
 
         const applyIframeTweaks = () => {
-            hideGrafanaMenuButton();
+            hideGrafanaNavigationOnly();
         };
 
         const handleLoad = () => {
@@ -222,11 +250,11 @@ const GrafanaExplore = ({ deviceId = null }) => {
                     ref={iframeRef}
                     key={deviceId || 'default'}
                     src={iframeSrc}
-                    title="Grafana Dashboard"
+                    title="Grafana Explore"
                     className="grafana-iframe"
                     frameBorder="0"
                     allowFullScreen
-                    onLoad={hideGrafanaMenuButton}
+                    onLoad={hideGrafanaNavigationOnly}
                 />
             </div>
         </div>
