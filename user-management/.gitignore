@@ -36,3 +36,8 @@ bin/
 .vscode/
 .idea/
 *.swp
+
+# Generated API artifacts (auto-created during image build)
+api/**/*.pb.go
+internal/**/*.pb.go
+openapi.yaml
