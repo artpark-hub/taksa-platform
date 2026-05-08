@@ -51,6 +51,12 @@ service UserManagementService {
       body: "*"
     };
   }
+
+  rpc DeleteIncompleteOidcUser (DeleteUserRequest) returns (DeleteUserResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/um/delete_incomplete_oidc_user/{identity_id}"
+    };
+  }
 }
 
 message CreateSubUserRequest {

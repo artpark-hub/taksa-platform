@@ -51,6 +51,10 @@ func (uc *TenantsUsecase) DeleteMasterUser(ctx context.Context, id string) error
 	return uc.repo.DeleteIdentity(ctx, id)
 }
 
+func (uc *TenantsUsecase) DeleteIncompleteOidcUser(ctx context.Context, id string) error {
+	return uc.repo.DeleteIdentity(ctx, id)
+}
+
 func (uc *TenantsUsecase) UpdateUserProfile(ctx context.Context, id, firstName, lastName, role string) (*User, error) {
 	return uc.repo.UpdateIdentity(ctx, id, firstName, lastName, role)
 }
