@@ -235,7 +235,8 @@ func (s *UserManagementService) DeleteMasterUser(ctx context.Context, req *v1.De
 }
 
 func (s *UserManagementService) DeleteIncompleteOidcUser(ctx context.Context, req *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error) {
-	if strings.TrimSpace(req.IdentityId) == "" {
+	identityId := strings.TrimSpace(req.IdentityId)
+	if identityId == "" {
 		return nil, errors.New("identity_id is required")
 	}
 
@@ -301,13 +302,13 @@ func (s *UserManagementService) DeleteIncompleteOidcUser(ctx context.Context, re
 		return nil, errors.New("unauthorized: bearer token or session cookie required")
 	}
 
-	if callerIdentityID != strings.TrimSpace(req.IdentityId) {
-		s.log.Warnf("Identity mismatch: caller=%s requested=%s", callerIdentityID, req.IdentityId)
+	if callerIdentityID != identityId {
+		s.log.Warnf("Identity mismatch: caller=%s requested=%s", callerIdentityID, identityId)
 		return nil, errors.New("forbidden: you can only delete your own account")
 	}
 
-	if err := s.uc.DeleteIncompleteOidcUser(ctx, req.IdentityId); err != nil {
-		s.log.Errorf("Failed to delete incomplete OIDC user %s: %v", req.IdentityId, err)
+	if err := s.uc.DeleteIncompleteOidcUser(ctx, identityId); err != nil {
+		s.log.Errorf("Failed to delete incomplete OIDC user %s: %v", identityId, err)
 		return nil, err
 	}
 

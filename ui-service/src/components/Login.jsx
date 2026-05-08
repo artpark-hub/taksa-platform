@@ -558,19 +558,11 @@ const Login = () => {
             throw new Error('Account deletion skipped because organisation details already exist.');
         }
 
-        const jwt = localStorage.getItem('taksa_jwt');
-
-        const headers = {
-            Accept: 'application/json'
-        };
-
-        if (jwt) {
-            headers.Authorization = `Bearer ${jwt}`;
-        }
-
         const response = await fetch(`/api/v1/um/delete_incomplete_oidc_user/${encodeURIComponent(identityId)}`, {
             method: 'DELETE',
-            headers,
+            headers: {
+                Accept: 'application/json'
+            },
             credentials: 'include'
         });
 
