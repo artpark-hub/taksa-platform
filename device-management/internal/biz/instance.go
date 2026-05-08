@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
@@ -2088,64 +2087,43 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 		return nil // Skip if repo unavailable
 	}
 
-	// Decode message content if base64 encoded
-	decodedContent := messageContent
+	// Decode message content if base64 encoded.
+	decodedBytes := []byte(messageContent)
 	if messageContent != "" {
-		decoded, err := base64.StdEncoding.DecodeString(messageContent)
-		if err == nil {
-			decodedContent = string(decoded)
+		if b, err := base64.StdEncoding.DecodeString(messageContent); err == nil && len(b) > 0 {
+			decodedBytes = b
 		}
 	}
 
-	// Parse JSON to extract StatusMessage structure
+	// Heartbeat payloads may be compressed (zstd/gzip). Decompress when detected.
+	if b, err := decompressIfNeeded(decodedBytes); err == nil && len(b) > 0 {
+		decodedBytes = b
+	}
+
+	// Parse JSON StatusMessage (umh-core sends JSON; payload may be base64+compressed).
 	var messageData map[string]interface{}
-	if err := json.Unmarshal([]byte(decodedContent), &messageData); err != nil {
+	if err := json.Unmarshal(decodedBytes, &messageData); err != nil {
+		// Preserve original warning format for log filters/dashboards.
 		fmt.Printf("Warning: Failed to parse StatusMessage JSON: %v\n", err)
 		return nil
 	}
 
-	// Try to unmarshal as protobuf StatusMessage
-	var statusMsg *v2.StatusMessage
-	if msgBytes := []byte(decodedContent); len(msgBytes) > 0 {
-		statusMsg = &v2.StatusMessage{}
-		// Try to unmarshal from JSON (if that fails, we'll use map fallback)
-		_ = proto.UnmarshalOptions{AllowPartial: true}.Unmarshal(msgBytes, statusMsg)
-	}
-
 	// Extract DFCs from status message to find protocol converters
 	var discoveredConverters []*ConverterInfo
-	if statusMsg != nil && statusMsg.Core != nil {
-		// Protocol converters are DFCs with dfcType == "protocol-converter"
-		for _, dfc := range statusMsg.Core.Dfcs {
-			if dfc.DfcType == "protocol-converter" {
-				discoveredConverters = append(discoveredConverters, &ConverterInfo{
-					UUID:           dfc.Uuid,
-					Name:           dfc.Name,
-					Type:           dfc.DfcType,
-					ConnectionUUID: "", // Not available in DFC structure
-					Health:         dfc.Health,
-				})
-			}
-		}
-	}
-
-	// Fallback: Try to extract from JSON map if proto unmarshal didn't work
-	if len(discoveredConverters) == 0 && messageData != nil {
-		// Check if message has a Core structure with DFCs
-		if coreData, ok := messageData["Core"].(map[string]interface{}); ok {
-			if dfcs, ok := coreData["dfcs"].([]interface{}); ok {
-				for _, dfc := range dfcs {
-					if dfcMap, ok := dfc.(map[string]interface{}); ok {
-						dfcType, _ := dfcMap["dfcType"].(string)
-						if dfcType == "protocol-converter" {
-							converter := &ConverterInfo{
-								UUID: extractStringField(dfcMap, "uuid"),
-								Name: extractStringField(dfcMap, "name"),
-								Type: dfcType,
-							}
-							if converter.UUID != "" && converter.Name != "" {
-								discoveredConverters = append(discoveredConverters, converter)
-							}
+	// Check if message has a Core structure with DFCs
+	if coreData, ok := messageData["Core"].(map[string]interface{}); ok {
+		if dfcs, ok := coreData["dfcs"].([]interface{}); ok {
+			for _, dfc := range dfcs {
+				if dfcMap, ok := dfc.(map[string]interface{}); ok {
+					dfcType, _ := dfcMap["dfcType"].(string)
+					if dfcType == "protocol-converter" {
+						converter := &ConverterInfo{
+							UUID: extractStringField(dfcMap, "uuid"),
+							Name: extractStringField(dfcMap, "name"),
+							Type: dfcType,
+						}
+						if converter.UUID != "" && converter.Name != "" {
+							discoveredConverters = append(discoveredConverters, converter)
 						}
 					}
 				}
@@ -2239,74 +2217,54 @@ func (uc *InstanceUsecase) syncStreamProcessorsFromStatusMessage(ctx context.Con
 		return nil // Skip if repo unavailable
 	}
 
-	// Decode message content if base64 encoded
-	decodedContent := messageContent
+	// Decode message content if base64 encoded.
+	decodedBytes := []byte(messageContent)
 	if messageContent != "" {
-		decoded, err := base64.StdEncoding.DecodeString(messageContent)
-		if err == nil {
-			decodedContent = string(decoded)
+		if b, err := base64.StdEncoding.DecodeString(messageContent); err == nil && len(b) > 0 {
+			decodedBytes = b
 		}
 	}
 
-	// Parse JSON to extract StatusMessage structure
+	// Heartbeat payloads may be compressed (zstd/gzip). Decompress when detected.
+	if b, err := decompressIfNeeded(decodedBytes); err == nil && len(b) > 0 {
+		decodedBytes = b
+	}
+
+	// Parse JSON StatusMessage (umh-core sends JSON; payload may be base64+compressed).
 	var messageData map[string]interface{}
-	if err := json.Unmarshal([]byte(decodedContent), &messageData); err != nil {
+	if err := json.Unmarshal(decodedBytes, &messageData); err != nil {
+		// Preserve original warning format for log filters/dashboards.
 		fmt.Printf("Warning: Failed to parse StatusMessage JSON: %v\n", err)
 		return nil
 	}
 
-	// Try to unmarshal as protobuf StatusMessage
-	var statusMsg *v2.StatusMessage
-	if msgBytes := []byte(decodedContent); len(msgBytes) > 0 {
-		statusMsg = &v2.StatusMessage{}
-		// Try to unmarshal from JSON (if that fails, we'll use map fallback)
-		_ = proto.UnmarshalOptions{AllowPartial: true}.Unmarshal(msgBytes, statusMsg)
-	}
-
 	// Extract DFCs from status message to find stream processors
 	var discoveredProcessors []*StreamProcessorStatusInfo
-	if statusMsg != nil && statusMsg.Core != nil {
-		// Stream processors are DFCs with dfcType == "stream-processor"
-		for _, dfc := range statusMsg.Core.Dfcs {
-			if dfc.DfcType == "stream-processor" {
-				discoveredProcessors = append(discoveredProcessors, &StreamProcessorStatusInfo{
-					UUID:   dfc.Uuid,
-					Name:   dfc.Name,
-					Type:   dfc.DfcType,
-					Health: dfc.Health,
-				})
-			}
-		}
-	}
+	// Check if message has a Core structure with DFCs
+	if coreData, ok := messageData["Core"].(map[string]interface{}); ok {
+		if dfcs, ok := coreData["dfcs"].([]interface{}); ok {
+			for _, dfc := range dfcs {
+				if dfcMap, ok := dfc.(map[string]interface{}); ok {
+					dfcType, _ := dfcMap["dfcType"].(string)
+					if dfcType == "stream-processor" {
+						processor := &StreamProcessorStatusInfo{
+							UUID: extractStringField(dfcMap, "uuid"),
+							Name: extractStringField(dfcMap, "name"),
+							Type: dfcType,
+						}
 
-	// Fallback: Try to extract from JSON map if proto unmarshal didn't work
-	if len(discoveredProcessors) == 0 && messageData != nil {
-		// Check if message has a Core structure with DFCs
-		if coreData, ok := messageData["Core"].(map[string]interface{}); ok {
-			if dfcs, ok := coreData["dfcs"].([]interface{}); ok {
-				for _, dfc := range dfcs {
-					if dfcMap, ok := dfc.(map[string]interface{}); ok {
-						dfcType, _ := dfcMap["dfcType"].(string)
-						if dfcType == "stream-processor" {
-							processor := &StreamProcessorStatusInfo{
-								UUID: extractStringField(dfcMap, "uuid"),
-								Name: extractStringField(dfcMap, "name"),
-								Type: dfcType,
+						// Extract Health from JSON
+						if healthMap, ok := dfcMap["health"].(map[string]interface{}); ok {
+							processor.Health = &v2.Health{
+								Message:      extractStringField(healthMap, "message"),
+								State:        extractStringField(healthMap, "state"),
+								DesiredState: extractStringField(healthMap, "desiredState"),
+								Category:     extractStringField(healthMap, "category"),
 							}
-							
-							// Extract Health from JSON
-							if healthMap, ok := dfcMap["health"].(map[string]interface{}); ok {
-								processor.Health = &v2.Health{
-									Message:    extractStringField(healthMap, "message"),
-									State:      extractStringField(healthMap, "state"),
-									DesiredState: extractStringField(healthMap, "desiredState"),
-									Category:   extractStringField(healthMap, "category"),
-								}
-							}
-							
-							if processor.UUID != "" && processor.Name != "" {
-								discoveredProcessors = append(discoveredProcessors, processor)
-							}
+						}
+
+						if processor.UUID != "" && processor.Name != "" {
+							discoveredProcessors = append(discoveredProcessors, processor)
 						}
 					}
 				}
