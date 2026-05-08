@@ -774,7 +774,7 @@ const Login = () => {
             />
 
             {googleModalOpen && (
-                <div className="login-google-modal-overlay">
+                <div className="login-google-modal-overlay" onClick={() => { setGoogleModalOpen(false); setPendingIdentity(null); }}>
                     <div
                         className="login-google-modal"
                         onClick={(e) => e.stopPropagation()}
@@ -782,6 +782,14 @@ const Login = () => {
                         aria-modal="true"
                         aria-labelledby="login-google-modal-title"
                     >
+                        <button
+                            type="button"
+                            className="login-google-modal-close"
+                            aria-label="Close"
+                            onClick={() => { setGoogleModalOpen(false); setPendingIdentity(null); }}
+                        >
+                            &#x2715;
+                        </button>
                         <h3 id="login-google-modal-title" className="login-google-modal-title">Enter Organisation Name</h3>
                         <p className="login-google-modal-subtitle">
                             Please provide your organisation name to complete your Taksa account setup.
