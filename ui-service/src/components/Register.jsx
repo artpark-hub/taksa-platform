@@ -1,22 +1,13 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react'; 
 import LegalDocumentModal from './LegalDocumentModal';
 
-const GOOGLE_REGISTER_CONTEXT_KEY = 'taksa_google_register_context';
-const GOOGLE_REGISTER_ATTEMPT_KEY = 'taksa_google_register_attempt';
-const GOOGLE_LOGIN_ATTEMPT_KEY = 'taksa_google_login_attempt';
-const GOOGLE_LOGIN_ERROR_KEY = 'taksa_google_login_error';
-
 const Register = () => {
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const flowId = searchParams?.get('flow') || '';
-
-    const handledFlowRef = useRef('');
 
     const [formData, setFormData] = useState({
         firstName: '', lastName: '', email: '', orgName: '', password: '', confirmPassword: ''
@@ -31,10 +22,6 @@ const Register = () => {
     const [agreementChecked, setAgreementChecked] = useState(false);
     const [agreementError, setAgreementError] = useState('');
     const [activeLegalDocument, setActiveLegalDocument] = useState(null);
-    const [openSection, setOpenSection] = useState('social');
-    const [googleModalOpen, setGoogleModalOpen] = useState(false);
-    const [googleOrgName, setGoogleOrgName] = useState('');
-    const [googleOrgError, setGoogleOrgError] = useState('');
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -51,12 +38,6 @@ const Register = () => {
         const nodes = flow?.ui?.nodes || [];
         const csrfNode = nodes.find((node) => node?.attributes?.name === 'csrf_token');
         return csrfNode?.attributes?.value || '';
-    };
-
-    const getNodeValue = (flow, name) => {
-        const nodes = flow?.ui?.nodes || [];
-        const node = nodes.find((n) => n?.attributes?.name === name);
-        return node?.attributes?.value || '';
     };
 
     const storeUserInLocalStorage = (identity) => {
@@ -76,19 +57,6 @@ const Register = () => {
             organizationName: traits.organization_name || '',
             tenantId: traits.tenant_id || ''
         }));
-    };
-
-    const fetchSessionIdentity = async () => {
-        const response = await fetch('/sessions/whoami', {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-            credentials: 'include'
-        });
-
-        if (!response.ok) return null;
-
-        const data = await response.json().catch(() => ({}));
-        return data?.identity || null;
     };
 
     const fetchJwt = async () => {
@@ -114,59 +82,6 @@ const Register = () => {
         }
 
         localStorage.setItem('taksa_jwt', finalJwt);
-    };
-
-    const setSecurePendingGoogleRegistration = async (pendingContext) => {
-        const response = await fetch('/api/auth/google-register-context', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json'
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-                organizationName: pendingContext?.organization_name,
-                tenantId: pendingContext?.tenant_id
-            })
-        });
-
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error(data?.message || 'Failed to store secure Google registration context');
-        }
-    };
-
-    const getSecurePendingGoogleRegistration = async () => {
-        const response = await fetch('/api/auth/google-register-context', {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-            credentials: 'include'
-        });
-
-        if (!response.ok) {
-            return null;
-        }
-
-        const data = await response.json().catch(() => ({}));
-        return data?.pending || null;
-    };
-
-    const clearSecurePendingGoogleRegistration = async () => {
-        try {
-            await fetch('/api/auth/google-register-context', {
-                method: 'DELETE',
-                headers: { Accept: 'application/json' },
-                credentials: 'include'
-            });
-        } catch {
-        }
-    };
-
-    const clearGoogleTransientState = async () => {
-        await clearSecurePendingGoogleRegistration();
-        sessionStorage.removeItem(GOOGLE_REGISTER_CONTEXT_KEY);
-        sessionStorage.removeItem(GOOGLE_REGISTER_ATTEMPT_KEY);
-        sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
     };
 
     const handleChange = (e) => {
@@ -236,317 +151,6 @@ const Register = () => {
 
         return organizationId;
     };
-
-    const storePendingGoogleRegistration = async ({ organizationName, organizationId }) => {
-        const pendingContext = {
-            organization_name: organizationName,
-            tenant_id: organizationId,
-            role: 'master',
-            source: 'google',
-            created_at: Date.now()
-        };
-
-        await setSecurePendingGoogleRegistration(pendingContext);
-        sessionStorage.setItem(GOOGLE_REGISTER_CONTEXT_KEY, JSON.stringify(pendingContext));
-    };
-
-    const startGoogleOidcRegistration = async () => {
-        const initRes = await fetch('/self-service/registration/browser', {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-            credentials: 'include',
-            redirect: 'follow'
-        });
-
-        const initData = await initRes.json().catch(() => ({}));
-
-        if (!initRes.ok) {
-            throw new Error(getErrorMessage(initData, 'Failed to initialize Google registration flow'));
-        }
-
-        const uiAction = initData?.ui?.action;
-        const uiMethod = (initData?.ui?.method || 'POST').toUpperCase();
-        const uiNodes = initData?.ui?.nodes || [];
-
-        if (!uiAction) {
-            throw new Error('Registration action not found in Kratos flow');
-        }
-
-        const googleProviderNode = uiNodes.find(
-            node =>
-                node?.group === 'oidc' &&
-                node?.attributes?.name === 'provider' &&
-                node?.attributes?.value === 'google'
-        );
-
-        if (!googleProviderNode) {
-            throw new Error('Google provider is not available in the Kratos registration flow');
-        }
-
-        const form = document.createElement('form');
-        form.method = uiMethod;
-        form.action = uiAction;
-        form.style.display = 'none';
-
-        uiNodes.forEach(node => {
-            const attributes = node?.attributes || {};
-            if (
-                attributes?.type === 'hidden' &&
-                typeof attributes?.name === 'string' &&
-                typeof attributes?.value !== 'undefined'
-            ) {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = attributes.name;
-                input.value = String(attributes.value);
-                form.appendChild(input);
-            }
-        });
-
-        if (!form.querySelector('input[name="method"]')) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'method';
-            input.value = 'oidc';
-            form.appendChild(input);
-        }
-
-        const providerInput = document.createElement('input');
-        providerInput.type = 'hidden';
-        providerInput.name = 'provider';
-        providerInput.value = 'google';
-        form.appendChild(providerInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    };
-
-    const handleGoogleContinue = async () => {
-        setFormError('');
-        setGoogleOrgError('');
-        setAgreementError('');
-
-        if (!agreementChecked) {
-            setAgreementError('Please agree to the Platform Agreement and Privacy Policy before continuing.');
-            return;
-        }
-
-        const trimmedOrgName = googleOrgName.trim();
-
-        if (!trimmedOrgName) {
-            setGoogleOrgError('Organisation name is required.');
-            return;
-        }
-
-        setIsLoading(true);
-        sessionStorage.setItem(GOOGLE_REGISTER_ATTEMPT_KEY, String(Date.now()));
-
-        try {
-            const organizationId = await fetchOrganizationId();
-
-            await storePendingGoogleRegistration({
-                organizationName: trimmedOrgName,
-                organizationId
-            });
-
-            await startGoogleOidcRegistration();
-        } catch (err) {
-            console.error('Google Registration Error:', err);
-            sessionStorage.removeItem(GOOGLE_REGISTER_ATTEMPT_KEY);
-            setFormError(err.message || 'Failed to continue with Google registration');
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (!flowId) {
-            handledFlowRef.current = '';
-            return;
-        }
-
-        if (handledFlowRef.current === flowId) {
-            return;
-        }
-
-        handledFlowRef.current = flowId;
-
-        let cancelled = false;
-
-        const completeOidcRegistration = async () => {
-            const loginAttemptTs = Number(sessionStorage.getItem(GOOGLE_LOGIN_ATTEMPT_KEY) || 0);
-            const registerAttemptTs = Number(sessionStorage.getItem(GOOGLE_REGISTER_ATTEMPT_KEY) || 0);
-
-            const isRecentGoogleLoginAttempt =
-                loginAttemptTs > 0 && Date.now() - loginAttemptTs < 10 * 60 * 1000;
-
-            const isRecentGoogleRegisterAttempt =
-                registerAttemptTs > 0 && Date.now() - registerAttemptTs < 10 * 60 * 1000;
-
-            let pending = null;
-
-            try {
-                pending = await getSecurePendingGoogleRegistration();
-            } catch {
-                pending = null;
-            }
-
-            if (!pending) {
-                const pendingRaw = sessionStorage.getItem(GOOGLE_REGISTER_CONTEXT_KEY);
-                if (pendingRaw) {
-                    try {
-                        pending = JSON.parse(pendingRaw);
-                    } catch {
-                        pending = null;
-                    }
-                }
-            }
-
-            if (!pending && isRecentGoogleLoginAttempt) {
-                sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
-                sessionStorage.setItem(
-                    GOOGLE_LOGIN_ERROR_KEY,
-                    'Google sign-in could not be completed. This account is either new or not yet linked—please register first, or sign in with email/password and link Google later.'
-                );
-                router.replace('/');
-                return;
-            }
-
-            if (!pending && isRecentGoogleRegisterAttempt) {
-                sessionStorage.removeItem(GOOGLE_REGISTER_ATTEMPT_KEY);
-                if (!cancelled) {
-                    setFormError('Google registration context expired or was not found. Please start Google registration again.');
-                    setOpenSection('social');
-                    router.replace('/register');
-                }
-                return;
-            }
-
-            if (!pending) {
-                return;
-            }
-
-            if (!pending?.source || Date.now() - (pending.created_at || 0) > 10 * 60 * 1000) {
-                await clearGoogleTransientState();
-                if (!cancelled) {
-                    setFormError('Google registration context expired. Please start Google registration again.');
-                    setOpenSection('social');
-                    router.replace('/register');
-                }
-                return;
-            }
-
-            if (cancelled) return;
-
-            setIsLoading(true);
-            setFormError('');
-
-            try {
-                const flowRes = await fetch(`/self-service/registration/flows?id=${encodeURIComponent(flowId)}`, {
-                    method: 'GET',
-                    headers: { Accept: 'application/json' },
-                    credentials: 'include'
-                });
-
-                const flowData = await flowRes.json().catch(() => ({}));
-
-                if (!flowRes.ok) {
-                    throw new Error(getErrorMessage(flowData, 'Failed to fetch registration flow'));
-                }
-
-                const completeRes = await fetch(`/self-service/registration?flow=${encodeURIComponent(flowId)}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json'
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        method: 'oidc',
-                        provider: 'google',
-                        csrf_token: extractCsrfToken(flowData),
-                        traits: {
-                            email: getNodeValue(flowData, 'traits.email'),
-                            name: {
-                                first: getNodeValue(flowData, 'traits.name.first'),
-                                last: getNodeValue(flowData, 'traits.name.last')
-                            },
-                            organization_name: pending.organization_name,
-                            tenant_id: pending.tenant_id,
-                            role: pending.role || 'master'
-                        }
-                    })
-                });
-
-                const completeData = await completeRes.json().catch(() => ({}));
-
-                if (!completeRes.ok) {
-                    const redirectTo =
-                        completeData?.redirect_browser_to ||
-                        completeData?.error?.redirect_browser_to ||
-                        completeData?.error?.details?.redirect_browser_to;
-
-                    const errorMessage =
-                        completeData?.error?.message ||
-                        completeData?.ui?.messages?.[0]?.text ||
-                        completeData?.message ||
-                        '';
-
-                    if (
-                        completeRes.status === 422 &&
-                        redirectTo &&
-                        errorMessage.toLowerCase().includes('browser location change required')
-                    ) {
-                        window.location.assign(redirectTo);
-                        return;
-                    }
-
-                    throw new Error(getErrorMessage(completeData, 'Google registration failed'));
-                }
-
-                let identity =
-                    completeData?.session?.identity ||
-                    completeData?.identity ||
-                    null;
-
-                if (!identity) {
-                    identity = await fetchSessionIdentity();
-                }
-
-                if (!identity) {
-                    throw new Error('Google registration completed but no session was issued.');
-                }
-
-                await clearGoogleTransientState();
-
-                if (cancelled) return;
-
-                storeUserInLocalStorage(identity);
-
-                try {
-                    await fetchJwt();
-                } catch (jwtErr) {
-                    console.error('JWT fetch error:', jwtErr);
-                }
-
-                router.push('/dashboard');
-            } catch (err) {
-                console.error('OIDC completion error:', err);
-                await clearGoogleTransientState();
-                if (!cancelled) {
-                    setFormError(err.message || 'Google registration failed. Please try again.');
-                    setIsLoading(false);
-                    setOpenSection('social');
-                    router.replace('/register');
-                }
-            }
-        };
-
-        completeOidcRegistration();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [flowId, router]);
 
     const registerWithKratos = async () => {
         const initRes = await fetch('/self-service/registration/browser', {
@@ -696,61 +300,7 @@ const Register = () => {
                         </div>
                     )}
 
-                    <div className="register-auth-mode-switch" role="tablist" aria-label="Choose registration method">
-                        <button
-                            type="button"
-                            role="tab"
-                            aria-selected={openSection === 'social'}
-                            className={`register-auth-mode-btn ${openSection === 'social' ? 'is-active' : ''}`}
-                            onClick={() => setOpenSection('social')}
-                        >
-                            Register with Social Id
-                        </button>
-                        <button
-                            type="button"
-                            role="tab"
-                            aria-selected={openSection === 'local'}
-                            className={`register-auth-mode-btn ${openSection === 'local' ? 'is-active' : ''}`}
-                            onClick={() => setOpenSection('local')}
-                        >
-                            Register Locally
-                        </button>
-                    </div>
-
-                    <div className="register-auth-carousel" aria-live="polite">
-                        <div className={`register-auth-track ${openSection === 'local' ? 'show-local' : 'show-social'}`}>
-                            <section className={`register-auth-slide is-social ${openSection === 'social' ? 'is-active' : ''}`} aria-hidden={openSection !== 'social'}>
-                                <div className="register-accordion-body">
-                                    <button
-                                        type="button"
-                                        className="register-social-btn register-google-btn"
-                                        disabled={isLoading}
-                                        onClick={() => {
-                                            setGoogleOrgName('');
-                                            setGoogleOrgError('');
-                                            setGoogleModalOpen(true);
-                                        }}
-                                    >
-                                        <span className="register-social-icon register-google-icon">G</span>
-                                        <span>{isLoading ? 'Please wait...' : 'Continue with Google'}</span>
-                                    </button>
-
-                                    <div className="register-disabled-auth-wrap" title="Feature not available now but will be there shortly.">
-                                        <button type="button" className="register-social-btn register-azure-btn" disabled>
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" className="register-social-icon register-azure-icon" aria-hidden="true">
-                                                <rect x="1" y="1" width="9" height="9" fill="#3c4043" />
-                                                <rect x="11" y="1" width="9" height="9" fill="#3c4043" />
-                                                <rect x="1" y="11" width="9" height="9" fill="#3c4043" />
-                                                <rect x="11" y="11" width="9" height="9" fill="#3c4043" />
-                                            </svg>
-                                            <span>Continue with Microsoft</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section className={`register-auth-slide is-local ${openSection === 'local' ? 'is-active' : ''}`} aria-hidden={openSection !== 'local'}>
-                                <form id="local-register-form" className="register-auth-form" onSubmit={handleSubmit}>
+                    <form id="local-register-form" className="register-auth-form" onSubmit={handleSubmit}>
                                     <div className="register-name-row" style={{ display: 'flex', gap: '15px' }}>
                                         <div className="register-input-group" style={{ flex: 1 }}>
                                             <label>First name *</label>
@@ -840,10 +390,7 @@ const Register = () => {
                                             </span>
                                         )}
                                     </div>
-                                </form>
-                            </section>
-                        </div>
-                    </div>
+                    </form>
 
                     <div className="register-auth-form">
                         <div className="register-form-divider" />
@@ -880,7 +427,7 @@ const Register = () => {
                             type="submit"
                             form="local-register-form"
                             className="register-submit-btn"
-                            disabled={isLoading || !isFormValid || !agreementChecked || openSection !== 'local'}
+                            disabled={isLoading || !isFormValid || !agreementChecked}
                         >
                             {isLoading ? "Creating Account..." : "Register"}
                         </button>
@@ -897,49 +444,6 @@ const Register = () => {
                 open={Boolean(activeLegalDocument)}
                 onClose={() => setActiveLegalDocument(null)}
             />
-
-            {googleModalOpen && (
-                <div className="reg-google-modal-overlay" onClick={() => !isLoading && setGoogleModalOpen(false)}>
-                    <div
-                        className="reg-google-modal"
-                        onClick={(e) => e.stopPropagation()}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="google-modal-title"
-                    >
-                        <h3 id="google-modal-title" className="reg-google-modal-title">Enter Organisation Name</h3>
-                        <p className="reg-google-modal-subtitle">Please provide your organisation name before continuing with Google.</p>
-
-                        <input
-                            type="text"
-                            className="reg-google-modal-input"
-                            placeholder="Your organisation name"
-                            value={googleOrgName}
-                            onChange={(e) => {
-                                setGoogleOrgName(e.target.value);
-                                if (googleOrgError) setGoogleOrgError('');
-                            }}
-                            autoFocus
-                            disabled={isLoading}
-                        />
-
-                        {googleOrgError && (
-                            <p style={{ color: 'red', fontSize: '0.85rem', marginTop: '8px' }}>
-                                {googleOrgError}
-                            </p>
-                        )}
-
-                        <button
-                            type="button"
-                            className="reg-google-modal-btn"
-                            disabled={isLoading || !googleOrgName.trim()}
-                            onClick={handleGoogleContinue}
-                        >
-                            {isLoading ? 'Continuing...' : 'Click to continue'}
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

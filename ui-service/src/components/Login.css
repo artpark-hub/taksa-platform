@@ -527,3 +527,187 @@
     font-size: 1rem;
     color: #3c4043;
 }
+
+/* ─── Google org-name modal ──────────────────────────────── */
+.login-google-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.login-google-modal {
+    background: #ffffff;
+    border-radius: var(--radius-xl);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    padding: var(--space-2xl) var(--space-xl);
+    width: min(90vw, 26rem);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    position: relative;
+}
+
+.login-google-modal-close {
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-md);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: var(--text-lg);
+    color: #888;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.login-google-modal-close:hover {
+    color: #333;
+    background: #f0f0f0;
+}
+
+.login-google-modal-title {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: #111;
+    margin: 0;
+}
+
+.login-google-modal-subtitle {
+    font-size: var(--text-sm);
+    color: #555;
+    margin: 0;
+}
+
+.login-google-modal-consent-card {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+}
+
+.login-google-modal-consent-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: var(--space-sm);
+}
+
+.login-google-modal-consent-checkbox {
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.login-google-modal-consent-copy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    min-width: 0;
+}
+
+.login-google-modal-consent-title {
+    color: #334155;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: normal;
+    margin: 0;
+}
+
+.login-google-modal-consent-label-copy {
+    font: inherit;
+    color: inherit;
+}
+
+.login-google-modal-link-button {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #0056b3;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.login-google-modal-link-button:hover {
+    color: #003d82;
+}
+
+.login-google-modal-consent-error {
+    font-size: var(--text-sm);
+    color: red;
+    margin: 0;
+}
+
+.login-google-modal-input {
+    width: 100%;
+    padding: var(--space-sm);
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-base);
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.login-google-modal-input:focus {
+    border-color: #111;
+    outline: none;
+}
+
+.login-google-modal-input-error {
+    border-color: #ef4444 !important;
+    background-color: rgba(254, 242, 242, 1);
+}
+
+.login-google-modal-field-error {
+    color: red;
+    font-size: 0.85rem;
+    margin: -0.35rem 0 0;
+}
+
+.login-google-modal-btn {
+    width: 100%;
+    padding: var(--space-sm);
+    background-color: #111;
+    color: #fff;
+    border: 1px solid #111;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-base);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-family: inherit;
+}
+
+.login-google-modal-btn:not(:disabled):hover {
+    background-color: #333;
+}
+
+.login-google-modal-btn:disabled {
+    background-color: #9ca3af;
+    border-color: #9ca3af;
+    color: #f3f4f6;
+    cursor: not-allowed;
+    opacity: 0.85;
+}
+
+@media (max-width: 28rem) {
+    .login-google-modal {
+        width: min(92vw, 24rem);
+        padding: var(--space-xl);
+    }
+
+    .login-google-modal-consent-title {
+        white-space: normal;
+    }
+}

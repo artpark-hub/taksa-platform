@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react'; 
+import LegalDocumentModal from './LegalDocumentModal';
 
 const GOOGLE_LOGIN_ATTEMPT_KEY = 'taksa_google_login_attempt';
 const GOOGLE_LOGIN_ERROR_KEY = 'taksa_google_login_error';
@@ -16,6 +17,14 @@ const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [formError, setFormError] = useState('');
     const [openSection, setOpenSection] = useState('social');
+
+    const [pendingIdentity, setPendingIdentity] = useState(null);
+    const [googleModalOpen, setGoogleModalOpen] = useState(false);
+    const [googleOrgName, setGoogleOrgName] = useState('');
+    const [googleOrgError, setGoogleOrgError] = useState('');
+    const [agreementChecked, setAgreementChecked] = useState(false);
+    const [agreementError, setAgreementError] = useState('');
+    const [activeLegalDocument, setActiveLegalDocument] = useState(null);
 
     const router = useRouter();
 
@@ -110,6 +119,23 @@ const Login = () => {
         );
     };
 
+    const fetchSessionIdentity = async () => {
+        const response = await fetch('/sessions/whoami', {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json'
+            },
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const data = await response.json().catch(() => ({}));
+        return data?.identity || null;
+    };
+
     const fetchJwt = async () => {
         const jwtResponse = await fetch('/api/v1/um/token', {
             method: 'GET',
@@ -137,6 +163,168 @@ const Login = () => {
         localStorage.setItem('taksa_jwt', finalJwt);
     };
 
+    const fetchOrganizationId = async () => {
+        const orgIdRes = await fetch('/api/v1/um/generate_organization_id', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({})
+        });
+
+        const orgIdData = await orgIdRes.json().catch(() => ({}));
+
+        if (!orgIdRes.ok) {
+            throw new Error(
+                orgIdData?.message ||
+                orgIdData?.error?.message ||
+                'Failed to generate organization id'
+            );
+        }
+
+        const organizationId =
+            orgIdData?.tenant_id ||
+            orgIdData?.tenantId ||
+            orgIdData?.data?.tenant_id ||
+            orgIdData?.data?.tenantId ||
+            orgIdData?.organization_id ||
+            orgIdData?.organizationId ||
+            orgIdData?.data?.organization_id ||
+            orgIdData?.data?.organizationId;
+
+        if (!organizationId) {
+            throw new Error('Organization id not found in response');
+        }
+
+        return organizationId;
+    };
+
+    const updateIdentityTraits = async ({ identity, organizationName, tenantId }) => {
+        const traits = identity?.traits || {};
+
+        const initRes = await fetch('/self-service/settings/browser', {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            redirect: 'follow'
+        });
+
+        const initData = await initRes.json().catch(() => ({}));
+
+        if (!initRes.ok) {
+            throw new Error(getErrorMessage(initData, 'Failed to initialize profile update flow'));
+        }
+
+        const flowId = initData?.id;
+
+        if (!flowId) {
+            throw new Error('Settings flow id not found');
+        }
+
+        const flowRes = await fetch(`/self-service/settings/flows?id=${encodeURIComponent(flowId)}`, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json'
+            },
+            credentials: 'include'
+        });
+
+        const flowData = await flowRes.json().catch(() => ({}));
+
+        if (!flowRes.ok) {
+            throw new Error(getErrorMessage(flowData, 'Failed to fetch profile update flow'));
+        }
+
+        const updatedTraits = {
+            ...traits,
+            email: traits.email || '',
+            name: {
+                first: traits.name?.first || '',
+                last: traits.name?.last || ''
+            },
+            role: traits.role || 'master',
+            organization_name: organizationName,
+            tenant_id: tenantId
+        };
+
+        const updateRes = await fetch(`/self-service/settings?flow=${encodeURIComponent(flowId)}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                method: 'profile',
+                csrf_token: extractCsrfToken(flowData),
+                traits: updatedTraits
+            })
+        });
+
+        const updateData = await updateRes.json().catch(() => ({}));
+
+        if (!updateRes.ok) {
+            const redirectTo =
+                updateData?.redirect_browser_to ||
+                updateData?.error?.redirect_browser_to ||
+                updateData?.error?.details?.redirect_browser_to;
+
+            const errorMessage =
+                updateData?.error?.message ||
+                updateData?.ui?.messages?.[0]?.text ||
+                updateData?.message ||
+                '';
+
+            if (
+                updateRes.status === 422 &&
+                redirectTo &&
+                errorMessage.toLowerCase().includes('browser location change required')
+            ) {
+                window.location.assign(redirectTo);
+                return false;
+            }
+
+            throw new Error(getErrorMessage(updateData, 'Failed to update organisation details'));
+        }
+
+        return true;
+    };
+
+    const completeTaksaLogin = async (identity) => {
+        if (!identity) {
+            throw new Error('Logged in user identity not found');
+        }
+
+        const traits = identity?.traits || {};
+
+        if (!hasRequiredOrgTraits(traits)) {
+            throw new Error('Organisation details are missing');
+        }
+
+        sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
+        sessionStorage.removeItem(GOOGLE_LOGIN_ERROR_KEY);
+
+        storeUserInLocalStorage(identity);
+        await fetchJwt();
+
+        router.push('/dashboard');
+    };
+
+    const openOrganisationModal = (identity) => {
+        clearStoredAuth();
+        setPendingIdentity(identity);
+        setGoogleOrgName('');
+        setGoogleOrgError('');
+        setAgreementChecked(false);
+        setAgreementError('');
+        setGoogleModalOpen(true);
+        setIsLoading(false);
+    };
+
     const handleAuthenticatedIdentity = async (identity) => {
         const traits = identity?.traits || {};
 
@@ -145,42 +333,17 @@ const Login = () => {
         }
 
         if (!hasRequiredOrgTraits(traits)) {
-            clearStoredAuth();
-            setFormError('Login failed. Your account is missing organisation details. Please complete registration first.');
+            openOrganisationModal(identity);
             return false;
         }
 
-        sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
-        sessionStorage.removeItem(GOOGLE_LOGIN_ERROR_KEY);
-
-        storeUserInLocalStorage(identity);
-
-        try {
-            await fetchJwt();
-        } catch (jwtErr) {
-            console.error('JWT fetch error:', jwtErr);
-        }
-
-        router.push('/dashboard');
+        await completeTaksaLogin(identity);
         return true;
     };
 
     const checkExistingSession = async () => {
         try {
-            const response = await fetch('/sessions/whoami', {
-                method: 'GET',
-                headers: {
-                    Accept: 'application/json'
-                },
-                credentials: 'include'
-            });
-
-            if (!response.ok) {
-                return false;
-            }
-
-            const data = await response.json().catch(() => ({}));
-            const identity = data?.identity;
+            const identity = await fetchSessionIdentity();
 
             if (!identity) {
                 return false;
@@ -323,6 +486,62 @@ const Login = () => {
         } catch (err) {
             console.error('Google Login Error:', err);
             setFormError(err.message || 'Failed to continue with Google login');
+            setIsLoading(false);
+        }
+    };
+
+    const handleCompleteOrganisationDetails = async () => {
+        setFormError('');
+        setGoogleOrgError('');
+        setAgreementError('');
+
+        if (!agreementChecked) {
+            setAgreementError('Please agree to the Platform Agreement and Privacy Policy before continuing.');
+            return;
+        }
+
+        const trimmedOrgName = googleOrgName.trim();
+
+        if (!trimmedOrgName) {
+            setGoogleOrgError('Organisation name is required.');
+            return;
+        }
+
+        if (!pendingIdentity) {
+            setFormError('Logged in user identity not found. Please sign in again.');
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            const tenantId = await fetchOrganizationId();
+
+            const updated = await updateIdentityTraits({
+                identity: pendingIdentity,
+                organizationName: trimmedOrgName,
+                tenantId
+            });
+
+            if (!updated) return;
+
+            const updatedIdentity = await fetchSessionIdentity();
+
+            if (!updatedIdentity) {
+                throw new Error('Unable to verify updated session. Please sign in again.');
+            }
+
+            if (!hasRequiredOrgTraits(updatedIdentity?.traits || {})) {
+                throw new Error('Organisation details were not saved. Please try again.');
+            }
+
+            setGoogleModalOpen(false);
+            setPendingIdentity(null);
+
+            await completeTaksaLogin(updatedIdentity);
+        } catch (err) {
+            console.error('Organisation completion error:', err);
+            setFormError(err.message || 'Failed to complete organisation details');
             setIsLoading(false);
         }
     };
@@ -542,11 +761,105 @@ const Login = () => {
                     )}
 
                     <div className={`login-footer-section${openSection === 'local' ? ' has-top-margin' : ''}`}>
-                        <span>Don't have an account? <Link href="/register">Sign up now</Link></span>
+                        <span>Don't have a local account? <Link href="/register">Sign up now</Link></span>
                         <Link href="/recovery" style={{ fontSize: '0.85rem' }}>Forgot Password?</Link>
                     </div>
                 </div>
             </div>
+
+            <LegalDocumentModal
+                documentKey={activeLegalDocument || 'terms'}
+                open={Boolean(activeLegalDocument)}
+                onClose={() => setActiveLegalDocument(null)}
+            />
+
+            {googleModalOpen && (
+                <div className="login-google-modal-overlay" onClick={() => { setGoogleModalOpen(false); setPendingIdentity(null); }}>
+                    <div
+                        className="login-google-modal"
+                        onClick={(e) => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="login-google-modal-title"
+                    >
+                        <button
+                            type="button"
+                            className="login-google-modal-close"
+                            aria-label="Close"
+                            onClick={() => { setGoogleModalOpen(false); setPendingIdentity(null); }}
+                        >
+                            &#x2715;
+                        </button>
+                        <h3 id="login-google-modal-title" className="login-google-modal-title">Enter Organisation Name</h3>
+                        <p className="login-google-modal-subtitle">
+                            Please provide your organisation name to complete your Taksa account setup.
+                        </p>
+
+                        <div className="login-google-modal-consent-card">
+                            <div className="login-google-modal-consent-row">
+                                <input
+                                    id="login-google-agreement"
+                                    type="checkbox"
+                                    className="login-google-modal-consent-checkbox"
+                                    checked={agreementChecked}
+                                    onChange={(e) => {
+                                        setAgreementChecked(e.target.checked);
+                                        if (e.target.checked) setAgreementError('');
+                                    }}
+                                    disabled={isLoading}
+                                />
+
+                                <div className="login-google-modal-consent-copy">
+                                    <p className="login-google-modal-consent-title">
+                                        <label htmlFor="login-google-agreement" className="login-google-modal-consent-label-copy">I agree to the </label>
+                                        <button type="button" className="login-google-modal-link-button" onClick={() => setActiveLegalDocument('terms')}>
+                                            Platform Agreement
+                                        </button>{' '}
+                                        &{' '}
+                                        <button type="button" className="login-google-modal-link-button" onClick={() => setActiveLegalDocument('privacy')}>
+                                            Privacy Policy
+                                        </button>
+                                    </p>
+
+                                    {agreementError && (
+                                        <p className="login-google-modal-consent-error">
+                                            {agreementError}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <input
+                            type="text"
+                            className={`login-google-modal-input ${googleOrgError ? 'login-google-modal-input-error' : ''}`}
+                            placeholder="Your organisation name"
+                            value={googleOrgName}
+                            onChange={(e) => {
+                                setGoogleOrgName(e.target.value);
+                                if (googleOrgError) setGoogleOrgError('');
+                            }}
+                            autoFocus
+                            disabled={isLoading}
+                        />
+
+                        {googleOrgError && (
+                            <p className="login-google-modal-field-error">
+                                {googleOrgError}
+                            </p>
+                        )}
+
+                        <button
+                            type="button"
+                            className="login-google-modal-btn"
+                            disabled={isLoading || !agreementChecked || !googleOrgName.trim()}
+                            onClick={handleCompleteOrganisationDetails}
+                        >
+                            {isLoading ? 'Completing setup...' : 'Click to continue'}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
