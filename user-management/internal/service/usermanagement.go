@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"strings"
 
 	v1 "user-management/api/tenants/v1"
@@ -229,6 +231,90 @@ func (s *UserManagementService) DeleteMasterUser(ctx context.Context, req *v1.De
 	return &v1.DeleteUserResponse{
 		Status:  "success",
 		Message: "Master user deleted successfully",
+	}, nil
+}
+
+func (s *UserManagementService) DeleteIncompleteOidcUser(ctx context.Context, req *v1.DeleteUserRequest) (*v1.DeleteUserResponse, error) {
+	identityId := strings.TrimSpace(req.IdentityId)
+	if identityId == "" {
+		return nil, errors.New("identity_id is required")
+	}
+
+	var callerIdentityID string
+
+	var authHeader, cookieHeader string
+	if tr, ok := transport.FromServerContext(ctx); ok {
+		authHeader = tr.RequestHeader().Get("Authorization")
+		cookieHeader = tr.RequestHeader().Get("Cookie")
+	}
+
+	if len(authHeader) > 7 && strings.EqualFold(authHeader[:7], "Bearer ") {
+		tokenString := strings.TrimSpace(authHeader[7:])
+		token, _, err := new(jwtv5.Parser).ParseUnverified(tokenString, jwtv5.MapClaims{})
+		if err != nil {
+			s.log.Errorf("Failed to parse bearer token: %v", err)
+			return nil, errors.New("unauthorized: invalid bearer token")
+		}
+		if claims, ok := token.Claims.(jwtv5.MapClaims); ok {
+			if sub, found := claims["sub"]; found {
+				callerIdentityID, _ = sub.(string)
+			}
+		}
+		if strings.TrimSpace(callerIdentityID) == "" {
+			return nil, errors.New("unauthorized: sub claim not found in token")
+		}
+	} else if cookieHeader != "" {
+		whoamiURL := s.data.KratosPublicURL() + "/sessions/whoami"
+		whoamiReq, err := http.NewRequestWithContext(ctx, http.MethodGet, whoamiURL, nil)
+		if err != nil {
+			s.log.Errorf("Failed to build whoami request: %v", err)
+			return nil, errors.New("internal error: failed to validate session")
+		}
+		whoamiReq.Header.Set("Cookie", cookieHeader)
+		whoamiReq.Header.Set("Accept", "application/json")
+
+		whoamiResp, err := s.data.HTTPClient().Do(whoamiReq)
+		if err != nil {
+			s.log.Errorf("Whoami request failed: %v", err)
+			return nil, errors.New("internal error: session validation request failed")
+		}
+		defer whoamiResp.Body.Close()
+
+		if whoamiResp.StatusCode != http.StatusOK {
+			s.log.Warnf("Whoami returned non-200 status: %d", whoamiResp.StatusCode)
+			return nil, errors.New("unauthorized: invalid or expired session")
+		}
+
+		var sessionData struct {
+			Identity struct {
+				ID string `json:"id"`
+			} `json:"identity"`
+		}
+		if err := json.NewDecoder(whoamiResp.Body).Decode(&sessionData); err != nil {
+			s.log.Errorf("Failed to decode whoami response: %v", err)
+			return nil, errors.New("internal error: failed to parse session")
+		}
+		callerIdentityID = strings.TrimSpace(sessionData.Identity.ID)
+		if callerIdentityID == "" {
+			return nil, errors.New("unauthorized: session identity not found")
+		}
+	} else {
+		return nil, errors.New("unauthorized: bearer token or session cookie required")
+	}
+
+	if callerIdentityID != identityId {
+		s.log.Warnf("Identity mismatch: caller=%s requested=%s", callerIdentityID, identityId)
+		return nil, errors.New("forbidden: you can only delete your own account")
+	}
+
+	if err := s.uc.DeleteIncompleteOidcUser(ctx, identityId); err != nil {
+		s.log.Errorf("Failed to delete incomplete OIDC user %s: %v", identityId, err)
+		return nil, err
+	}
+
+	return &v1.DeleteUserResponse{
+		Status:  "success",
+		Message: "Incomplete OIDC user deleted successfully",
 	}, nil
 }
 

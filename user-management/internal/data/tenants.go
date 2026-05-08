@@ -160,6 +160,10 @@ func (r *tenantsRepo) DeleteIdentity(ctx context.Context, id string) error {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to delete identity, status: %d", resp.StatusCode)
 	}

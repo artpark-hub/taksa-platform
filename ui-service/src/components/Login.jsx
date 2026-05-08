@@ -38,6 +38,11 @@ const Login = () => {
         localStorage.removeItem('taksa_jwt');
     };
 
+    const clearGoogleLoginState = () => {
+        sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
+        sessionStorage.removeItem(GOOGLE_LOGIN_ERROR_KEY);
+    };
+
     const getErrorMessage = (data, fallback) => {
         return (
             data?.ui?.messages?.[0]?.text ||
@@ -90,10 +95,24 @@ const Login = () => {
         );
     };
 
+    const isRecentGoogleLoginAttempt = () => {
+        const loginAttemptTs = Number(sessionStorage.getItem(GOOGLE_LOGIN_ATTEMPT_KEY) || 0);
+        return loginAttemptTs > 0 && Date.now() - loginAttemptTs < 10 * 60 * 1000;
+    };
+
     const hasRequiredOrgTraits = (traits = {}) => {
         return Boolean(
             String(traits?.organization_name || '').trim() &&
             String(traits?.tenant_id || '').trim()
+        );
+    };
+
+    const identityHasNoOrgAndTenant = (identity) => {
+        const traits = identity?.traits || {};
+
+        return Boolean(
+            !String(traits?.organization_name || '').trim() &&
+            !String(traits?.tenant_id || '').trim()
         );
     };
 
@@ -134,6 +153,36 @@ const Login = () => {
 
         const data = await response.json().catch(() => ({}));
         return data?.identity || null;
+    };
+
+    const logoutKratosSession = async () => {
+        try {
+            const logoutFlowRes = await fetch('/self-service/logout/browser', {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json'
+                },
+                credentials: 'include'
+            });
+
+            const logoutFlowData = await logoutFlowRes.json().catch(() => ({}));
+            const logoutUrl = logoutFlowData?.logout_url;
+
+            if (logoutUrl) {
+                await fetch(logoutUrl, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+            }
+        } catch (err) {
+            console.error('Logout error:', err);
+        }
+    };
+
+    const clearExistingSessionAndAuth = async () => {
+        await logoutKratosSession();
+        clearStoredAuth();
+        clearGoogleLoginState();
     };
 
     const fetchJwt = async () => {
@@ -294,19 +343,12 @@ const Login = () => {
         return true;
     };
 
-    const completeTaksaLogin = async (identity) => {
+    const completeLocalLogin = async (identity) => {
         if (!identity) {
             throw new Error('Logged in user identity not found');
         }
 
-        const traits = identity?.traits || {};
-
-        if (!hasRequiredOrgTraits(traits)) {
-            throw new Error('Organisation details are missing');
-        }
-
-        sessionStorage.removeItem(GOOGLE_LOGIN_ATTEMPT_KEY);
-        sessionStorage.removeItem(GOOGLE_LOGIN_ERROR_KEY);
+        clearGoogleLoginState();
 
         storeUserInLocalStorage(identity);
         await fetchJwt();
@@ -325,23 +367,32 @@ const Login = () => {
         setIsLoading(false);
     };
 
-    const handleAuthenticatedIdentity = async (identity) => {
-        const traits = identity?.traits || {};
-
+    const completeGoogleLogin = async (identity) => {
         if (!identity) {
             throw new Error('Logged in user identity not found');
         }
+
+        const traits = identity?.traits || {};
 
         if (!hasRequiredOrgTraits(traits)) {
             openOrganisationModal(identity);
             return false;
         }
 
-        await completeTaksaLogin(identity);
+        clearGoogleLoginState();
+
+        storeUserInLocalStorage(identity);
+        await fetchJwt();
+
+        router.push('/dashboard');
         return true;
     };
 
-    const checkExistingSession = async () => {
+    const checkGoogleSessionAfterRedirect = async () => {
+        if (!isRecentGoogleLoginAttempt()) {
+            return false;
+        }
+
         try {
             const identity = await fetchSessionIdentity();
 
@@ -349,16 +400,17 @@ const Login = () => {
                 return false;
             }
 
-            await handleAuthenticatedIdentity(identity);
+            await completeGoogleLogin(identity);
             return true;
         } catch (err) {
-            console.error('Session check error:', err);
+            console.error('Google session check error:', err);
+            setFormError(err.message || 'Failed to complete Google sign in');
             return false;
         }
     };
 
     useEffect(() => {
-        checkExistingSession();
+        checkGoogleSessionAfterRedirect();
 
         const googleLoginError = sessionStorage.getItem(GOOGLE_LOGIN_ERROR_KEY);
         if (googleLoginError) {
@@ -393,8 +445,8 @@ const Login = () => {
 
         if (!response.ok) {
             if (isAlreadyLoggedInError(data)) {
-                await checkExistingSession();
-                return null;
+                await clearExistingSessionAndAuth();
+                throw new Error('An existing session was found and cleared. Please click Sign In again.');
             }
 
             throw new Error(getErrorMessage(data, 'Failed to initialize login flow'));
@@ -413,7 +465,6 @@ const Login = () => {
 
     const handleGoogleLogin = async () => {
         setFormError('');
-
         setIsLoading(true);
 
         try {
@@ -430,8 +481,8 @@ const Login = () => {
 
             if (!response.ok) {
                 if (isAlreadyLoggedInError(data)) {
-                    await checkExistingSession();
-                    return;
+                    await clearExistingSessionAndAuth();
+                    throw new Error('An existing session was found and cleared. Please click Continue with Google again.');
                 }
 
                 throw new Error(getErrorMessage(data, 'Failed to initialize Google login flow'));
@@ -490,6 +541,75 @@ const Login = () => {
         }
     };
 
+    const deleteIncompleteOidcUser = async (identity) => {
+        const identityId = identity?.id;
+
+        if (!identityId) {
+            return;
+        }
+
+        const latestIdentity = await fetchSessionIdentity();
+
+        if (!latestIdentity || latestIdentity.id !== identityId) {
+            throw new Error('Unable to verify incomplete Google account before deletion.');
+        }
+
+        if (!identityHasNoOrgAndTenant(latestIdentity)) {
+            throw new Error('Account deletion skipped because organisation details already exist.');
+        }
+
+        const response = await fetch(`/api/v1/um/delete_incomplete_oidc_user/${encodeURIComponent(identityId)}`, {
+            method: 'DELETE',
+            headers: {
+                Accept: 'application/json'
+            },
+            credentials: 'include'
+        });
+
+        if (!response.ok && response.status !== 404) {
+            const data = await response.json().catch(() => ({}));
+
+            throw new Error(
+                data?.message ||
+                data?.error?.message ||
+                'Failed to delete incomplete Google account'
+            );
+        }
+    };
+
+    const handleCloseGoogleModal = async () => {
+        if (isLoading) return;
+
+        const identityToDelete = pendingIdentity;
+
+        setIsLoading(true);
+        setFormError('');
+
+        try {
+            await deleteIncompleteOidcUser(identityToDelete);
+
+            setGoogleModalOpen(false);
+            setPendingIdentity(null);
+            setGoogleOrgName('');
+            setGoogleOrgError('');
+            setAgreementChecked(false);
+            setAgreementError('');
+
+            await clearExistingSessionAndAuth();
+
+            setFormError('Google setup was cancelled. The incomplete account was removed. Please sign in again.');
+        } catch (err) {
+            console.error('Incomplete Google account cleanup error:', err);
+
+            setFormError(
+                err.message ||
+                'Unable to cancel setup safely. Please try again.'
+            );
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleCompleteOrganisationDetails = async () => {
         setFormError('');
         setGoogleOrgError('');
@@ -538,7 +658,7 @@ const Login = () => {
             setGoogleModalOpen(false);
             setPendingIdentity(null);
 
-            await completeTaksaLogin(updatedIdentity);
+            await completeGoogleLogin(updatedIdentity);
         } catch (err) {
             console.error('Organisation completion error:', err);
             setFormError(err.message || 'Failed to complete organisation details');
@@ -549,6 +669,7 @@ const Login = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
         setFormError('');
+        clearGoogleLoginState();
 
         if (!email) {
             setEmailError('Email is required');
@@ -587,12 +708,13 @@ const Login = () => {
             const data = await response.json().catch(() => ({}));
 
             if (response.ok) {
-                await handleAuthenticatedIdentity(data?.session?.identity);
+                await completeLocalLogin(data?.session?.identity);
                 return;
             }
 
             if (isAlreadyLoggedInError(data)) {
-                await checkExistingSession();
+                await clearExistingSessionAndAuth();
+                setFormError('An existing session was found and cleared. Please click Sign In again.');
                 return;
             }
 
@@ -774,7 +896,7 @@ const Login = () => {
             />
 
             {googleModalOpen && (
-                <div className="login-google-modal-overlay" onClick={() => { setGoogleModalOpen(false); setPendingIdentity(null); }}>
+                <div className="login-google-modal-overlay">
                     <div
                         className="login-google-modal"
                         onClick={(e) => e.stopPropagation()}
@@ -785,11 +907,13 @@ const Login = () => {
                         <button
                             type="button"
                             className="login-google-modal-close"
-                            aria-label="Close"
-                            onClick={() => { setGoogleModalOpen(false); setPendingIdentity(null); }}
+                            onClick={handleCloseGoogleModal}
+                            aria-label="Close organisation setup"
+                            disabled={isLoading}
                         >
-                            &#x2715;
+                            ×
                         </button>
+
                         <h3 id="login-google-modal-title" className="login-google-modal-title">Enter Organisation Name</h3>
                         <p className="login-google-modal-subtitle">
                             Please provide your organisation name to complete your Taksa account setup.
