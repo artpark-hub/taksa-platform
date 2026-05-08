@@ -2096,13 +2096,18 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 	}
 
 	// Heartbeat payloads may be compressed (zstd/gzip). Decompress when detected.
-	if b, err := decompressIfNeeded(decodedBytes); err == nil && len(b) > 0 {
+	if b, err := decompressIfNeeded(decodedBytes); err != nil {
+		fmt.Printf("Warning: Failed to decompress StatusMessage payload: %v\n", err)
+		return nil
+	} else if len(b) > 0 {
 		decodedBytes = b
 	}
 
 	// Parse JSON StatusMessage (umh-core sends JSON; payload may be base64+compressed).
 	var messageData map[string]interface{}
-	if err := json.Unmarshal(decodedBytes, &messageData); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(decodedBytes))
+	dec.UseNumber()
+	if err := dec.Decode(&messageData); err != nil || messageData == nil {
 		// Preserve original warning format for log filters/dashboards.
 		fmt.Printf("Warning: Failed to parse StatusMessage JSON: %v\n", err)
 		return nil
@@ -2110,24 +2115,38 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 
 	// Extract DFCs from status message to find protocol converters
 	var discoveredConverters []*ConverterInfo
-	// Check if message has a Core structure with DFCs
-	if coreData, ok := messageData["Core"].(map[string]interface{}); ok {
-		if dfcs, ok := coreData["dfcs"].([]interface{}); ok {
-			for _, dfc := range dfcs {
-				if dfcMap, ok := dfc.(map[string]interface{}); ok {
-					dfcType, _ := dfcMap["dfcType"].(string)
-					if dfcType == "protocol-converter" {
-						converter := &ConverterInfo{
-							UUID: extractStringField(dfcMap, "uuid"),
-							Name: extractStringField(dfcMap, "name"),
-							Type: dfcType,
-						}
-						if converter.UUID != "" && converter.Name != "" {
-							discoveredConverters = append(discoveredConverters, converter)
-						}
-					}
-				}
-			}
+	// The heartbeat may be either the StatusMessage object itself or a wrapper with "Payload".
+	payload := messageData
+	if p := jsonMap(messageData, "Payload", "payload"); p != nil {
+		payload = p
+	}
+
+	core := jsonMap(payload, "core", "Core")
+	if core == nil {
+		return nil
+	}
+
+	dfcs, _ := core["dfcs"].([]interface{})
+	if dfcs == nil {
+		dfcs, _ = core["Dfcs"].([]interface{})
+	}
+	for _, dfc := range dfcs {
+		dfcMap, ok := dfc.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		dfcType := jsonString(dfcMap, "dfcType", "dfc_type", "DfcType")
+		if dfcType != "protocol-converter" {
+			continue
+		}
+
+		converter := &ConverterInfo{
+			UUID: jsonString(dfcMap, "uuid", "Uuid", "UUID"),
+			Name: jsonString(dfcMap, "name", "Name"),
+			Type: dfcType,
+		}
+		if converter.UUID != "" && converter.Name != "" {
+			discoveredConverters = append(discoveredConverters, converter)
 		}
 	}
 
@@ -2226,13 +2245,18 @@ func (uc *InstanceUsecase) syncStreamProcessorsFromStatusMessage(ctx context.Con
 	}
 
 	// Heartbeat payloads may be compressed (zstd/gzip). Decompress when detected.
-	if b, err := decompressIfNeeded(decodedBytes); err == nil && len(b) > 0 {
+	if b, err := decompressIfNeeded(decodedBytes); err != nil {
+		fmt.Printf("Warning: Failed to decompress StatusMessage payload: %v\n", err)
+		return nil
+	} else if len(b) > 0 {
 		decodedBytes = b
 	}
 
 	// Parse JSON StatusMessage (umh-core sends JSON; payload may be base64+compressed).
 	var messageData map[string]interface{}
-	if err := json.Unmarshal(decodedBytes, &messageData); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(decodedBytes))
+	dec.UseNumber()
+	if err := dec.Decode(&messageData); err != nil || messageData == nil {
 		// Preserve original warning format for log filters/dashboards.
 		fmt.Printf("Warning: Failed to parse StatusMessage JSON: %v\n", err)
 		return nil
@@ -2240,35 +2264,49 @@ func (uc *InstanceUsecase) syncStreamProcessorsFromStatusMessage(ctx context.Con
 
 	// Extract DFCs from status message to find stream processors
 	var discoveredProcessors []*StreamProcessorStatusInfo
-	// Check if message has a Core structure with DFCs
-	if coreData, ok := messageData["Core"].(map[string]interface{}); ok {
-		if dfcs, ok := coreData["dfcs"].([]interface{}); ok {
-			for _, dfc := range dfcs {
-				if dfcMap, ok := dfc.(map[string]interface{}); ok {
-					dfcType, _ := dfcMap["dfcType"].(string)
-					if dfcType == "stream-processor" {
-						processor := &StreamProcessorStatusInfo{
-							UUID: extractStringField(dfcMap, "uuid"),
-							Name: extractStringField(dfcMap, "name"),
-							Type: dfcType,
-						}
+	// The heartbeat may be either the StatusMessage object itself or a wrapper with "Payload".
+	payload := messageData
+	if p := jsonMap(messageData, "Payload", "payload"); p != nil {
+		payload = p
+	}
 
-						// Extract Health from JSON
-						if healthMap, ok := dfcMap["health"].(map[string]interface{}); ok {
-							processor.Health = &v2.Health{
-								Message:      extractStringField(healthMap, "message"),
-								State:        extractStringField(healthMap, "state"),
-								DesiredState: extractStringField(healthMap, "desiredState"),
-								Category:     extractStringField(healthMap, "category"),
-							}
-						}
+	core := jsonMap(payload, "core", "Core")
+	if core == nil {
+		return nil
+	}
 
-						if processor.UUID != "" && processor.Name != "" {
-							discoveredProcessors = append(discoveredProcessors, processor)
-						}
-					}
-				}
+	dfcs, _ := core["dfcs"].([]interface{})
+	if dfcs == nil {
+		dfcs, _ = core["Dfcs"].([]interface{})
+	}
+	for _, dfc := range dfcs {
+		dfcMap, ok := dfc.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		dfcType := jsonString(dfcMap, "dfcType", "dfc_type", "DfcType")
+		if dfcType != "stream-processor" {
+			continue
+		}
+
+		processor := &StreamProcessorStatusInfo{
+			UUID: jsonString(dfcMap, "uuid", "Uuid", "UUID"),
+			Name: jsonString(dfcMap, "name", "Name"),
+			Type: dfcType,
+		}
+
+		// Extract Health from JSON
+		if healthMap := jsonMap(dfcMap, "health", "Health"); healthMap != nil {
+			processor.Health = &v2.Health{
+				Message:      jsonString(healthMap, "message", "Message"),
+				State:        jsonString(healthMap, "state", "State"),
+				DesiredState: jsonString(healthMap, "desiredState", "desired_state", "DesiredState"),
+				Category:     jsonString(healthMap, "category", "Category"),
 			}
+		}
+
+		if processor.UUID != "" && processor.Name != "" {
+			discoveredProcessors = append(discoveredProcessors, processor)
 		}
 	}
 
