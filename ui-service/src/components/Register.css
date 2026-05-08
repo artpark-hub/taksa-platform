@@ -128,6 +128,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);                    
+    margin-bottom: var(--space-md);                    
 }
 
 .register-name-row {
@@ -200,105 +201,6 @@
     opacity: 0.85;
 }
 
-.register-auth-mode-switch {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-sm);
-    padding: var(--space-xs);
-    margin-bottom: var(--space-md);
-    border-radius: var(--radius-lg);
-    background: rgba(15, 23, 42, 0.06);
-}
-
-.register-auth-mode-btn {
-    border-radius: var(--radius-md);
-    width: 100%;
-    padding: var(--space-xs) var(--space-sm);
-    font-size: var(--text-sm);
-    white-space: nowrap;
-    color: #667085;
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    font-weight: 600;
-    transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
-}
-
-.register-auth-mode-btn.is-active {
-    color: #1e293b;
-    background: #ffffff;
-    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.12);
-}
-
-.register-auth-mode-btn:not(.is-active):hover {
-    color: #475467;
-}
-
-.register-auth-carousel {
-    width: 100%;
-    overflow: hidden;
-    margin-bottom: var(--space-md);
-}
-
-.register-auth-track {
-    position: relative;
-    width: 100%;
-    min-height: 0;
-}
-
-.register-auth-slide {
-    width: 100%;
-    box-sizing: border-box;
-    opacity: 0;
-    transform: translateX(0);
-    transition: transform 0.42s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.28s ease;
-    pointer-events: none;
-}
-
-.register-auth-slide.is-active {
-    position: relative;
-    opacity: 1;
-    transform: translateX(0);
-    pointer-events: auto;
-}
-
-.register-auth-slide:not(.is-active) {
-    position: absolute;
-    inset: 0;
-}
-
-.register-auth-track.show-social .register-auth-slide.is-local:not(.is-active) {
-    transform: translateX(100%);
-}
-
-.register-auth-track.show-local .register-auth-slide.is-social:not(.is-active) {
-    transform: translateX(-100%);
-}
-
-.register-accordion-body {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-    padding: var(--space-md);
-    background-color: #e0e0e052;
-    border-radius: 12px;
-    margin: 0;
-}
-
-.register-social-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    width: 100%;
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
-    font-size: var(--text-base);
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-}
-
 .register-form-divider {
     width: 100%;
     height: 1px;
@@ -306,7 +208,6 @@
     margin: 0.25rem 0;
 }
 
-.register-google-btn,
 .register-submit-btn {
     width: 100%;
     min-height: 3rem;
@@ -316,72 +217,6 @@
     font-weight: 600;
     line-height: 1;
     font-family: inherit;
-}
-
-.register-google-btn {
-    border: 1px solid rgba(15, 23, 42, 0.12);
-    background: #ffffff;
-    color: #3c4043;
-}
-
-.register-google-btn:hover {
-    background: #f8f9fa;
-    border-color: #c0c5cc;
-}
-
-.register-social-icon {
-    width: 1.35rem;
-    height: 1.35rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.register-google-icon {
-    width: 1.35rem;
-    height: 1.35rem;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #3c4043;
-    font-size: 0.95rem;
-    font-weight: 700;
-}
-
-.register-azure-btn {
-    background: #ffffff;
-    color: #3c4043;
-    border: 1px solid #dadce0;
-}
-
-.register-azure-btn:hover {
-    background: #f0f7ff;
-}
-
-.register-disabled-auth-wrap {
-    width: 100%;
-    cursor: not-allowed;
-}
-
-.register-disabled-auth-wrap .register-azure-btn,
-.register-disabled-auth-wrap .register-azure-btn:disabled,
-.register-disabled-auth-wrap .register-azure-btn:hover {
-    cursor: not-allowed;
-    opacity: 0.7;
-    background: #f5f5f5;
-    border-color: #dadce0;
-}
-
-.register-azure-icon {
-    width: 1.35rem;
-    height: 1.35rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    color: #3c4043;
 }
 
 .register-auth-form .legal-consent-card {
@@ -437,7 +272,6 @@
 }
 
 @media (max-width: 28rem) {
-    .register-auth-mode-btn,
     .register-auth-form .legal-consent-title {
         white-space: normal;
     }
@@ -489,82 +323,4 @@
         margin-inline-start: auto;
         margin-inline-end: 0;
     }
-}
-
-/* ─── Google org-name modal ──────────────────────────────── */
-.reg-google-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    backdrop-filter: blur(2px);
-}
-
-.reg-google-modal {
-    background: #ffffff;
-    border-radius: var(--radius-xl);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-    padding: var(--space-2xl) var(--space-xl);
-    width: min(90vw, 26rem);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-}
-
-.reg-google-modal-title {
-    font-size: var(--text-xl);
-    font-weight: 700;
-    color: #111;
-    margin: 0;
-}
-
-.reg-google-modal-subtitle {
-    font-size: var(--text-sm);
-    color: #555;
-    margin: 0;
-}
-
-.reg-google-modal-input {
-    width: 100%;
-    padding: var(--space-sm);
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-base);
-    font-family: inherit;
-    box-sizing: border-box;
-    transition: border-color 0.2s;
-}
-
-.reg-google-modal-input:focus {
-    border-color: #111;
-    outline: none;
-}
-
-.reg-google-modal-btn {
-    width: 100%;
-    padding: var(--space-sm);
-    background-color: #111;
-    color: #fff;
-    border: 1px solid #111;
-    border-radius: var(--radius-sm);
-    font-size: var(--text-base);
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-family: inherit;
-}
-
-.reg-google-modal-btn:not(:disabled):hover {
-    background-color: #333;
-}
-
-.reg-google-modal-btn:disabled {
-    background-color: #9ca3af;
-    border-color: #9ca3af;
-    color: #f3f4f6;
-    cursor: not-allowed;
-    opacity: 0.85;
 }
