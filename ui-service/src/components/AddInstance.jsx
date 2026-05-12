@@ -16,6 +16,7 @@ const AddInstance = () => {
 
     const [showModal, setShowModal] = useState(false);
     const [hasCopied, setHasCopied] = useState(false);
+    const [hasCopiedOnce, setHasCopiedOnce] = useState(false);
     const [errors, setErrors] = useState({});
     const [formError, setFormError] = useState('');
     const [copyError, setCopyError] = useState('');
@@ -48,6 +49,7 @@ const AddInstance = () => {
                 setCreatedDeviceResponse({ instructions: { docker_command: parsedCache.dockerCommand } });
                 setShowModal(Boolean(parsedCache.showModal));
                 setHasCopied(false);
+                setHasCopiedOnce(false);
             }
         } catch (error) {
             console.error('Error restoring modal state', error);
@@ -56,7 +58,7 @@ const AddInstance = () => {
 
     useEffect(() => {
         try {
-            if (!dockerCommand) {
+            if (!dockerCommand || !showModal) {
                 sessionStorage.removeItem(INSTALL_MODAL_CACHE_KEY);
                 return;
             }
@@ -69,6 +71,18 @@ const AddInstance = () => {
             console.error('Error caching modal state', error);
         }
     }, [dockerCommand, showModal]);
+
+    useEffect(() => {
+        if (!hasCopied || !showModal) {
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            setHasCopied(false);
+        }, 5000);
+
+        return () => clearTimeout(timeoutId);
+    }, [hasCopied, showModal]);
 
     const handleBack = () => { router.back(); };
 
@@ -124,6 +138,7 @@ const AddInstance = () => {
         setFormError('');
         setCopyError('');
         setHasCopied(false);
+        setHasCopiedOnce(false);
         setIsSubmitting(true);
 
         try {
@@ -168,6 +183,7 @@ const AddInstance = () => {
             setCreatedDeviceResponse(data);
             setShowModal(true);
             setHasCopied(false);
+            setHasCopiedOnce(false);
         } catch (error) {
             console.error('Failed to create Data Collecting Device (DCD):', error);
             setFormError(error.message || 'Failed to create Data Collecting Device (DCD). Please try again.');
@@ -178,7 +194,10 @@ const AddInstance = () => {
 
     const handleCloseModal = () => {
         setShowModal(false);
+        setHasCopied(false);
+        setHasCopiedOnce(false);
         setCopyError('');
+        setCreatedDeviceResponse(null);
         try {
             sessionStorage.removeItem(INSTALL_MODAL_CACHE_KEY);
         } catch (error) {
@@ -197,6 +216,7 @@ const AddInstance = () => {
             if (navigator?.clipboard?.writeText) {
                 await navigator.clipboard.writeText(dockerCommand);
                 setHasCopied(true);
+                setHasCopiedOnce(true);
             } else {
                 const textArea = document.createElement("textarea");
                 textArea.value = dockerCommand;
@@ -209,6 +229,7 @@ const AddInstance = () => {
                 try {
                     document.execCommand('copy');
                     setHasCopied(true);
+                    setHasCopiedOnce(true);
                 } catch (err) {
                     console.error('Fallback: Oops, unable to copy', err);
                     setCopyError('Failed to copy the docker command. Please copy it manually.');
@@ -222,7 +243,10 @@ const AddInstance = () => {
     };
 
     const handleContinue = () => {
-        if (hasCopied) {
+        if (hasCopiedOnce) {
+            setHasCopied(false);
+            setHasCopiedOnce(false);
+            setCopyError('');
             router.push('/dashboard/Edge-devices');
         }
     };
@@ -367,7 +391,7 @@ const AddInstance = () => {
                         </div>
                         {copyError && <div className="error-text" style={{ marginTop: '10px' }}>{copyError}</div>}
                         <div className="modal-actions">
-                            <button className={`btn-continue ${hasCopied ? 'active' : 'disabled'}`} onClick={handleContinue} disabled={!hasCopied}>Continue</button>
+                            <button className={`btn-continue ${hasCopiedOnce ? 'active' : 'disabled'}`} onClick={handleContinue} disabled={!hasCopiedOnce}>Continue</button>
                         </div>
                     </div>
                 </div>
