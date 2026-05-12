@@ -313,6 +313,14 @@
     line-height: 1.5;
 }
 
+.bridge-config-timer {
+    margin-top: 0.5rem !important;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: #dc2626 !important;
+    font-variant-numeric: tabular-nums;
+}
+
 @keyframes bridge-config-spin {
     to {
         transform: rotate(360deg);

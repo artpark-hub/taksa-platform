@@ -227,6 +227,13 @@
     line-height: 1.5;
 }
 
+.getconfig-queue-timer {
+    margin-top: 0.5rem !important;
+    color: #dc2626 !important;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
 @keyframes getconfig-spin {
     to {
         transform: rotate(360deg);

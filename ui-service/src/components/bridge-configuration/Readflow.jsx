@@ -5,21 +5,20 @@ import { ChevronDown, Copy, Info, Maximize2, Trash2, X } from 'lucide-react';
 import './Readflow.css';
 
 const defaultModbusYaml = `modbus:
-  controller: 'tcp://{{ .IP }}:{{ .PORT }}' # IP address of the Modbus device
+  addresses:
+    - address: 1025
+      name: FirstFlagOfDiscreteInput
+      register: holding
+      type: UINT16
+    - address: 1024
+      name: ZeroElementOfInputRegister
+      register: holding
+      type: UINT16
+  controller: "tcp://{{ .IP }}:{{ .PORT }}"
   slaveIDs:
-    - 1 # Default slave ID. Adjust as necessary
-  timeout: '1s' # Timeout in seconds for connections and requests. Default to 1 second
-  timeBetweenReads: '1s' # Interval at which to read data
-  addresses: # List of registers to read from
-    - name: "FirstFlagOfDiscreteInput"
-      register: "discrete"
-      address: 1
-      type: "BIT"
-      output: "BOOL"
-    - name: "ZeroElementOfInputRegister"
-      register: "input"
-      address: 0
-      type: "UINT16"`;
+    - 1
+  timeBetweenReads: 1s
+  timeout: 1s`;
 
 const defaultOpcuaYaml = `opcua:
   endpoint: 'opc.tcp://{{ .IP }}:{{ .PORT }}' # OPC UA server endpoint
@@ -48,31 +47,16 @@ const Readflow = ({ bridgeConfig, setBridgeConfig }) => {
     const [expandedAlways, setExpandedAlways] = useState(false);
     const [expandedConditions, setExpandedConditions] = useState({});
     const [conditions, setConditions] = useState([
-        { id: 1, condition: '(msg.meta.tag_name || msg.meta.modbus_tag_name || msg.meta.opcua_tag_name) === "FirstFlagOfDiscreteInput"', action: 'msg.payload = Boolean(msg.payload);\nmsg.meta.unit = "bool";\nreturn msg;' },
-        { id: 2, condition: '(msg.meta.tag_name || msg.meta.modbus_tag_name || msg.meta.opcua_tag_name) === "ZeroElementOfInputRegister"', action: 'msg.payload = msg.payload;\nmsg.meta.unit = "raw";\nreturn msg;' }
+        { id: 1, condition: 'msg.meta.modbus_tag_name === "FirstFlagOfDiscreteInput"', action: 'msg.payload = Number(msg.payload) > 0 ? 1 : 0;\nmsg.meta.unit = "raw";\nmsg.meta.modbus_tag_datatype = "uint64";\nmsg.meta.modbus_tag_datatype_json = "number";\nreturn msg;' },
+        { id: 2, condition: 'msg.meta.modbus_tag_name === "ZeroElementOfInputRegister"', action: 'msg.payload = Number(msg.payload);\nmsg.meta.unit = "raw";\nmsg.meta.modbus_tag_datatype = "uint64";\nmsg.meta.modbus_tag_datatype_json = "number";\nreturn msg;' }
     ]);
-    const [defaultsCode, setDefaultsCode] = useState(`// This sample automatically configures the message with proper metadata.
-// It assumes that the incoming message contains tag information in its metadata.
-// 1. Set your location (e.g., "enterprise.site.area.line.workcell.plc123").
-msg.meta.location_path = "{{ .location_path }}";
-
-// 2. Specify the data schema. Here we use the historian schema.
+    const [defaultsCode, setDefaultsCode] = useState(`msg.meta.location_path = "{{ .location_path }}";
 msg.meta.data_contract = "_historian";
-
-// 3. Use the incoming tag metadata as the tag identifier, supporting generic and protocol-specific fields.
-msg.meta.tag_name = msg.meta.tag_name || msg.meta.modbus_tag_name || msg.meta.opcua_tag_name;
-
-// 4. Pass through the incoming payload without modification.
-msg.payload = msg.payload;
-
-// 5. (Optional) Define a virtual grouping path if needed.
+msg.meta.tag_name = msg.meta.modbus_tag_name;
 msg.meta.virtual_path = "";
-
-// 6. Set timestamp_ms to current time (Modbus protocol doesn't provide timestamps)
 msg.meta.timestamp_ms = Date.now();
-
 return msg;`);
-    const [advancedProcessingCode, setAdvancedProcessingCode] = useState('// No advanced processing is needed for this example.\nreturn msg;');
+    const [advancedProcessingCode, setAdvancedProcessingCode] = useState('return msg;');
     const [processingCodeYaml, setProcessingCodeYaml] = useState('');
     const inputYamlRef = useRef(null);
     const injectYamlRef = useRef(null);
@@ -249,9 +233,9 @@ return msg;`);
                 .replace(/\s+$/, '');
         };
 
-        const defaultsMatch = text.match(/(?:^|\n)defaults:\s*\|\n([\s\S]*?)(?=\nconditions:|\nadvancedProcessing:|$)/);
-        const conditionsMatch = text.match(/(?:^|\n)conditions:\s*\n([\s\S]*?)(?=\nadvancedProcessing:|$)/);
-        const advancedMatch = text.match(/(?:^|\n)advancedProcessing:\s*\|\n([\s\S]*?)$/);
+        const advancedMatch = text.match(/(?:^|\n)advancedProcessing:\s*\|-?\n([\s\S]*?)(?=\nconditions:|\n$)/);
+        const conditionsMatch = text.match(/(?:^|\n)conditions:\s*\n([\s\S]*?)(?=\ndefaults:|\n$)/);
+        const defaultsMatch = text.match(/(?:^|\n)defaults:\s*\|\n([\s\S]*?)$/);
 
         if (!defaultsMatch && !conditionsMatch && !advancedMatch) {
             return null;
@@ -291,14 +275,12 @@ return msg;`);
             .map((cond) => `  - if: ${cond.condition}\n    then: |\n${cond.action.split('\n').map((line) => `      ${line}`).join('\n')}`)
             .join('\n');
 
-        return `defaults: |
-${defaultsCode.split('\n').map((line) => `  ${line}`).join('\n')}
-
+        return `advancedProcessing: |-
+  ${advancedProcessingCode.split('\n').map((line) => line).join('\n  ')}
 conditions:
 ${conditionsYaml}
-
-advancedProcessing: |
-${advancedProcessingCode.split('\n').map((line) => `  ${line}`).join('\n')}`;
+defaults: |
+${defaultsCode.split('\n').map((line) => `  ${line}`).join('\n')}`;
     };
 
     useEffect(() => {
