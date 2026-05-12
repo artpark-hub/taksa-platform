@@ -16,8 +16,9 @@ COPY --chown=taksa:taksa configs ./configs
 
 USER taksa
 
+# Use GET (-O /dev/null), not wget --spider: spider sends HEAD and Kratos only registers GET for /health → 404.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8000/ || exit 1
+    CMD wget --no-verbose --tries=1 -O /dev/null http://localhost:8000/health || exit 1
 
 EXPOSE 8000 9000
 

@@ -26,7 +26,8 @@ services:
       - taksa-network
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/" ]
+      # GET required: --spider uses HEAD; /health has no HEAD route → 404.
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8000/health" ]
       interval: 10s
       timeout: 3s
       retries: 3
