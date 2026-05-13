@@ -157,7 +157,9 @@ const GrafanaDashboard = ({ deviceId = null }) => {
         try {
             const iframe = iframeRef.current;
             const doc = iframe?.contentDocument || iframe?.contentWindow?.document;
-            if (!doc) return;
+            const iframeWindow = iframe?.contentWindow;
+
+            if (!doc || !iframeWindow) return;
 
             const styleId = 'taksa-hide-grafana-chrome';
             let style = doc.getElementById(styleId);
@@ -173,65 +175,223 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                 [data-testid="sidemenu-toggle"],
                 [data-testid="nav-toggle"],
                 [data-testid="menu-toggle"],
+                [data-testid="mega-menu"],
+                [data-testid="mega-menu-drawer"],
+                [data-testid="navigation-menu"],
+                [data-testid="main-navigation"],
+                [aria-label="Main menu"],
+                [aria-label="Main navigation"],
                 nav[aria-label*="navigation" i],
                 nav[aria-label*="main" i],
+                aside[aria-label*="navigation" i],
+                aside[aria-label*="menu" i],
                 [class*="sidemenu"],
                 [class*="SideMenu"],
+                [class*="mega-menu"],
+                [class*="MegaMenu"],
+                [class*="NavMenu"],
+                [class*="navigation-menu"],
+                [class*="MainNavigation"] {
+                    display: none !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                }
+
+                button[aria-label*="menu" i],
+                button[aria-label*="navigation" i],
+                button[aria-label*="main menu" i],
+                button[aria-label*="open menu" i],
+                header button[aria-label*="menu" i],
+                header button[aria-label*="navigation" i],
+                [role="banner"] button[aria-label*="menu" i],
+                [role="banner"] button[aria-label*="navigation" i] {
+                    display: none !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                }
+
+                header a[href="/grafana"],
+                header a[href="/grafana/"],
+                [role="banner"] a[href="/grafana"],
+                [role="banner"] a[href="/grafana/"],
+                header a[aria-label*="Home" i],
+                [role="banner"] a[aria-label*="Home" i],
+                header [aria-label*="Grafana" i],
+                [role="banner"] [aria-label*="Grafana" i],
+                [data-testid="grafana-logo"],
+                [class*="grafana-logo"],
+                [class*="GrafanaLogo"] {
+                    display: none !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                }
+
+                a[href*="/grafana/login"],
+                a[href*="/login"],
+                [aria-label*="sign in" i],
+                [aria-label*="Sign in" i],
+                [title*="Sign in" i],
+                [title*="sign in" i] {
+                    display: none !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                }
+
                 [class*="powered-by"],
                 a[href*="grafana.com"],
                 [role="contentinfo"] {
                     display: none !important;
-                }
-
-                header:has(a[href*="/grafana/dashboards"]),
-                header:has(a[href*="/dashboards"]),
-                header:has(a[href*="/grafana/login"]),
-                header:has(a[href*="/login"]),
-                header:has(nav[aria-label*="breadcrumb" i]),
-                header:has(button[aria-label*="search" i]),
-                [role="banner"]:has(a[href*="/grafana/dashboards"]),
-                [role="banner"]:has(a[href*="/dashboards"]),
-                [role="banner"]:has(a[href*="/grafana/login"]),
-                [role="banner"]:has(a[href*="/login"]),
-                [role="banner"]:has(nav[aria-label*="breadcrumb" i]),
-                [role="banner"]:has(button[aria-label*="search" i]),
-                [data-testid="page-header"],
-                [data-testid="page-toolbar"],
-                [data-testid="topnav"],
-                [data-testid="top-nav"],
-                [data-testid="nav-toolbar"],
-                [class*="TopNav"],
-                [class*="topnav"],
-                [class*="PageToolbar"],
-                [class*="page-toolbar"] {
-                    display: none !important;
-                }
-
-                header nav[aria-label*="breadcrumb" i],
-                header a[href*="/grafana/dashboards"],
-                header a[href*="/dashboards"],
-                header a[href*="/grafana/login"],
-                header a[href*="/login"],
-                header button[aria-label*="search" i],
-                header button[aria-label*="create" i],
-                header button[aria-label*="new" i],
-                header button[aria-label*="help" i],
-                header [aria-label*="sign in" i],
-                header [data-testid*="breadcrumb" i],
-                [role="banner"] nav[aria-label*="breadcrumb" i],
-                [role="banner"] a[href*="/grafana/dashboards"],
-                [role="banner"] a[href*="/dashboards"],
-                [role="banner"] a[href*="/grafana/login"],
-                [role="banner"] a[href*="/login"],
-                [role="banner"] button[aria-label*="search" i],
-                [role="banner"] button[aria-label*="create" i],
-                [role="banner"] button[aria-label*="new" i],
-                [role="banner"] button[aria-label*="help" i],
-                [role="banner"] [aria-label*="sign in" i],
-                [role="banner"] [data-testid*="breadcrumb" i] {
-                    display: none !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
                 }
             `;
+
+            const hideElement = (element) => {
+                if (!element) return;
+
+                element.style.display = 'none';
+                element.style.visibility = 'hidden';
+                element.style.pointerEvents = 'none';
+            };
+
+            const hideOpenSideNavigation = () => {
+                const navLinks = Array.from(
+                    doc.querySelectorAll(
+                        [
+                            'a[href*="/grafana/dashboards"]',
+                            'a[href*="/grafana/explore"]',
+                            'a[href*="/grafana/alerting"]',
+                            'a[href*="/grafana/connections"]',
+                            'a[href*="/grafana/admin"]',
+                            'a[href*="/dashboards"]',
+                            'a[href*="/explore"]',
+                            'a[href*="/alerting"]',
+                            'a[href*="/connections"]',
+                            'a[href*="/admin"]',
+                        ].join(',')
+                    )
+                );
+
+                navLinks.forEach((link) => {
+                    let element = link.parentElement;
+                    let drawerElement = null;
+                    let overlayElement = null;
+
+                    while (element && element !== doc.body) {
+                        const rect = element.getBoundingClientRect();
+                        const computedStyle = iframeWindow.getComputedStyle(element);
+                        const role = element.getAttribute('role') || '';
+                        const ariaModal = element.getAttribute('aria-modal') || '';
+
+                        if (
+                            rect.width >= 220 &&
+                            rect.width <= 700 &&
+                            rect.height >= iframeWindow.innerHeight * 0.5 &&
+                            rect.left <= 160
+                        ) {
+                            drawerElement = element;
+                        }
+
+                        if (
+                            (
+                                role === 'dialog' ||
+                                ariaModal === 'true' ||
+                                computedStyle.position === 'fixed'
+                            ) &&
+                            rect.height >= iframeWindow.innerHeight * 0.5 &&
+                            rect.left <= 10
+                        ) {
+                            overlayElement = element;
+                        }
+
+                        element = element.parentElement;
+                    }
+
+                    hideElement(drawerElement);
+
+                    if (
+                        overlayElement &&
+                        overlayElement !== doc.body &&
+                        overlayElement !== doc.documentElement
+                    ) {
+                        hideElement(overlayElement);
+                    }
+                });
+            };
+
+            const hideGrafanaLogo = () => {
+                const headerElements = Array.from(
+                    doc.querySelectorAll('header *, [role="banner"] *')
+                );
+
+                headerElements.forEach((element) => {
+                    const rect = element.getBoundingClientRect();
+                    const href = element.getAttribute('href') || '';
+                    const ariaLabel = element.getAttribute('aria-label') || '';
+                    const title = element.getAttribute('title') || '';
+
+                    const isLogoLike =
+                        href === '/grafana' ||
+                        href === '/grafana/' ||
+                        ariaLabel.toLowerCase().includes('grafana') ||
+                        title.toLowerCase().includes('grafana');
+
+                    if (
+                        isLogoLike &&
+                        rect.left <= 120 &&
+                        rect.top <= 80
+                    ) {
+                        hideElement(element.closest('a') || element);
+                    }
+                });
+            };
+
+            const hideSignIn = () => {
+                const signInElements = Array.from(
+                    doc.querySelectorAll(
+                        [
+                            'a[href*="/grafana/login"]',
+                            'a[href*="/login"]',
+                            '[aria-label*="sign in" i]',
+                            '[title*="sign in" i]',
+                            'header *',
+                            '[role="banner"] *',
+                        ].join(',')
+                    )
+                );
+
+                signInElements.forEach((element) => {
+                    const text = element.textContent?.trim().toLowerCase() || '';
+                    const href = element.getAttribute('href') || '';
+                    const ariaLabel = element.getAttribute('aria-label') || '';
+                    const title = element.getAttribute('title') || '';
+                    const rect = element.getBoundingClientRect();
+
+                    const isSignIn =
+                        text === 'sign in' ||
+                        href.includes('/login') ||
+                        href.includes('/grafana/login') ||
+                        ariaLabel.toLowerCase().includes('sign in') ||
+                        title.toLowerCase().includes('sign in');
+
+                    if (
+                        isSignIn &&
+                        rect.top <= 120
+                    ) {
+                        const control =
+                            element.closest('a') ||
+                            element.closest('button') ||
+                            element.closest('[role="button"]') ||
+                            element;
+
+                        hideElement(control);
+                    }
+                });
+            };
+
+            hideOpenSideNavigation();
+            hideGrafanaLogo();
+            hideSignIn();
         } catch (error) {
             console.warn('Could not hide Grafana chrome:', error);
         }

@@ -24,6 +24,8 @@ const Getconfig = () => {
     const [queueMessage, setQueueMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [queueTimer, setQueueTimer] = useState(0);
+    const queueCountdown = Math.max(60 - queueTimer, 0);
 
     const hasChanges = useMemo(() => configValue !== initialConfigValue, [configValue, initialConfigValue]);
 
@@ -47,8 +49,22 @@ const Getconfig = () => {
         };
     }, []);
 
+    useEffect(() => {
+        if (!isQueued) {
+            setQueueTimer(0);
+            return;
+        }
+
+        setQueueTimer(0);
+        const interval = setInterval(() => {
+            setQueueTimer((prev) => prev + 1);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isQueued]);
+
     const pollConfigActionResult = async (actionId, cancelledRef) => {
-        for (let attempt = 0; attempt < 60; attempt += 1) {
+        for (let attempt = 0; attempt < 20; attempt += 1) {
             if (cancelledRef?.current || !isMountedRef.current) {
                 return null;
             }
@@ -84,13 +100,22 @@ const Getconfig = () => {
     };
 
     const queueGetConfig = async (cancelledRef) => {
-        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(deviceId)}/config`, {
-            method: 'GET',
-            headers: {
-                Accept: 'application/json'
-            },
-            credentials: 'include'
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        let response;
+
+        try {
+            response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(deviceId)}/config`, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json'
+                },
+                credentials: 'include',
+                signal: controller.signal
+            });
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         const data = await response.json().catch(() => ({}));
 
@@ -317,6 +342,7 @@ const Getconfig = () => {
                         <div className="getconfig-loader"></div>
                         <h3>{queueMessage}</h3>
                         <p>The config action has been queued and we are waiting for the device response.</p>
+                        <p className="getconfig-queue-timer">Time left: {queueCountdown}s</p>
                     </div>
                 </div>
             )}

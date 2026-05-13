@@ -20,6 +20,8 @@ const BridgeConfiguration = () => {
     const [isDeploying, setIsDeploying] = useState(false);
     const [deployMessage, setDeployMessage] = useState('');
     const [deployError, setDeployError] = useState('');
+    const [deployTimer, setDeployTimer] = useState(0);
+    const deployCountdown = Math.max(60 - deployTimer, 0);
 
     const [bridgeConfig, setBridgeConfig] = useState({
         name: '',
@@ -138,8 +140,22 @@ const BridgeConfiguration = () => {
         };
     };
 
+    useEffect(() => {
+        if (!isDeploying) {
+            setDeployTimer(0);
+            return;
+        }
+
+        setDeployTimer(0);
+        const interval = setInterval(() => {
+            setDeployTimer((prev) => prev + 1);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isDeploying]);
+
     const pollProtocolConverterActionResult = async (actionId) => {
-        for (let attempt = 0; attempt < 60; attempt += 1) {
+        for (let attempt = 0; attempt < 20; attempt += 1) {
             const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(actionId)}/result`, {
                 method: 'GET',
                 headers: {
@@ -214,13 +230,22 @@ const BridgeConfiguration = () => {
             }
 
             try {
-                const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}`, {
-                    method: 'GET',
-                    headers: {
-                        Accept: 'application/json'
-                    },
-                    credentials: 'include'
-                });
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+                let response;
+                try {
+                    response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}`, {
+                        method: 'GET',
+                        headers: {
+                            Accept: 'application/json'
+                        },
+                        credentials: 'include',
+                        signal: controller.signal
+                    });
+                } finally {
+                    clearTimeout(timeoutId);
+                }
 
                 const data = await response.json().catch(() => ({}));
 
@@ -323,18 +348,7 @@ const BridgeConfiguration = () => {
                     },
                     location,
                     meta: {
-                        processingMode: 'streaming',
                         protocol: sanitizeProtocolMeta(bridgeConfig?.protocol)
-                    },
-                    templateInfo: {
-                        variables: [
-                            {
-                                label: 'location_path',
-                                value: getLocationPathValue(location)
-                            }
-                        ],
-                        rootUUID: '00000000-0000-0000-0000-000000000000',
-                        isTemplated: false
                     }
                 };
 
@@ -377,7 +391,8 @@ const BridgeConfiguration = () => {
                         port: Number.isFinite(parsedPort) ? parsedPort : 0
                     },
                     location,
-                    readDfc: {
+                    readDFC: {
+                        ignoreErrors: true,
                         inputs: {
                             type: String(bridgeConfig?.readInputType || bridgeConfig?.protocol || 'modbus').toLowerCase(),
                             data: toMultilineString(bridgeConfig?.readInputYaml)
@@ -393,8 +408,16 @@ const BridgeConfiguration = () => {
                         },
                         rawYAML: {
                             data: toMultilineString(bridgeConfig?.readRawYamlInject, 'buffer:\n  none: {}')
-                        },
-                        ignoreErrors: false
+                        }
+                    },
+                    templateInfo: {
+                        variables: [
+                            { label: 'IP', value: bridgeConfig?.ipAddress || '' },
+                            { label: 'PORT', value: String(parsedPort || '') }
+                        ]
+                    },
+                    meta: {
+                        protocol: sanitizeProtocolMeta(bridgeConfig?.protocol)
                     }
                 };
 
@@ -550,6 +573,7 @@ const BridgeConfiguration = () => {
                         <div className="bridge-config-loader"></div>
                         <h3>{deployMessage}</h3>
                         <p>The deployment action has been queued and we are waiting for the device response.</p>
+                        <p className="bridge-config-timer">Time left: {deployCountdown}s</p>
                     </div>
                 </div>
             )}

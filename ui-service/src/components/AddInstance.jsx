@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft, Copy, Check, AlertCircle, Plus, Trash2, X } from 'lucide-react';
 import './AddInstance.css';
 
+const INSTALL_MODAL_CACHE_KEY = 'taksa_install_modal_state';
+
 const AddInstance = () => {
     const router = useRouter();
     const [instanceName, setInstanceName] = useState('');
@@ -14,6 +16,7 @@ const AddInstance = () => {
 
     const [showModal, setShowModal] = useState(false);
     const [hasCopied, setHasCopied] = useState(false);
+    const [hasCopiedOnce, setHasCopiedOnce] = useState(false);
     const [errors, setErrors] = useState({});
     const [formError, setFormError] = useState('');
     const [copyError, setCopyError] = useState('');
@@ -34,7 +37,52 @@ const AddInstance = () => {
             console.error("Error loading user data", error);
             setFormError('Failed to load user data. Please refresh and try again.');
         }
+
+        try {
+            const cachedModalState = sessionStorage.getItem(INSTALL_MODAL_CACHE_KEY);
+            if (!cachedModalState) {
+                return;
+            }
+
+            const parsedCache = JSON.parse(cachedModalState);
+            if (parsedCache?.dockerCommand) {
+                setCreatedDeviceResponse({ instructions: { docker_command: parsedCache.dockerCommand } });
+                setShowModal(Boolean(parsedCache.showModal));
+                setHasCopied(false);
+                setHasCopiedOnce(false);
+            }
+        } catch (error) {
+            console.error('Error restoring modal state', error);
+        }
     }, []);
+
+    useEffect(() => {
+        try {
+            if (!dockerCommand || !showModal) {
+                sessionStorage.removeItem(INSTALL_MODAL_CACHE_KEY);
+                return;
+            }
+
+            sessionStorage.setItem(INSTALL_MODAL_CACHE_KEY, JSON.stringify({
+                dockerCommand,
+                showModal
+            }));
+        } catch (error) {
+            console.error('Error caching modal state', error);
+        }
+    }, [dockerCommand, showModal]);
+
+    useEffect(() => {
+        if (!hasCopied || !showModal) {
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            setHasCopied(false);
+        }, 5000);
+
+        return () => clearTimeout(timeoutId);
+    }, [hasCopied, showModal]);
 
     const handleBack = () => { router.back(); };
 
@@ -90,6 +138,7 @@ const AddInstance = () => {
         setFormError('');
         setCopyError('');
         setHasCopied(false);
+        setHasCopiedOnce(false);
         setIsSubmitting(true);
 
         try {
@@ -133,6 +182,8 @@ const AddInstance = () => {
 
             setCreatedDeviceResponse(data);
             setShowModal(true);
+            setHasCopied(false);
+            setHasCopiedOnce(false);
         } catch (error) {
             console.error('Failed to create Data Collecting Device (DCD):', error);
             setFormError(error.message || 'Failed to create Data Collecting Device (DCD). Please try again.');
@@ -143,7 +194,15 @@ const AddInstance = () => {
 
     const handleCloseModal = () => {
         setShowModal(false);
+        setHasCopied(false);
+        setHasCopiedOnce(false);
         setCopyError('');
+        setCreatedDeviceResponse(null);
+        try {
+            sessionStorage.removeItem(INSTALL_MODAL_CACHE_KEY);
+        } catch (error) {
+            console.error('Error clearing modal cache', error);
+        }
     };
 
     const handleCopyCommand = async () => {
@@ -157,6 +216,7 @@ const AddInstance = () => {
             if (navigator?.clipboard?.writeText) {
                 await navigator.clipboard.writeText(dockerCommand);
                 setHasCopied(true);
+                setHasCopiedOnce(true);
             } else {
                 const textArea = document.createElement("textarea");
                 textArea.value = dockerCommand;
@@ -169,6 +229,7 @@ const AddInstance = () => {
                 try {
                     document.execCommand('copy');
                     setHasCopied(true);
+                    setHasCopiedOnce(true);
                 } catch (err) {
                     console.error('Fallback: Oops, unable to copy', err);
                     setCopyError('Failed to copy the docker command. Please copy it manually.');
@@ -182,7 +243,10 @@ const AddInstance = () => {
     };
 
     const handleContinue = () => {
-        if (hasCopied) {
+        if (hasCopiedOnce) {
+            setHasCopied(false);
+            setHasCopiedOnce(false);
+            setCopyError('');
             router.push('/dashboard/Edge-devices');
         }
     };
@@ -315,7 +379,7 @@ const AddInstance = () => {
                             <AlertCircle size={20} className="note-icon" />
                             <div className="note-text">
                                 <span className="note-title">Note</span>
-                                The installation command applies only to your current session and will be shown just once. Data is stored in a Docker volume named 'umh-core-data'. To use a different volume name, update it in the command or compose file. On Linux, you may need to prefix with 'sudo' or ensure your user is in the 'docker' group.
+                                You can copy this installation command whenever needed while this dialog is available. Data is stored in a Docker volume named 'umh-core-data'. To use a different volume name, update it in the command or compose file. On Linux, you may need to prefix with 'sudo' or ensure your user is in the 'docker' group.
                             </div>
                         </div>
                         <div className="tab-track"><button className="tab-btn-pill">Docker Run</button></div>
@@ -327,7 +391,7 @@ const AddInstance = () => {
                         </div>
                         {copyError && <div className="error-text" style={{ marginTop: '10px' }}>{copyError}</div>}
                         <div className="modal-actions">
-                            <button className={`btn-continue ${hasCopied ? 'active' : 'disabled'}`} onClick={handleContinue} disabled={!hasCopied}>Continue</button>
+                            <button className={`btn-continue ${hasCopiedOnce ? 'active' : 'disabled'}`} onClick={handleContinue} disabled={!hasCopiedOnce}>Continue</button>
                         </div>
                     </div>
                 </div>
