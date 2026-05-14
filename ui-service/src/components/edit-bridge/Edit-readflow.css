@@ -68,6 +68,7 @@
     margin-bottom: var(--space-xl);
 }
 
+.bridge-readflow-section-card p a,
 .bridge-readflow-section-card p button {
     background: transparent;
     border: none;

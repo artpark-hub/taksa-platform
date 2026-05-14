@@ -218,11 +218,11 @@ const Bridges = () => {
             const hasError = Boolean(data?.errorMessage);
             const hasResult = Boolean(data?.result);
 
-            if (hasError || statusText.includes('FAILED') || statusText === '3') {
+            if (hasError || statusText.includes('FAILED') || statusText === '5') {
                 throw new Error(getErrorMessage(data, 'Bridge deletion failed.'));
             }
 
-            if (statusText.includes('COMPLETED') || statusText === '2' || hasCompletedAt || hasResult) {
+            if (statusText.includes('COMPLETED') || statusText === '4' || statusText === '2' || hasCompletedAt || hasResult) {
                 return data;
             }
 
@@ -469,12 +469,12 @@ const Bridges = () => {
             )}
 
             {isDeleting && (
-                <div className="bridge-config-queue-overlay">
-                    <div className="bridge-config-queue-modal">
-                        <div className="bridge-config-loader"></div>
+                <div className="bridge-list-queue-overlay">
+                    <div className="bridge-list-queue-modal">
+                        <div className="bridge-list-loader"></div>
                         <h3>Deleting {deleteBridgeName}, kindly wait.</h3>
                         <p>The delete action has been queued and we are waiting for the device response.</p>
-                        <p className="bridge-config-timer">Time left: {deleteCountdown}s</p>
+                        <p className="bridge-list-timer">Time left: {deleteCountdown}s</p>
                     </div>
                 </div>
             )}

@@ -44,6 +44,7 @@ const EditBridge = () => {
         templateVariables: []
     });
     const initialBridgeConfigRef = useRef(null);
+    const loadedProtocolConverterRef = useRef(null);
 
     const normalizeBridgeConfig = (config) => {
         const levels = Array.isArray(config?.levels)
@@ -141,16 +142,17 @@ const EditBridge = () => {
             .filter((level) => Number.isInteger(level?.index))
             .sort((a, b) => a.index - b.index);
 
-        if (normalizedLevels.length > 0) {
-            return normalizedLevels.reduce((acc, level) => {
-                acc[String(level.index)] = String(level?.value || '');
+        return normalizedLevels.reduce(
+            (acc, level) => {
+                if (Number(level.index) > 0) {
+                    acc[String(level.index)] = String(level?.value || '');
+                }
                 return acc;
-            }, {});
-        }
-
-        return {
-            '0': String(bridgeConfig?.level0 || '')
-        };
+            },
+            {
+                '0': String(bridgeConfig?.level0 || '')
+            }
+        );
     };
 
     useEffect(() => {
@@ -204,19 +206,25 @@ const EditBridge = () => {
             const hasError = Boolean(data?.errorMessage);
             const hasResult = Boolean(data?.result);
 
-            if (hasError || statusText.includes('FAILED') || statusText === '3') {
+            if (hasError || statusText.includes('FAILED') || statusText === '5') {
                 const errMsg = data?.errorMessage || data?.error?.message || data?.message || 'Bridge configuration retrieval failed.';
                 throw new Error(errMsg);
             }
 
-            if (statusText.includes('COMPLETED') || statusText === '2' || hasCompletedAt || hasResult) {
+            const isCompleted = statusText.includes('COMPLETED') || statusText === '4' || statusText === '2' || hasCompletedAt;
+
+            if (hasResult) {
                 return data;
+            }
+
+            if (isCompleted) {
+                throw new Error('Bridge configuration retrieval completed without result data.');
             }
 
             await wait(3000);
         }
 
-        throw new Error('Getting bridge configuration timed out after 45 seconds. Please try again.');
+        throw new Error(`Getting bridge configuration timed out after ${maxWaitSeconds} seconds. Please try again.`);
     };
 
     const queueProtocolConverterUpdate = async (converterUuid, editPayload) => {
@@ -291,6 +299,7 @@ const EditBridge = () => {
                 if (cancelled) return;
 
                 const result = resultData?.result || resultData;
+                loadedProtocolConverterRef.current = result && typeof result === 'object' ? result : null;
                 const levels = result?.location || {};
 
                 const normalizedLevels = Object.entries(levels)
@@ -308,7 +317,10 @@ const EditBridge = () => {
                 const inputData = result?.readDFC?.inputs?.data || '';
                 const rawYamlData = result?.readDFC?.rawYAML?.data || 'buffer:\n  none: {}';
 
-                const rawMetaProtocol = String(result?.meta?.protocol || 'modbus_tcp').toLowerCase();
+                const rawMetaProtocol = sanitizeProtocolMeta(result?.meta?.protocol || 'modbus_tcp');
+                const loadedInputType = String(result?.readDFC?.inputs?.type || '').trim().toLowerCase();
+                const resolvedInputType = loadedInputType || (rawMetaProtocol === 'opcua' ? 'opcua' : 'modbus');
+                const resolvedProtocolLabel = rawMetaProtocol === 'opcua' ? 'OPCUA' : 'Modbus';
                 const templateVariables = Array.isArray(result?.templateInfo?.variables)
                     ? result.templateInfo.variables
                     : [];
@@ -327,11 +339,11 @@ const EditBridge = () => {
                     instance: selectedDeviceName,
                     level0: String(levels?.['0'] || ''),
                     levels: normalizedLevels,
-                    protocol: rawMetaProtocol,
+                    protocol: resolvedProtocolLabel,
                     dataType: 'Time Series',
                     ipAddress: ip,
                     port: port,
-                    readInputType: rawMetaProtocol,
+                    readInputType: resolvedInputType,
                     readInputYaml: inputData,
                     readProcessorType: 'tag_processor',
                     readProcessorYaml: processorData,
@@ -381,11 +393,30 @@ const EditBridge = () => {
         return JSON.stringify(normalizeBridgeConfig(bridgeConfig)) !== JSON.stringify(initialBridgeConfigRef.current);
     }, [bridgeConfig]);
 
+    const isBridgeConfigValid = useMemo(() => {
+        const hasName = String(bridgeConfig?.name || '').trim().length > 0;
+        const hasLevel0 = String(bridgeConfig?.level0 || '').trim().length > 0;
+        const hasIp = String(bridgeConfig?.ipAddress || '').trim().length > 0;
+        const hasInputYaml = String(bridgeConfig?.readInputYaml || '').trim().length > 0;
+        const hasProcessorYaml = String(bridgeConfig?.readProcessorYaml || '').trim().length > 0;
+        const parsedPort = Number.parseInt(String(bridgeConfig?.port || ''), 10);
+        const hasValidPort = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535;
+
+        return hasName && hasLevel0 && hasIp && hasValidPort && hasInputYaml && hasProcessorYaml;
+    }, [
+        bridgeConfig?.name,
+        bridgeConfig?.level0,
+        bridgeConfig?.ipAddress,
+        bridgeConfig?.port,
+        bridgeConfig?.readInputYaml,
+        bridgeConfig?.readProcessorYaml
+    ]);
+
     const isOnReadflow = activeTab === 'readflow';
     const isStep3Active = isOnReadflow && isStep3Ready;
     const isSaveDeployEnabled = useMemo(() => {
-        return hasChanges && !isLoadingConfig;
-    }, [hasChanges, isLoadingConfig]);
+        return hasChanges && isBridgeConfigValid && !isLoadingConfig;
+    }, [hasChanges, isBridgeConfigValid, isLoadingConfig]);
 
     const handleBack = () => {
         router.back();
@@ -398,6 +429,11 @@ const EditBridge = () => {
 
         if (!selectedDeviceId || !bridgeId) {
             setDeployError('Device or bridge id is missing. Please try again.');
+            return;
+        }
+
+        if (!isBridgeConfigValid) {
+            setDeployError('Please fill all required fields with valid values before updating.');
             return;
         }
 
@@ -420,37 +456,58 @@ const EditBridge = () => {
                     return v;
                 });
 
+                const loadedConverter = loadedProtocolConverterRef.current && typeof loadedProtocolConverterRef.current === 'object'
+                    ? loadedProtocolConverterRef.current
+                    : {};
+                const loadedConnection = loadedConverter?.connection || {};
+                const loadedReadDFC = loadedConverter?.readDFC || {};
+                const loadedPipeline = loadedReadDFC?.pipeline || {};
+                const loadedProcessors = loadedPipeline?.processors || {};
+                const loadedProcessor0 = loadedProcessors?.['0'] || {};
+                const loadedTemplateInfo = loadedConverter?.templateInfo || {};
+                const loadedMeta = loadedConverter?.meta || {};
+
                 const editPayload = {
-                    uuid: bridgeId,
+                    ...loadedConverter,
+                    uuid: loadedConverter?.uuid || bridgeId,
                     name: bridgeConfig?.name || '',
                     connection: {
+                        ...loadedConnection,
                         ip: currentIp,
                         port: portNum
                     },
                     location,
                     readDFC: {
+                        ...loadedReadDFC,
                         ignoreErrors: true,
                         inputs: {
+                            ...(loadedReadDFC?.inputs || {}),
                             type: String(bridgeConfig?.readInputType || bridgeConfig?.metaProtocol || 'modbus').toLowerCase(),
                             data: toMultilineString(bridgeConfig?.readInputYaml)
                         },
                         pipeline: {
+                            ...loadedPipeline,
                             threads: -1,
                             processors: {
+                                ...loadedProcessors,
                                 '0': {
+                                    ...loadedProcessor0,
                                     type: String(bridgeConfig?.readProcessorType || 'tag_processor').toLowerCase(),
                                     data: toMultilineString(bridgeConfig?.readProcessorYaml)
                                 }
                             }
                         },
                         rawYAML: {
+                            ...(loadedReadDFC?.rawYAML || {}),
                             data: toMultilineString(bridgeConfig?.readRawYamlInject)
                         }
                     },
                     templateInfo: {
+                        ...loadedTemplateInfo,
                         variables: syncedVars
                     },
                     meta: {
+                        ...loadedMeta,
                         protocol: bridgeConfig?.metaProtocol || 'modbus_tcp'
                     }
                 };
@@ -490,7 +547,7 @@ const EditBridge = () => {
             )}
             <div className="bridge-config-header">
                 <div className="bridge-config-header-left">
-                    <button className="bridge-config-back-btn" onClick={handleBack}>
+                    <button className="bridge-config-back-btn" onClick={handleBack} aria-label="Back">
                         <ArrowLeft size={22} />
                     </button>
 
