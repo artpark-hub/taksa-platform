@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc"
@@ -20,8 +21,120 @@ const (
 	AuthorizationHeader        = "authorization"
 	TenantIDContextKey  ctxKey = "tenant_id"
 	DeviceIDContextKey  ctxKey = "device_id"
-	BearerScheme               = "Bearer"
+	// deviceJWTVerifiedCtxKey is set when the request carried a device JWT whose signature
+	// was verified by this service (HTTP cookie, verified Authorization HS256 from Login, or gRPC equivalent).
+	// Edge Instance APIs require this before handlers run (see grpcAuthContext and HTTP tenant middleware).
+	deviceJWTVerifiedCtxKey ctxKey = "device_jwt_signature_verified"
+	BearerScheme                   = "Bearer"
+
+	grpcInstanceServicePrefix = "/api.umh_core.v2.InstanceService/"
 )
+
+const grpcJWTLeeway = 2 * time.Minute
+
+// MarkDeviceJWTSignatureVerified returns a child context that marks the device JWT as
+// cryptographically verified (issued by Login, same secret as Verify paths).
+func MarkDeviceJWTSignatureVerified(ctx context.Context) context.Context {
+	return context.WithValue(ctx, deviceJWTVerifiedCtxKey, true)
+}
+
+// IsDeviceJWTSignatureVerified reports whether the device identity came from a
+// signature-verified device JWT (not merely parsed/unverified bearer claims).
+// Instance device traffic enforces this at the HTTP and gRPC boundaries; callers may
+// still use this for defense in depth or tests.
+func IsDeviceJWTSignatureVerified(ctx context.Context) bool {
+	v, _ := ctx.Value(deviceJWTVerifiedCtxKey).(bool)
+	return v
+}
+
+func isGRPCInstanceLogin(fullMethod string) bool {
+	return strings.HasSuffix(fullMethod, "InstanceService/Login")
+}
+
+// tryVerifyDeviceJWTHS256 validates a JWT issued by device-management Login (HS256, server secret).
+func tryVerifyDeviceJWTHS256(tokenString, jwtSecret string) (tenantID, deviceID string, ok bool) {
+	if jwtSecret == "" || tokenString == "" {
+		return "", "", false
+	}
+	claims := jwt.MapClaims{}
+	parser := jwt.NewParser(
+		jwt.WithLeeway(grpcJWTLeeway),
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+	)
+	token, err := parser.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return "", "", false
+	}
+	tid, _ := claims["tenant_id"].(string)
+	did, _ := claims["device_id"].(string)
+	if tid == "" || did == "" {
+		return "", "", false
+	}
+	return tid, did, true
+}
+
+func grpcAuthContext(ctx context.Context, fullMethod, jwtSecret string) (context.Context, error) {
+	// Login uses the raw auth token (not a JWT); do not parse Authorization as JWT.
+	if isGRPCInstanceLogin(fullMethod) {
+		return ctx, nil
+	}
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "missing metadata")
+	}
+
+	authHeaders := md.Get(AuthorizationHeader)
+	if len(authHeaders) == 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing authorization header")
+	}
+
+	token := extractBearerToken(authHeaders[0])
+	if token == "" {
+		return nil, status.Error(codes.Unauthenticated, "invalid authorization header format")
+	}
+
+	var tenantID, deviceID string
+	verified := false
+
+	if tid, did, ok := tryVerifyDeviceJWTHS256(token, jwtSecret); ok {
+		tenantID, deviceID, verified = tid, did, true
+	} else {
+		claims := jwt.MapClaims{}
+		_, _, err := new(jwt.Parser).ParseUnverified(token, claims)
+		if err != nil {
+			return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("failed to parse JWT: %v", err))
+		}
+		var tok bool
+		tenantID, tok = claims["tenant_id"].(string)
+		if !tok || tenantID == "" {
+			return nil, status.Error(codes.PermissionDenied, "missing or invalid tenant_id in JWT claims")
+		}
+		deviceID, _ = claims["device_id"].(string)
+	}
+
+	if strings.HasPrefix(fullMethod, grpcInstanceServicePrefix) {
+		if deviceID == "" {
+			return nil, status.Error(codes.PermissionDenied, "missing or invalid device_id in JWT claims")
+		}
+	}
+
+	ctx = context.WithValue(ctx, TenantIDContextKey, tenantID)
+	if deviceID != "" {
+		ctx = context.WithValue(ctx, DeviceIDContextKey, deviceID)
+	}
+	if verified {
+		ctx = MarkDeviceJWTSignatureVerified(ctx)
+	}
+	// Edge Instance RPCs must not rely on forgeable unverified JWT claims.
+	if strings.HasPrefix(fullMethod, grpcInstanceServicePrefix) && !isGRPCInstanceLogin(fullMethod) && !verified {
+		return nil, status.Error(codes.Unauthenticated,
+			"instance service requires a Login-issued device JWT (HS256) verified by this service")
+	}
+	return ctx, nil
+}
 
 // ExtractClaimsFromJWT extracts tenant_id and device_id from JWT claims in Authorization header
 // Assumes JWT has been pre-validated by upstream auth gateway (Oathkeeper)
@@ -79,73 +192,37 @@ func TenantFromJWT(ctx context.Context) (string, error) {
 	return tenantID, err
 }
 
-// UnaryInterceptor is a gRPC unary interceptor that extracts tenant_id and device_id from JWT
-// and stores them in the request context
-func UnaryInterceptor() grpc.UnaryServerInterceptor {
+// UnaryInterceptor returns a gRPC unary interceptor that extracts tenant_id and device_id from JWT
+// and stores them in the request context. When jwtSecret is set, HS256 Login-issued JWTs are
+// signature-verified and IsDeviceJWTSignatureVerified(ctx) is true for those requests.
+func UnaryInterceptor(jwtSecret string) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req interface{},
 		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (interface{}, error) {
-		// Extract tenant_id and device_id from JWT
-		tenantID, deviceID, err := ExtractClaimsFromJWT(ctx)
+		ctx, err := grpcAuthContext(ctx, info.FullMethod, jwtSecret)
 		if err != nil {
 			return nil, err
 		}
-
-		// Enforce device_id only for InstanceService calls.
-		// DeviceMgmtService calls require tenant_id but not device_id (device_id is provided
-		// in request/path params and must be tenant-scoped by handlers/repos).
-		if strings.HasPrefix(info.FullMethod, "/api.umh_core.v2.InstanceService/") {
-			if deviceID == "" {
-				return nil, status.Error(codes.PermissionDenied, "missing or invalid device_id in JWT claims")
-			}
-		}
-
-		// Add tenant_id and (optionally) device_id to context
-		ctx = context.WithValue(ctx, TenantIDContextKey, tenantID)
-		if deviceID != "" {
-			ctx = context.WithValue(ctx, DeviceIDContextKey, deviceID)
-		}
-
-		// Call handler with enriched context
 		return handler(ctx, req)
 	}
 }
 
-// StreamInterceptor is a gRPC stream interceptor that extracts tenant_id and device_id from JWT
-// and stores them in the request context
-func StreamInterceptor() grpc.StreamServerInterceptor {
+// StreamInterceptor mirrors UnaryInterceptor for streaming RPCs.
+func StreamInterceptor(jwtSecret string) grpc.StreamServerInterceptor {
 	return func(
 		srv interface{},
 		ss grpc.ServerStream,
 		info *grpc.StreamServerInfo,
 		handler grpc.StreamHandler,
 	) error {
-		// Extract tenant_id and device_id from JWT
-		tenantID, deviceID, err := ExtractClaimsFromJWT(ss.Context())
+		ctx, err := grpcAuthContext(ss.Context(), info.FullMethod, jwtSecret)
 		if err != nil {
 			return err
 		}
-
-		// Enforce device_id only for InstanceService calls.
-		if strings.HasPrefix(info.FullMethod, "/api.umh_core.v2.InstanceService/") {
-			if deviceID == "" {
-				return status.Error(codes.PermissionDenied, "missing or invalid device_id in JWT claims")
-			}
-		}
-
-		// Add tenant_id and (optionally) device_id to context
-		ctx := context.WithValue(ss.Context(), TenantIDContextKey, tenantID)
-		if deviceID != "" {
-			ctx = context.WithValue(ctx, DeviceIDContextKey, deviceID)
-		}
-
-		// Wrap the stream to use the enriched context
 		wrappedStream := &wrappedServerStream{ServerStream: ss, ctx: ctx}
-
-		// Call handler with enriched context
 		return handler(srv, wrappedStream)
 	}
 }

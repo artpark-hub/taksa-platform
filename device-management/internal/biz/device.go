@@ -59,7 +59,7 @@ func (uc *DeviceUsecase) RegisterDevice(ctx context.Context, req *RegisterDevice
 		Location:  req.Location,
 		Status:    v1.DeviceStatus_PENDING,
 		CreatedAt: timestamppb.Now(),
-		LastSeen:  timestamppb.Now(),
+		// LastSeen is unset until the device first contacts DM (e.g. login / pull).
 		// AuthTokenExpiresAt will be set after token creation
 	}
 

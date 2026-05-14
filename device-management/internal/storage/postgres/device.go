@@ -460,7 +460,8 @@ func (s *DeviceStore) ListSummaries(ctx context.Context, filters *storage.Device
 				summary.CreatedAt = timestamppb.New(t)
 			}
 		}
-		if lastSeen.Valid {
+		// PENDING means the device has never successfully contacted DM; do not surface last_seen.
+		if summary.Status != v1.DeviceStatus_PENDING && lastSeen.Valid {
 			if t, err := time.Parse(time.RFC3339, lastSeen.String); err == nil {
 				summary.LastSeen = timestamppb.New(t)
 			}
