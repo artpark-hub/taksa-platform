@@ -351,15 +351,21 @@ ${defaultsCode.split('\n').map((line) => `  ${line}`).join('\n')}`;
         const normalizedProcessorYaml = stripTagProcessorRoot(loadedProcessorYaml);
         const parsed = parseProcessingCodeView(normalizedProcessorYaml);
 
-        if (parsed?.defaultsCode !== null) {
+        if (!parsed) {
+            didLoadProcessorFromBridgeRef.current = true;
+            didProcessorInitRef.current = true;
+            return;
+        }
+
+        if (parsed.defaultsCode !== null) {
             setDefaultsCode(parsed.defaultsCode);
         }
 
-        if (parsed?.conditions !== null) {
+        if (parsed.conditions !== null) {
             setConditions(parsed.conditions);
         }
 
-        if (parsed?.advancedProcessingCode !== null) {
+        if (parsed.advancedProcessingCode !== null) {
             setAdvancedProcessingCode(parsed.advancedProcessingCode);
         }
 
