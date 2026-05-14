@@ -27,11 +27,6 @@ func NewStore(db *sql.DB) (storage.Store, error) {
 		return nil, fmt.Errorf("database connection is nil")
 	}
 
-	// Test the connection
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping PostgreSQL database: %w", err)
-	}
-
 	return &Store{
 		db:                    db,
 		devices:               &DeviceStore{db: db},

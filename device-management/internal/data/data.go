@@ -32,12 +32,6 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		return nil, nil, fmt.Errorf("failed to create database: %w", err)
 	}
 
-	// Test connection
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
-		return nil, nil, fmt.Errorf("failed to ping database: %w", err)
-	}
-
 	// PostgreSQL only: schema is managed via migrations
 	if c.Database.Driver != "postgres" {
 		_ = db.Close()
