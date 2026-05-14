@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-    Boxes, Settings, Menu, ChevronUp, Users, LogOut, House, LayoutDashboard, Workflow, FileCog, FileText, BookOpen, Compass, Bot
+    Boxes, Settings, Menu, ChevronUp, Users, LogOut, House, LayoutDashboard, Workflow, FileCog, BookOpen, Compass, Bot
 } from 'lucide-react';
 
 const Sidebar = ({ isCollapsed, toggleSidebar }) => {
@@ -198,12 +198,6 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
                     href: '/dashboard/models',
                     icon: FileCog,
                     matchPaths: ['/dashboard/models']
-                },
-                {
-                    name: 'Contracts',
-                    href: '/dashboard/contracts',
-                    icon: FileText,
-                    matchPaths: ['/dashboard/contracts']
                 }
             ]
         }
