@@ -39,10 +39,21 @@ func NewPostgresDatabase(config PostgresConfig) (*sql.DB, error) {
 		db.SetConnMaxIdleTime(time.Duration(config.ConnMaxIdleTime) * time.Second)
 	}
 
-	// Test connection
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping PostgreSQL database: %w", err)
+	// Wait for PostgreSQL to accept connections (e.g. container startup / restarts).
+	const (
+		maxAttempts = 30
+		interval    = time.Second
+	)
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		lastErr = db.Ping()
+		if lastErr == nil {
+			return db, nil
+		}
+		if attempt < maxAttempts {
+			time.Sleep(interval)
+		}
 	}
-
-	return db, nil
+	_ = db.Close()
+	return nil, fmt.Errorf("failed to ping PostgreSQL database after %d attempts: %w", maxAttempts, lastErr)
 }
