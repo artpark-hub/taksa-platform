@@ -1,0 +1,367 @@
+:root{
+    --radius-md: clamp(0.4rem, 0.3vw + 0.2rem, 0.625rem);
+    --radius-lg: clamp(0.5rem, 0.5vw + 0.25rem, 0.875rem);
+
+    --shadow-soft: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+
+    --space-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
+    --space-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+    --space-md: clamp(0.75rem, 0.6rem + 0.75vw, 1.25rem);
+    --space-lg: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+    --space-xl: clamp(1.25rem, 1rem + 1.5vw, 2.5rem);
+    --space-2xl: clamp(1.5rem, 1.2rem + 2vw, 3.5rem);
+
+    --text-xs: clamp(0.65rem, 0.6rem + 0.2vw, 0.75rem);
+    --text-sm: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+    --text-base: clamp(0.875rem, 0.8rem + 0.4vw, 1rem);
+    --text-lg: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+    --text-xl: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+    --text-2xl: clamp(1.25rem, 1rem + 1.5vw, 2rem);
+}
+.bridge-config-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100%;
+    padding-bottom: 40px;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+.bridge-config-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: var(--text-lg);
+    color: #666;
+}
+
+.bridge-config-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-2xl);
+}
+
+.bridge-config-header-left {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-lg);
+}
+
+.bridge-config-back-btn {
+    background: transparent;
+    border: none;
+    color: #000;
+    cursor: pointer;
+    padding: var(--space-xs);
+    margin-top: 0.2rem;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bridge-config-back-btn:hover {
+    background-color: #f3f4f6;
+}
+
+.bridge-config-title {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: #000;
+    margin: 0 0 var(--space-sm) 0;
+    letter-spacing: -0.03em;
+}
+
+.bridge-config-subtitle {
+    color: #555;
+    font-size: var(--text-sm);
+    margin: 0;
+    line-height: 1.5;
+    font-weight: 500;
+}
+
+.bridge-config-error-msg {
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    margin-bottom: var(--space-md);
+}
+
+.bridge-config-save-btn {
+    background-color: #000;
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: var(--space-sm) var(--space-lg);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-family: inherit;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-soft);
+}
+
+.bridge-config-save-btn:hover {
+    background-color: #333;
+    transform: translateY(-1px);
+}
+
+.bridge-config-save-btn:disabled {
+    background-color: #9ca3af;
+    color: #f3f4f6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.bridge-config-save-btn:disabled:hover {
+    background-color: #9ca3af;
+    transform: none;
+}
+
+.bridge-config-stepper {
+    width: 100%;
+    margin: 0 auto var(--space-xl);
+    display: flex;
+    align-items: flex-start;
+}
+
+.bridge-config-step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 10rem;
+    color: #777;
+}
+
+.bridge-config-step-circle {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 2px solid #b8b8b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    background-color: white;
+    color: #777;
+}
+
+.bridge-config-step-item.active .bridge-config-step-circle {
+    background-color: #222;
+    border-color: #222;
+    color: white;
+}
+
+.bridge-config-step-item.completed .bridge-config-step-circle {
+    background-color: white;
+    border-color: #777;
+    color: #555;
+}
+
+.bridge-config-step-item p {
+    margin: var(--space-sm) 0 0 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: center;
+}
+
+.bridge-config-step-item.active p {
+    color: #000;
+}
+
+.bridge-config-step-line {
+    height: 2px;
+    background-color: #b8b8b8;
+    flex: 1;
+    margin-top: 1rem;
+    position: relative;
+}
+
+.bridge-config-step-line.half-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 2px;
+    width: 50%;
+    background-color: #000;
+}
+
+.bridge-config-step-line.progress-42::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 2px;
+    width: 42%;
+    background-color: #000;
+}
+
+.bridge-config-step-line.progress-90::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 2px;
+    width: 90%;
+    background-color: #000;
+}
+
+.bridge-config-step-line.full-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 2px;
+    width: 100%;
+    background-color: #000;
+}
+
+.bridge-config-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    margin: 0 0 var(--space-xl);
+    padding: 0;
+    background-color: #fff;
+}
+
+.bridge-config-tab {
+    background: transparent;
+    border: none;
+    color: #777;
+    cursor: pointer;
+    padding: var(--space-lg) var(--space-md);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    position: relative;
+}
+
+.bridge-config-tab.active {
+    color: #000;
+}
+
+.bridge-config-tab.active::after {
+    content: "";
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    bottom: 0;
+    height: 3px;
+    background-color: #000;
+    border-radius: 9999px 9999px 0 0;
+}
+
+.bridge-config-body {
+    width: 100%;
+}
+
+.bridge-config-body > *:last-child {
+    margin-bottom: 40px;
+}
+
+.bridge-config-queue-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.bridge-config-queue-modal {
+    width: min(90vw, 26rem);
+    background: #ffffff;
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+    text-align: center;
+}
+
+.bridge-config-loader {
+    width: 3rem;
+    height: 3rem;
+    border: 4px solid #e5e7eb;
+    border-top-color: #111827;
+    border-radius: 999px;
+    margin: 0 auto var(--space-md) auto;
+    animation: bridge-config-spin 0.8s linear infinite;
+}
+
+.bridge-config-queue-modal h3 {
+    margin: 0 0 var(--space-xs) 0;
+    color: #111827;
+    font-size: var(--text-lg);
+    font-weight: 700;
+}
+
+.bridge-config-queue-modal p {
+    margin: 0;
+    color: #6b7280;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+}
+
+.bridge-config-timer {
+    margin-top: 0.5rem !important;
+    color: #dc2626 !important;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes bridge-config-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 48rem) {
+    .bridge-config-header {
+        flex-direction: column;
+    }
+
+    .bridge-config-save-btn {
+        align-self: flex-start;
+    }
+
+    .bridge-config-stepper {
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: var(--space-sm);
+    }
+
+    .bridge-config-step-item {
+        min-width: 8rem;
+    }
+
+    .bridge-config-tabs {
+        margin-left: 0;
+        margin-right: 0;
+        padding: 0;
+        overflow-x: auto;
+    }
+
+    .bridge-config-tab {
+        min-width: 9rem;
+    }
+}
