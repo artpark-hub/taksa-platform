@@ -174,12 +174,10 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                 [data-testid="sidemenu"],
                 [data-testid="sidemenu-toggle"],
                 [data-testid="nav-toggle"],
-                [data-testid="menu-toggle"],
                 [data-testid="mega-menu"],
                 [data-testid="mega-menu-drawer"],
                 [data-testid="navigation-menu"],
                 [data-testid="main-navigation"],
-                [aria-label="Main menu"],
                 [aria-label="Main navigation"],
                 nav[aria-label*="navigation" i],
                 nav[aria-label*="main" i],
@@ -195,19 +193,9 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                     display: none !important;
                     visibility: hidden !important;
                     pointer-events: none !important;
-                }
-
-                button[aria-label*="menu" i],
-                button[aria-label*="navigation" i],
-                button[aria-label*="main menu" i],
-                button[aria-label*="open menu" i],
-                header button[aria-label*="menu" i],
-                header button[aria-label*="navigation" i],
-                [role="banner"] button[aria-label*="menu" i],
-                [role="banner"] button[aria-label*="navigation" i] {
-                    display: none !important;
-                    visibility: hidden !important;
-                    pointer-events: none !important;
+                    width: 0 !important;
+                    min-width: 0 !important;
+                    max-width: 0 !important;
                 }
 
                 header a[href="/grafana"],
@@ -237,12 +225,42 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                     pointer-events: none !important;
                 }
 
+                button[aria-label*="help" i],
+                button[title*="help" i],
+                [aria-label*="help" i],
+                [title*="help" i],
+                [data-testid*="help" i],
+                header button[aria-label*="help" i],
+                header button[title*="help" i],
+                [role="banner"] button[aria-label*="help" i],
+                [role="banner"] button[title*="help" i] {
+                    display: none !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                }
+
                 [class*="powered-by"],
                 a[href*="grafana.com"],
                 [role="contentinfo"] {
                     display: none !important;
                     visibility: hidden !important;
                     pointer-events: none !important;
+                }
+
+                main,
+                [role="main"],
+                [data-testid="main-view"],
+                [data-testid="page-container"],
+                [class*="main-view"],
+                [class*="MainView"],
+                [class*="page-container"],
+                [class*="PageContainer"],
+                [class*="Layout"] {
+                    margin-left: 0 !important;
+                    padding-left: 0 !important;
+                    left: 0 !important;
+                    width: 100% !important;
+                    max-width: none !important;
                 }
             `;
 
@@ -252,9 +270,74 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                 element.style.display = 'none';
                 element.style.visibility = 'hidden';
                 element.style.pointerEvents = 'none';
+                element.style.width = '0';
+                element.style.minWidth = '0';
+                element.style.maxWidth = '0';
             };
 
-            const hideOpenSideNavigation = () => {
+            const resetMainLayout = () => {
+                const layoutElements = Array.from(
+                    doc.querySelectorAll(
+                        [
+                            'main',
+                            '[role="main"]',
+                            '[data-testid="main-view"]',
+                            '[data-testid="page-container"]',
+                            '[class*="main-view"]',
+                            '[class*="MainView"]',
+                            '[class*="page-container"]',
+                            '[class*="PageContainer"]',
+                            '[class*="Layout"]',
+                        ].join(',')
+                    )
+                );
+
+                layoutElements.forEach((element) => {
+                    element.style.marginLeft = '0';
+                    element.style.paddingLeft = '0';
+                    element.style.left = '0';
+                    element.style.width = '100%';
+                    element.style.maxWidth = 'none';
+                });
+
+                iframeWindow.dispatchEvent(new Event('resize'));
+            };
+
+            const hideTopLeftNavigationButtons = () => {
+                const buttons = Array.from(
+                    doc.querySelectorAll(
+                        [
+                            'header button',
+                            '[role="banner"] button',
+                            'button[aria-label*="navigation" i]',
+                            'button[aria-label*="main menu" i]',
+                            'button[aria-label*="open menu" i]',
+                        ].join(',')
+                    )
+                );
+
+                buttons.forEach((button) => {
+                    const rect = button.getBoundingClientRect();
+                    const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+                    const title = button.getAttribute('title')?.toLowerCase() || '';
+
+                    const isTopLeftNavButton =
+                        rect.top <= 120 &&
+                        rect.left <= 120 &&
+                        (
+                            ariaLabel.includes('menu') ||
+                            ariaLabel.includes('navigation') ||
+                            title.includes('menu') ||
+                            title.includes('navigation')
+                        );
+
+                    if (isTopLeftNavButton) {
+                        hideElement(button);
+                    }
+                });
+            };
+
+            const collapseAndHideOpenSideNavigation = () => {
                 const navLinks = Array.from(
                     doc.querySelectorAll(
                         [
@@ -287,7 +370,7 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                             rect.width >= 220 &&
                             rect.width <= 700 &&
                             rect.height >= iframeWindow.innerHeight * 0.5 &&
-                            rect.left <= 160
+                            rect.left <= 180
                         ) {
                             drawerElement = element;
                         }
@@ -307,6 +390,36 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                         element = element.parentElement;
                     }
 
+                    if (!drawerElement) return;
+
+                    const closeButton = Array.from(
+                        drawerElement.querySelectorAll('button, [role="button"]')
+                    ).find((button) => {
+                        const text = button.textContent?.trim().toLowerCase() || '';
+                        const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+                        const title = button.getAttribute('title')?.toLowerCase() || '';
+                        const rect = button.getBoundingClientRect();
+
+                        return (
+                            rect.top <= 180 &&
+                            rect.left <= 360 &&
+                            (
+                                text === '×' ||
+                                text === 'x' ||
+                                ariaLabel.includes('close') ||
+                                ariaLabel.includes('collapse') ||
+                                ariaLabel.includes('hide') ||
+                                title.includes('close') ||
+                                title.includes('collapse') ||
+                                title.includes('hide')
+                            )
+                        );
+                    });
+
+                    if (closeButton) {
+                        closeButton.click();
+                    }
+
                     hideElement(drawerElement);
 
                     if (
@@ -316,6 +429,13 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                     ) {
                         hideElement(overlayElement);
                     }
+
+                    resetMainLayout();
+
+                    setTimeout(() => {
+                        hideElement(drawerElement);
+                        resetMainLayout();
+                    }, 100);
                 });
             };
 
@@ -389,9 +509,54 @@ const GrafanaDashboard = ({ deviceId = null }) => {
                 });
             };
 
-            hideOpenSideNavigation();
+            const hideHelpButton = () => {
+                const helpElements = Array.from(
+                    doc.querySelectorAll(
+                        [
+                            '[aria-label*="help" i]',
+                            '[title*="help" i]',
+                            '[data-testid*="help" i]',
+                            'header *',
+                            '[role="banner"] *',
+                        ].join(',')
+                    )
+                );
+
+                helpElements.forEach((element) => {
+                    const text = element.textContent?.trim().toLowerCase() || '';
+                    const ariaLabel = element.getAttribute('aria-label') || '';
+                    const title = element.getAttribute('title') || '';
+                    const dataTestId = element.getAttribute('data-testid') || '';
+                    const rect = element.getBoundingClientRect();
+
+                    const isHelp =
+                        text === '?' ||
+                        text === 'help' ||
+                        ariaLabel.toLowerCase().includes('help') ||
+                        title.toLowerCase().includes('help') ||
+                        dataTestId.toLowerCase().includes('help');
+
+                    if (
+                        isHelp &&
+                        rect.top <= 120
+                    ) {
+                        const control =
+                            element.closest('button') ||
+                            element.closest('a') ||
+                            element.closest('[role="button"]') ||
+                            element;
+
+                        hideElement(control);
+                    }
+                });
+            };
+
+            collapseAndHideOpenSideNavigation();
+            resetMainLayout();
+            hideTopLeftNavigationButtons();
             hideGrafanaLogo();
             hideSignIn();
+            hideHelpButton();
         } catch (error) {
             console.warn('Could not hide Grafana chrome:', error);
         }

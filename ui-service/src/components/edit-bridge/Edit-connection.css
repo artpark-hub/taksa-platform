@@ -1,0 +1,98 @@
+:root{
+    --radius-md: clamp(0.4rem, 0.3vw + 0.2rem, 0.625rem);
+    --radius-lg: clamp(0.5rem, 0.5vw + 0.25rem, 0.875rem);
+
+    --shadow-soft: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
+
+    --space-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
+    --space-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+    --space-md: clamp(0.75rem, 0.6rem + 0.75vw, 1.25rem);
+    --space-lg: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+    --space-xl: clamp(1.25rem, 1rem + 1.5vw, 2.5rem);
+    --space-2xl: clamp(1.5rem, 1.2rem + 2vw, 3.5rem);
+
+    --text-xs: clamp(0.65rem, 0.6rem + 0.2vw, 0.75rem);
+    --text-sm: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+    --text-base: clamp(0.875rem, 0.8rem + 0.4vw, 1rem);
+    --text-lg: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+    --text-xl: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+    --text-2xl: clamp(1.25rem, 1rem + 1.5vw, 2rem);
+}
+
+.bridge-connection-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    padding: var(--space-xl);
+}
+
+.bridge-connection-header {
+    margin-bottom: var(--space-xl);
+}
+
+.bridge-connection-header h2 {
+    color: #111827;
+    font-size: var(--text-xl);
+    font-weight: 700;
+    margin: 0 0 var(--space-sm) 0;
+    letter-spacing: -0.03em;
+}
+
+.bridge-connection-header p {
+    color: #6b7280;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.bridge-connection-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+}
+
+.bridge-connection-form-row {
+    display: grid;
+    grid-template-columns: 10rem 1fr;
+    align-items: center;
+    gap: var(--space-xl);
+}
+
+.bridge-connection-form-row label {
+    color: #111827;
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.bridge-connection-form-row label span {
+    margin-left: var(--space-md);
+}
+
+.bridge-connection-form-row input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: var(--space-md);
+    border: 1px solid #e5e7eb;
+    border-radius: var(--radius-md);
+    background-color: #fff;
+    color: #111827;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.bridge-connection-form-row input:focus {
+    border-color: #000;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 48rem) {
+    .bridge-connection-form-row {
+        grid-template-columns: 1fr;
+        gap: var(--space-sm);
+    }
+}

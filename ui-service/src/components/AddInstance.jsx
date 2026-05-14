@@ -21,6 +21,7 @@ const AddInstance = () => {
     const [formError, setFormError] = useState('');
     const [copyError, setCopyError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isNavigating, setIsNavigating] = useState(false);
     const [createdDeviceResponse, setCreatedDeviceResponse] = useState(null);
 
     const dockerCommand = createdDeviceResponse?.instructions?.docker_command || '';
@@ -192,17 +193,27 @@ const AddInstance = () => {
         }
     };
 
-    const handleCloseModal = () => {
+    const cleanupAndNavigate = () => {
+        if (isNavigating) return;
+        
+        setIsNavigating(true);
         setShowModal(false);
         setHasCopied(false);
         setHasCopiedOnce(false);
         setCopyError('');
         setCreatedDeviceResponse(null);
+        setInstanceName('');
+        setLocationLevels([{ id: 1, value: '' }]);
         try {
             sessionStorage.removeItem(INSTALL_MODAL_CACHE_KEY);
         } catch (error) {
             console.error('Error clearing modal cache', error);
         }
+        router.push('/dashboard/Edge-devices');
+    };
+
+    const handleCloseModal = () => {
+        cleanupAndNavigate();
     };
 
     const handleCopyCommand = async () => {
@@ -244,10 +255,7 @@ const AddInstance = () => {
 
     const handleContinue = () => {
         if (hasCopiedOnce) {
-            setHasCopied(false);
-            setHasCopiedOnce(false);
-            setCopyError('');
-            router.push('/dashboard/Edge-devices');
+            cleanupAndNavigate();
         }
     };
 
