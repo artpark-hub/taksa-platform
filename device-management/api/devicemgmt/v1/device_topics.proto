@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package api.devicemgmt.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.devicemgmt.v1";
+
+// Topic metadata key/value (parity with umh-core GraphQL MetadataEntry).
+message TopicMetadataEntry {
+  string key = 1;
+  string value = 2;
+}
+
+// Exact metadata match filter (parity with GraphQL MetaExpr: key + eq).
+message TopicMetaEq {
+  string key = 1;
+  string eq = 2;
+}
+
+// Scalar type hint for time-series payloads (parity with GraphQL ScalarType).
+enum TopicScalarType {
+  TOPIC_SCALAR_TYPE_UNSPECIFIED = 0;
+  NUMERIC = 1;
+  STRING = 2;
+  BOOLEAN = 3;
+}
+
+// Time-series last event (parity with GraphQL TimeSeriesEvent).
+message TopicTimeSeriesEvent {
+  google.protobuf.Timestamp produced_at = 1;
+  google.protobuf.Timestamp source_ts = 2;
+  TopicScalarType scalar_type = 3;
+  optional double numeric_value = 4;
+  optional string string_value = 5;
+  optional bool boolean_value = 6;
+  repeated TopicMetadataEntry kafka_headers = 7;
+}
+
+// Relational last event (parity with GraphQL RelationalEvent JSON).
+message TopicRelationalEvent {
+  google.protobuf.Timestamp produced_at = 1;
+  google.protobuf.Struct json = 2;
+  repeated TopicMetadataEntry kafka_headers = 3;
+}
+
+// One UNS topic row materialized from device status (core.topicBrowser).
+message DeviceTopic {
+  string topic = 1; // Canonical UNS path (same construction as umh-core GraphQL topic field)
+  string uns_tree_id = 2;
+  string level_0 = 3 [json_name = "level_0"];
+  repeated string location_sublevels = 4;
+  string data_contract = 5;
+  optional string virtual_path = 6;
+  string name = 7;
+  repeated TopicMetadataEntry metadata = 8;
+  oneof last_event {
+    TopicTimeSeriesEvent time_series = 9;
+    TopicRelationalEvent relational = 10;
+  }
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message ListDeviceTopicsRequest {
+  string device_id = 1;
+  int32 page_size = 2 [json_name = "page_size"]; // Page size (0 = default 20, max 100). Applied after text/meta filters.
+  string page_token = 3 [json_name = "page_token"];
+  // Substring filter on canonical topic path OR metadata keys/values (case-insensitive), same semantics as GraphQL TopicFilter.text.
+  string text = 4;
+  // All meta constraints must match (AND), same as GraphQL TopicFilter.meta.
+  repeated TopicMetaEq meta = 5;
+}
+
+message ListDeviceTopicsResponse {
+  repeated DeviceTopic topics = 1;
+  string next_page_token = 2 [json_name = "next_page_token"];
+}
+
+message GetDeviceTopicRequest {
+  string device_id = 1;
+  // Lookup by stable tree id (hex xxhash), preferred.
+  string uns_tree_id = 2 [json_name = "uns_tree_id"];
+  // Exact canonical topic string (same as GraphQL topic(topic: "...")).
+  string canonical_topic = 3 [json_name = "canonical_topic"];
+}

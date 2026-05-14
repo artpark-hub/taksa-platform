@@ -1044,6 +1044,60 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/topics/detail:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get a single topic by uns_tree_id or exact canonical_topic (query params).
+            operationId: DeviceMgmtService_GetDeviceTopic
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uns_tree_id
+                  in: query
+                  description: Lookup by stable tree id (hex xxhash), preferred.
+                  schema:
+                    type: string
+                - name: canonical_topic
+                  in: query
+                  description: 'Exact canonical topic string (same as GraphQL topic(topic: "...")).'
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.DeviceTopic'
+    /api/v1/devicemgmt/devices/{deviceId}/topics/list:
+        post:
+            tags:
+                - DeviceMgmtService
+            description: List UNS topics for a device (paginated, filterable). POST body carries GraphQL-equivalent filters (text, meta[], limit).
+            operationId: DeviceMgmtService_ListDeviceTopics
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.ListDeviceTopicsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ListDeviceTopicsResponse'
     /api/v2/instance/login:
         post:
             tags:
@@ -1513,6 +1567,37 @@ components:
             description: |-
                 DeviceSummary represents a lightweight device summary for list/overview responses
                  Contains only essential device information without certificate data or extended company details
+        api.devicemgmt.v1.DeviceTopic:
+            type: object
+            properties:
+                topic:
+                    type: string
+                unsTreeId:
+                    type: string
+                level_0:
+                    type: string
+                locationSublevels:
+                    type: array
+                    items:
+                        type: string
+                dataContract:
+                    type: string
+                virtualPath:
+                    type: string
+                name:
+                    type: string
+                metadata:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetadataEntry'
+                timeSeries:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.TopicTimeSeriesEvent'
+                relational:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.TopicRelationalEvent'
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: One UNS topic row materialized from device status (core.topicBrowser).
         api.devicemgmt.v1.EditDataModelRequest:
             type: object
             properties:
@@ -1612,6 +1697,33 @@ components:
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.DataModelSummary'
                 nextPageToken:
+                    type: string
+        api.devicemgmt.v1.ListDeviceTopicsRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                page_size:
+                    type: integer
+                    format: int32
+                page_token:
+                    type: string
+                text:
+                    type: string
+                    description: Substring filter on canonical topic path OR metadata keys/values (case-insensitive), same semantics as GraphQL TopicFilter.text.
+                meta:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetaEq'
+                    description: All meta constraints must match (AND), same as GraphQL TopicFilter.meta.
+        api.devicemgmt.v1.ListDeviceTopicsResponse:
+            type: object
+            properties:
+                topics:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.DeviceTopic'
+                next_page_token:
                     type: string
         api.devicemgmt.v1.ListDevicesResponse:
             type: object
@@ -1809,6 +1921,59 @@ components:
                     type: string
                 errorMessage:
                     type: string
+        api.devicemgmt.v1.TopicMetaEq:
+            type: object
+            properties:
+                key:
+                    type: string
+                eq:
+                    type: string
+            description: 'Exact metadata match filter (parity with GraphQL MetaExpr: key + eq).'
+        api.devicemgmt.v1.TopicMetadataEntry:
+            type: object
+            properties:
+                key:
+                    type: string
+                value:
+                    type: string
+            description: Topic metadata key/value (parity with umh-core GraphQL MetadataEntry).
+        api.devicemgmt.v1.TopicRelationalEvent:
+            type: object
+            properties:
+                producedAt:
+                    type: string
+                    format: date-time
+                json:
+                    type: object
+                kafkaHeaders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetadataEntry'
+            description: Relational last event (parity with GraphQL RelationalEvent JSON).
+        api.devicemgmt.v1.TopicTimeSeriesEvent:
+            type: object
+            properties:
+                producedAt:
+                    type: string
+                    format: date-time
+                sourceTs:
+                    type: string
+                    format: date-time
+                scalarType:
+                    type: integer
+                    format: enum
+                numericValue:
+                    type: number
+                    format: double
+                stringValue:
+                    type: string
+                booleanValue:
+                    type: boolean
+                kafkaHeaders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetadataEntry'
+            description: Time-series last event (parity with GraphQL TimeSeriesEvent).
         api.devicemgmt.v1.UpdateDeviceRequest:
             type: object
             properties:

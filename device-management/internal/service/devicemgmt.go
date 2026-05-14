@@ -131,10 +131,11 @@ type DeviceMgmtService struct {
 	protocolConverterRepo *data.ProtocolConverterRepo
 	dataModelRepo         *data.DataModelRepo
 	streamProcessorRepo   *data.StreamProcessorRepo
+	deviceTopicRepo       *data.DeviceTopicRepo
 }
 
 // NewDeviceMgmtService creates a new device management service
-func NewDeviceMgmtService(deviceUc *biz.DeviceUsecase, actionUc *biz.ActionUsecase, instanceUc *biz.InstanceUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo) *DeviceMgmtService {
+func NewDeviceMgmtService(deviceUc *biz.DeviceUsecase, actionUc *biz.ActionUsecase, instanceUc *biz.InstanceUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo, deviceTopicRepo *data.DeviceTopicRepo) *DeviceMgmtService {
 	return &DeviceMgmtService{
 		deviceUc:              deviceUc,
 		actionUc:              actionUc,
@@ -142,6 +143,7 @@ func NewDeviceMgmtService(deviceUc *biz.DeviceUsecase, actionUc *biz.ActionUseca
 		protocolConverterRepo: protocolConverterRepo,
 		dataModelRepo:         dataModelRepo,
 		streamProcessorRepo:   streamProcessorRepo,
+		deviceTopicRepo:       deviceTopicRepo,
 	}
 }
 

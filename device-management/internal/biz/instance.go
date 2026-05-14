@@ -215,16 +215,18 @@ type InstanceUsecase struct {
 	protocolConverterRepo *data.ProtocolConverterRepo
 	dataModelRepo         *data.DataModelRepo
 	streamProcessorRepo   *data.StreamProcessorRepo
+	deviceTopicRepo       *data.DeviceTopicRepo
 }
 
 // NewInstanceUsecase creates a new InstanceUsecase with the given storage and authentication backends.
-func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo) *InstanceUsecase {
+func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo, deviceTopicRepo *data.DeviceTopicRepo) *InstanceUsecase {
 	return &InstanceUsecase{
 		store:                 store,
 		authUc:                authUc,
 		protocolConverterRepo: protocolConverterRepo,
 		dataModelRepo:         dataModelRepo,
 		streamProcessorRepo:   streamProcessorRepo,
+		deviceTopicRepo:       deviceTopicRepo,
 	}
 }
 
@@ -759,6 +761,7 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 			if msgType == "status-message" || msgType == "StatusMessage" || msgType == "status" {
 				_ = uc.syncProtocolConvertersFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
 				_ = uc.syncStreamProcessorsFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
+				_ = uc.syncDeviceTopicsFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
 			}
 		}
 

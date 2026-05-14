@@ -98,4 +98,5 @@ var ProviderSet = wire.NewSet(
 	NewProtocolConverterRepo,
 	NewDataModelRepo,
 	NewStreamProcessorRepo,
+	NewDeviceTopicRepo,
 )

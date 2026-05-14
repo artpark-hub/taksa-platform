@@ -1,0 +1,76 @@
+// UNS topic browser wire types (aligned with umh-core tag_processor / topic browser).
+// See umh-core/pkg/communicator/models/topicbrowser/proto/topic_browser_data.proto
+
+syntax = "proto3";
+
+package umh.events;
+
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/uns/v1;unsv1";
+
+import "google/protobuf/wrappers.proto";
+
+message TopicInfo {
+  string level0 = 1;
+  repeated string location_sublevels = 2;
+  string data_contract = 3;
+  optional string virtual_path = 4;
+  string name = 5;
+  map<string, string> metadata = 6;
+}
+
+message TopicMap {
+  map<string, TopicInfo> entries = 1;
+}
+
+message EventKafka {
+  map<string, string> headers = 1;
+  bytes payload = 2;
+}
+
+enum PayloadFormat {
+  PAYLOAD_FORMAT_UNSPECIFIED = 0;
+  TIMESERIES = 1;
+  RELATIONAL = 2;
+}
+
+enum ScalarType {
+  SCALAR_TYPE_UNSPECIFIED = 0;
+  NUMERIC = 1;
+  STRING = 2;
+  BOOLEAN = 3;
+}
+
+message TimeSeriesPayload {
+  ScalarType scalar_type = 1;
+  oneof value {
+    google.protobuf.DoubleValue numeric_value = 2;
+    google.protobuf.StringValue string_value = 3;
+    google.protobuf.BoolValue boolean_value = 4;
+  }
+  int64 timestamp_ms = 5;
+}
+
+message RelationalPayload {
+  bytes json = 1;
+}
+
+message EventTableEntry {
+  string uns_tree_id = 1;
+  PayloadFormat payload_format = 2;
+  EventKafka raw_kafka_msg = 5;
+  repeated string bridged_by = 6;
+  uint64 produced_at_ms = 7;
+  oneof payload {
+    TimeSeriesPayload ts = 10;
+    RelationalPayload rel = 11;
+  }
+}
+
+message EventTable {
+  repeated EventTableEntry entries = 1;
+}
+
+message UnsBundle {
+  TopicMap uns_map = 1;
+  EventTable events = 2;
+}
