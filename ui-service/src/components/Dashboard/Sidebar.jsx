@@ -198,12 +198,6 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
                     href: '/dashboard/models',
                     icon: FileCog,
                     matchPaths: ['/dashboard/models']
-                },
-                {
-                    name: 'Contracts',
-                    href: '/dashboard/contracts',
-                    icon: FileText,
-                    matchPaths: ['/dashboard/contracts']
                 }
             ]
         }
