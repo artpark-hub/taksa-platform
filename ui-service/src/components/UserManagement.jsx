@@ -588,7 +588,7 @@ const UserManagement = () => {
                                         onChange={handleInputChange}
                                     >
                                         <option value="local">Local</option>
-                                        <option value="oidc">Oidc</option>
+                                        <option value="oidc">OIDC</option>
                                     </select>
                                 </div>
 

@@ -321,20 +321,9 @@ func (r *tenantsRepo) CheckAndCompletePendingUser(ctx context.Context, email str
 	}
 
 	const q = `
-WITH matched AS (
-  SELECT email_id, details
-  FROM login_assist
-  WHERE status = 'pending' AND email_id = $1
-  FOR UPDATE
-), updated AS (
-  UPDATE login_assist l
-  SET status = 'completed'
-  FROM matched m
-  WHERE l.email_id = m.email_id
-  RETURNING m.email_id AS email_id, m.details AS details
-)
 SELECT email_id, details
-FROM updated
+FROM login_assist
+WHERE status = 'pending' AND email_id = $1
 `
 
 	var emailID string

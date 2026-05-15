@@ -347,6 +347,15 @@ func (s *UserManagementService) AddOidcUser(ctx context.Context, req *v1.AddOidc
 		return nil, err
 	}
 
+	actorRole := strings.ToLower(strings.TrimSpace(details.Role))
+	if actorRole != "master" {
+		return nil, errors.New("forbidden: only master users can add OIDC users")
+	}
+
+	if role == "master" {
+		return nil, errors.New("forbidden: add_oidc_user cannot create master users")
+	}
+
 	err = s.uc.UpsertPendingOidcUser(ctx, email, role, details.OrganizationName, details.OrganizationID)
 	if err != nil {
 		s.log.Errorf("Failed to add pending OIDC user for %s: %v", email, err)
@@ -363,6 +372,12 @@ func (s *UserManagementService) CheckUser(ctx context.Context, req *v1.CheckUser
 	if err != nil {
 		s.log.Errorf("Failed to extract login context from JWT/session: %v", err)
 		return nil, errors.New("failed to check user")
+	}
+
+	requestedEmail := strings.ToLower(strings.TrimSpace(req.Email))
+	sessionEmail := strings.ToLower(strings.TrimSpace(details.Email))
+	if sessionEmail != "" && requestedEmail != "" && requestedEmail != sessionEmail {
+		return nil, errors.New("forbidden: email does not match authenticated session")
 	}
 
 	if hasRequiredOrgTraits(details) {
@@ -382,9 +397,9 @@ func (s *UserManagementService) CheckUser(ctx context.Context, req *v1.CheckUser
 		}, nil
 	}
 
-	email := strings.ToLower(strings.TrimSpace(req.Email))
+	email := sessionEmail
 	if email == "" {
-		email = strings.ToLower(strings.TrimSpace(details.Email))
+		email = requestedEmail
 	}
 	if email == "" {
 		return nil, errors.New("email is required")
