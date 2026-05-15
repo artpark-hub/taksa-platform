@@ -147,10 +147,12 @@ func (s *UserManagementService) DeleteSubUser(ctx context.Context, req *v1.Delet
 
 	targetFound := false
 	targetIsMaster := false
+	targetEmail := ""
 
 	for _, user := range users {
 		if user.IdentityID == req.IdentityId {
 			targetFound = true
+			targetEmail = user.Email
 			if strings.ToLower(strings.TrimSpace(user.Role)) == "master" {
 				targetIsMaster = true
 			}
@@ -169,6 +171,10 @@ func (s *UserManagementService) DeleteSubUser(ctx context.Context, req *v1.Delet
 	err = s.uc.DeleteSubUser(ctx, req.IdentityId)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := s.uc.DeletePendingOidcUserByEmail(ctx, targetEmail); err != nil {
+		s.log.Warnf("Deleted user %s but failed to clean login_assist row for %s: %v", req.IdentityId, targetEmail, err)
 	}
 
 	return &v1.DeleteUserResponse{
@@ -198,6 +204,7 @@ func (s *UserManagementService) DeleteMasterUser(ctx context.Context, req *v1.De
 	masterCount := 0
 	targetFound := false
 	targetIsMaster := false
+	targetEmail := ""
 
 	for _, user := range users {
 		if strings.ToLower(strings.TrimSpace(user.Role)) == "master" {
@@ -205,6 +212,7 @@ func (s *UserManagementService) DeleteMasterUser(ctx context.Context, req *v1.De
 		}
 		if user.IdentityID == req.IdentityId {
 			targetFound = true
+			targetEmail = user.Email
 			if strings.ToLower(strings.TrimSpace(user.Role)) == "master" {
 				targetIsMaster = true
 			}
@@ -226,6 +234,10 @@ func (s *UserManagementService) DeleteMasterUser(ctx context.Context, req *v1.De
 	err = s.uc.DeleteMasterUser(ctx, req.IdentityId)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := s.uc.DeletePendingOidcUserByEmail(ctx, targetEmail); err != nil {
+		s.log.Warnf("Deleted master user %s but failed to clean login_assist row for %s: %v", req.IdentityId, targetEmail, err)
 	}
 
 	return &v1.DeleteUserResponse{
@@ -315,6 +327,87 @@ func (s *UserManagementService) DeleteIncompleteOidcUser(ctx context.Context, re
 	return &v1.DeleteUserResponse{
 		Status:  "success",
 		Message: "Incomplete OIDC user deleted successfully",
+	}, nil
+}
+
+func (s *UserManagementService) AddOidcUser(ctx context.Context, req *v1.AddOidcUserRequest) (*v1.AddOidcUserResponse, error) {
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if email == "" {
+		return nil, errors.New("email is required")
+	}
+
+	role := strings.ToLower(strings.TrimSpace(req.Role))
+	if role == "" {
+		return nil, errors.New("role is required")
+	}
+
+	details, err := s.getDetailsFromJWTOrSession(ctx)
+	if err != nil {
+		s.log.Errorf("Failed to extract org details for add_oidc_user: %v", err)
+		return nil, err
+	}
+
+	err = s.uc.UpsertPendingOidcUser(ctx, email, role, details.OrganizationName, details.OrganizationID)
+	if err != nil {
+		s.log.Errorf("Failed to add pending OIDC user for %s: %v", email, err)
+		return nil, errors.New("failed to add oidc user")
+	}
+
+	return &v1.AddOidcUserResponse{
+		Message: "user has been created",
+	}, nil
+}
+
+func (s *UserManagementService) CheckUser(ctx context.Context, req *v1.CheckUserRequest) (*v1.CheckUserResponse, error) {
+	details, err := s.getOptionalDetailsFromJWTOrSession(ctx)
+	if err != nil {
+		s.log.Errorf("Failed to extract login context from JWT/session: %v", err)
+		return nil, errors.New("failed to check user")
+	}
+
+	if hasRequiredOrgTraits(details) {
+		// Clean up any pending login_assist entry for this email
+		email := strings.ToLower(strings.TrimSpace(details.Email))
+		if email != "" {
+			if err := s.uc.DeletePendingOidcUserByEmail(ctx, email); err != nil {
+				s.log.Warnf("User is registered but failed to clean login_assist row for %s: %v", email, err)
+			}
+		}
+		return &v1.CheckUserResponse{
+			Email:            details.Email,
+			Role:             details.Role,
+			OrganizationName: details.OrganizationName,
+			TenantId:         details.OrganizationID,
+			Message:          "User is already registered.",
+		}, nil
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if email == "" {
+		email = strings.ToLower(strings.TrimSpace(details.Email))
+	}
+	if email == "" {
+		return nil, errors.New("email is required")
+	}
+
+	user, found, err := s.uc.CheckAndCompletePendingUser(ctx, email)
+	if err != nil {
+		s.log.Errorf("Failed to check pending user for %s: %v", email, err)
+		return nil, errors.New("failed to check user")
+	}
+
+	if !found {
+		return &v1.CheckUserResponse{
+			Message: "No matching user found",
+		}, nil
+	}
+
+	return &v1.CheckUserResponse{
+		Email:            user.Email,
+		Role:             user.Role,
+		OrganizationName: user.OrganizationName,
+		TenantId:         user.OrganizationID,
+		Message:          "matching user found",
 	}, nil
 }
 
@@ -421,18 +514,123 @@ func (s *UserManagementService) GenerateOrganizationID(ctx context.Context, req 
 	}, nil
 }
 
-func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDetails, error) {
-	var tokenString string
-
-	if tr, ok := transport.FromServerContext(ctx); ok {
-		authHeader := tr.RequestHeader().Get("Authorization")
-		if len(authHeader) > 7 && strings.EqualFold(authHeader[0:7], "Bearer ") {
-			tokenString = authHeader[7:]
-		} else {
-			tokenString = authHeader
-		}
+func normalizeClaimValue(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
 	}
 
+	switch strings.ToLower(trimmed) {
+	case "<no value>", "<nil>", "null", "undefined":
+		return ""
+	default:
+		return trimmed
+	}
+}
+
+func hasValue(value string) bool {
+	return normalizeClaimValue(value) != ""
+}
+
+func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDetails, error) {
+	details, err := s.getOptionalDetailsFromJWTOrSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	details.OrganizationName = normalizeClaimValue(details.OrganizationName)
+	details.OrganizationID = normalizeClaimValue(details.OrganizationID)
+	details.Role = strings.ToLower(normalizeClaimValue(details.Role))
+	details.Email = normalizeClaimValue(details.Email)
+	details.Subject = strings.TrimSpace(details.Subject)
+
+	if details.OrganizationName == "" {
+		return nil, errors.New("organization_name claim not found in token")
+	}
+	if details.OrganizationID == "" {
+		return nil, errors.New("tenant_id claim not found in token")
+	}
+	if details.Role == "" {
+		return nil, errors.New("role claim not found in token")
+	}
+
+	return details, nil
+}
+
+func (s *UserManagementService) getOptionalDetailsFromJWTOrSession(ctx context.Context) (*JWTDetails, error) {
+	if tr, ok := transport.FromServerContext(ctx); ok {
+		authHeader := strings.TrimSpace(tr.RequestHeader().Get("Authorization"))
+		if len(authHeader) > 7 && strings.EqualFold(authHeader[0:7], "Bearer ") {
+			authHeader = strings.TrimSpace(authHeader[7:])
+		}
+
+		authHeader = strings.Trim(authHeader, "\"")
+		if authHeader != "" {
+			details, err := parseJWTDetails(authHeader)
+			if err == nil {
+				return details, nil
+			}
+			s.log.Debugf("Failed to parse JWT from authorization header: %v", err)
+		}
+
+		cookieHeader := strings.TrimSpace(tr.RequestHeader().Get("Cookie"))
+		if cookieHeader == "" {
+			return nil, errors.New("unauthorized: jwt token or session cookie is required")
+		}
+
+		whoamiURL := s.data.KratosPublicURL() + "/sessions/whoami"
+		whoamiReq, err := http.NewRequestWithContext(ctx, http.MethodGet, whoamiURL, nil)
+		if err != nil {
+			s.log.Errorf("Failed to build whoami request: %v", err)
+			return nil, errors.New("internal error: failed to validate session")
+		}
+
+		whoamiReq.Header.Set("Cookie", cookieHeader)
+		whoamiReq.Header.Set("Accept", "application/json")
+
+		whoamiResp, err := s.data.HTTPClient().Do(whoamiReq)
+		if err != nil {
+			s.log.Errorf("Whoami request failed: %v", err)
+			return nil, errors.New("internal error: session validation request failed")
+		}
+		defer whoamiResp.Body.Close()
+
+		if whoamiResp.StatusCode != http.StatusOK {
+			s.log.Warnf("Whoami returned non-200 status: %d", whoamiResp.StatusCode)
+			return nil, errors.New("unauthorized: invalid or expired session")
+		}
+
+		var sessionData struct {
+			Identity struct {
+				ID     string `json:"id"`
+				Traits struct {
+					Email            string `json:"email"`
+					Role             string `json:"role"`
+					OrganizationName string `json:"organization_name"`
+					TenantID         string `json:"tenant_id"`
+				} `json:"traits"`
+			} `json:"identity"`
+		}
+		if err := json.NewDecoder(whoamiResp.Body).Decode(&sessionData); err != nil {
+			s.log.Errorf("Failed to decode whoami response: %v", err)
+			return nil, errors.New("internal error: failed to parse session")
+		}
+
+		details := &JWTDetails{
+			OrganizationName: normalizeClaimValue(sessionData.Identity.Traits.OrganizationName),
+			OrganizationID:   normalizeClaimValue(sessionData.Identity.Traits.TenantID),
+			Role:             strings.ToLower(normalizeClaimValue(sessionData.Identity.Traits.Role)),
+			Email:            normalizeClaimValue(sessionData.Identity.Traits.Email),
+			Subject:          strings.TrimSpace(sessionData.Identity.ID),
+		}
+
+		return details, nil
+	}
+
+	return nil, errors.New("failed to extract transport info")
+}
+
+func parseJWTDetails(tokenString string) (*JWTDetails, error) {
 	tokenString = strings.TrimSpace(tokenString)
 	tokenString = strings.Trim(tokenString, "\"")
 
@@ -442,7 +640,6 @@ func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDeta
 
 	token, _, err := new(jwtv5.Parser).ParseUnverified(tokenString, jwtv5.MapClaims{})
 	if err != nil {
-		s.log.Errorf("Token Parsing Failed: %v", err)
 		return nil, errors.New("failed to parse jwt token")
 	}
 
@@ -489,17 +686,95 @@ func (s *UserManagementService) getDetailsFromJWT(ctx context.Context) (*JWTDeta
 		}
 	}
 
-	if details.OrganizationName == "" {
-		return nil, errors.New("organization_name claim not found in token")
-	}
-	if details.OrganizationID == "" {
-		return nil, errors.New("tenant_id claim not found in token")
-	}
-	if details.Role == "" {
-		return nil, errors.New("role claim not found in token")
+	details.OrganizationName = normalizeClaimValue(details.OrganizationName)
+	details.OrganizationID = normalizeClaimValue(details.OrganizationID)
+	details.Role = normalizeClaimValue(details.Role)
+	details.Email = normalizeClaimValue(details.Email)
+	details.Subject = strings.TrimSpace(details.Subject)
+
+	return details, nil
+}
+
+func hasRequiredOrgTraits(details *JWTDetails) bool {
+	if details == nil {
+		return false
 	}
 
-	details.Role = strings.ToLower(strings.TrimSpace(details.Role))
+	return hasValue(details.OrganizationName) &&
+		hasValue(details.OrganizationID) &&
+		hasValue(details.Role)
+}
+
+func (s *UserManagementService) getDetailsFromJWTOrSession(ctx context.Context) (*JWTDetails, error) {
+	if details, err := s.getDetailsFromJWT(ctx); err == nil {
+		return details, nil
+	}
+
+	tr, ok := transport.FromServerContext(ctx)
+	if !ok {
+		return nil, errors.New("failed to extract transport info")
+	}
+
+	cookieHeader := strings.TrimSpace(tr.RequestHeader().Get("Cookie"))
+	if cookieHeader == "" {
+		return nil, errors.New("unauthorized: jwt token or session cookie is required")
+	}
+
+	whoamiURL := s.data.KratosPublicURL() + "/sessions/whoami"
+	whoamiReq, err := http.NewRequestWithContext(ctx, http.MethodGet, whoamiURL, nil)
+	if err != nil {
+		s.log.Errorf("Failed to build whoami request: %v", err)
+		return nil, errors.New("internal error: failed to validate session")
+	}
+
+	whoamiReq.Header.Set("Cookie", cookieHeader)
+	whoamiReq.Header.Set("Accept", "application/json")
+
+	whoamiResp, err := s.data.HTTPClient().Do(whoamiReq)
+	if err != nil {
+		s.log.Errorf("Whoami request failed: %v", err)
+		return nil, errors.New("internal error: session validation request failed")
+	}
+	defer whoamiResp.Body.Close()
+
+	if whoamiResp.StatusCode != http.StatusOK {
+		s.log.Warnf("Whoami returned non-200 status: %d", whoamiResp.StatusCode)
+		return nil, errors.New("unauthorized: invalid or expired session")
+	}
+
+	var sessionData struct {
+		Identity struct {
+			ID     string `json:"id"`
+			Traits struct {
+				Email            string `json:"email"`
+				Role             string `json:"role"`
+				OrganizationName string `json:"organization_name"`
+				TenantID         string `json:"tenant_id"`
+			} `json:"traits"`
+		} `json:"identity"`
+	}
+	if err := json.NewDecoder(whoamiResp.Body).Decode(&sessionData); err != nil {
+		s.log.Errorf("Failed to decode whoami response: %v", err)
+		return nil, errors.New("internal error: failed to parse session")
+	}
+
+	details := &JWTDetails{
+		OrganizationName: normalizeClaimValue(sessionData.Identity.Traits.OrganizationName),
+		OrganizationID:   normalizeClaimValue(sessionData.Identity.Traits.TenantID),
+		Role:             strings.ToLower(normalizeClaimValue(sessionData.Identity.Traits.Role)),
+		Email:            normalizeClaimValue(sessionData.Identity.Traits.Email),
+		Subject:          strings.TrimSpace(sessionData.Identity.ID),
+	}
+
+	if details.OrganizationName == "" {
+		return nil, errors.New("organization_name claim not found in session")
+	}
+	if details.OrganizationID == "" {
+		return nil, errors.New("tenant_id claim not found in session")
+	}
+	if details.Role == "" {
+		return nil, errors.New("role claim not found in session")
+	}
 
 	return details, nil
 }

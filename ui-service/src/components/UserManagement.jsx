@@ -51,6 +51,7 @@ const UserManagement = () => {
     });
 
     const [formData, setFormData] = useState({
+        method: 'local',
         firstName: '',
         lastName: '',
         email: '',
@@ -245,6 +246,15 @@ const UserManagement = () => {
                 const newErrors = { ...prevErrors };
                 if (newErrors[name]) delete newErrors[name];
 
+                if (name === 'method') {
+                    delete newErrors.firstName;
+                    delete newErrors.lastName;
+                    delete newErrors.password;
+                    delete newErrors.confirmPassword;
+                    delete newErrors.email;
+                    delete newErrors.role;
+                }
+
                 if (name === 'password') {
                     if (updated.confirmPassword && value !== updated.confirmPassword) {
                         newErrors.confirmPassword = "Passwords do not match";
@@ -276,14 +286,19 @@ const UserManagement = () => {
         setApiError('');
         setSuccessMessage('');
 
-        if (!formData.firstName.trim()) errors.firstName = "First name is required";
-        if (!formData.lastName.trim()) errors.lastName = "Last name is required";
+        const method = (formData.method || 'local').toLowerCase();
+
         if (!formData.email.trim() || !validateEmail(formData.email)) errors.email = "Valid email is required";
         if (!formData.role.trim()) errors.role = "Role is required";
-        if (!formData.password) errors.password = "Password is required";
-        if (formData.password && formData.password.length < 8) errors.password = "Password must be at least 8 characters";
-        if (!formData.confirmPassword) errors.confirmPassword = "Confirm password is required";
-        else if (formData.password !== formData.confirmPassword) errors.confirmPassword = "Passwords do not match";
+
+        if (method === 'local') {
+            if (!formData.firstName.trim()) errors.firstName = "First name is required";
+            if (!formData.lastName.trim()) errors.lastName = "Last name is required";
+            if (!formData.password) errors.password = "Password is required";
+            if (formData.password && formData.password.length < 8) errors.password = "Password must be at least 8 characters";
+            if (!formData.confirmPassword) errors.confirmPassword = "Confirm password is required";
+            else if (formData.password !== formData.confirmPassword) errors.confirmPassword = "Passwords do not match";
+        }
 
         if (Object.keys(errors).length > 0) {
             setFormErrors(errors);
@@ -293,15 +308,22 @@ const UserManagement = () => {
         setIsSubmitting(true);
 
         try {
-            const endpoint = '/api/v1/um/create_sub_user';
+            const endpoint = method === 'oidc'
+                ? '/api/v1/um/add_oidc_user'
+                : '/api/v1/um/create_sub_user';
 
-            const payload = {
-                email: formData.email.trim(),
-                password: formData.password,
-                first_name: formData.firstName.trim(),
-                last_name: formData.lastName.trim(),
-                role: formData.role.trim()
-            };
+            const payload = method === 'oidc'
+                ? {
+                    email: formData.email.trim(),
+                    role: formData.role.trim()
+                }
+                : {
+                    email: formData.email.trim(),
+                    password: formData.password,
+                    first_name: formData.firstName.trim(),
+                    last_name: formData.lastName.trim(),
+                    role: formData.role.trim()
+                };
 
             const response = await fetch(endpoint, {
                 method: 'POST',
@@ -315,10 +337,10 @@ const UserManagement = () => {
 
             await parseResponseSafely(
                 response,
-                'Failed to create user'
+                method === 'oidc' ? 'Failed to add OIDC user' : 'Failed to create user'
             );
 
-            setSuccessMessage('User successfully created!');
+            setSuccessMessage(method === 'oidc' ? 'OIDC user successfully added!' : 'User successfully created!');
             await fetchUsers();
 
             setTimeout(() => {
@@ -339,7 +361,7 @@ const UserManagement = () => {
         setApiError('');
         setShowPassword(false);
         setShowConfirmPassword(false);
-        setFormData({ firstName: '', lastName: '', email: '', role: '', password: '', confirmPassword: '' });
+        setFormData({ method: 'local', firstName: '', lastName: '', email: '', role: '', password: '', confirmPassword: '' });
         setFormErrors({});
     };
 
@@ -558,6 +580,19 @@ const UserManagement = () => {
                             )}
 
                             <form onSubmit={handleCreateUser}>
+                                <div className="um-input-group">
+                                    <label>Method <span className="um-req">*</span></label>
+                                    <select
+                                        name="method"
+                                        value={formData.method}
+                                        onChange={handleInputChange}
+                                    >
+                                        <option value="local">Local</option>
+                                        <option value="oidc">Oidc</option>
+                                    </select>
+                                </div>
+
+                                {formData.method === 'local' && (
                                 <div className="um-form-row-split">
                                     <div className="um-input-group">
                                         <label>First name <span className="um-req">*</span></label>
@@ -582,6 +617,7 @@ const UserManagement = () => {
                                         {formErrors.lastName && <span className="um-error-text">{formErrors.lastName}</span>}
                                     </div>
                                 </div>
+                                )}
 
                                 <div className="um-input-group">
                                     <label>Email <span className="um-req">*</span></label>
@@ -609,6 +645,8 @@ const UserManagement = () => {
                                     {formErrors.role && <span className="um-error-text">{formErrors.role}</span>}
                                 </div>
 
+                                {formData.method === 'local' && (
+                                <>
                                 <div className="um-input-group">
                                     <label>Password <span className="um-req">*</span></label>
                                     <div className="um-password-wrapper">
@@ -651,6 +689,8 @@ const UserManagement = () => {
                                     </div>
                                     {formErrors.confirmPassword && <span className="um-error-text">{formErrors.confirmPassword}</span>}
                                 </div>
+                                </>
+                                )}
 
                                 <button
                                     type="submit"
@@ -658,8 +698,8 @@ const UserManagement = () => {
                                     disabled={isSubmitting || successMessage !== ''}
                                 >
                                     {isSubmitting
-                                        ? 'Creating user...'
-                                        : 'Create'}
+                                        ? (formData.method === 'oidc' ? 'Adding OIDC user...' : 'Creating user...')
+                                        : (formData.method === 'oidc' ? 'Add OIDC User' : 'Create')}
                                 </button>
                             </form>
                         </div>

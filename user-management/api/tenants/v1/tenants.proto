@@ -38,7 +38,7 @@ service UserManagementService {
       body: "*"
     };
   }
-  
+
   rpc GetJWTToken (GetJWTTokenRequest) returns (GetJWTTokenResponse) {
     option (google.api.http) = {
       get: "/api/v1/um/token"
@@ -57,6 +57,41 @@ service UserManagementService {
       delete: "/api/v1/um/delete_incomplete_oidc_user/{identity_id}"
     };
   }
+
+  rpc AddOidcUser (AddOidcUserRequest) returns (AddOidcUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/add_oidc_user"
+      body: "*"
+    };
+  }
+
+  rpc CheckUser (CheckUserRequest) returns (CheckUserResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/um/check_user"
+      body: "*"
+    };
+  }
+}
+
+message AddOidcUserRequest {
+  string email = 1;
+  string role = 2;
+}
+
+message AddOidcUserResponse {
+  string message = 1;
+}
+
+message CheckUserRequest {
+  string email = 1;
+}
+
+message CheckUserResponse {
+  string email = 1;
+  string role = 2;
+  string organization_name = 3;
+  string tenant_id = 4;
+  string message = 5;
 }
 
 message CreateSubUserRequest {

@@ -3,10 +3,12 @@ package data
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"user-management/internal/biz"
 
@@ -171,6 +173,26 @@ func (r *tenantsRepo) DeleteIdentity(ctx context.Context, id string) error {
 	return nil
 }
 
+func (r *tenantsRepo) DeletePendingOidcUserByEmail(ctx context.Context, email string) error {
+	db := r.data.DB()
+	if db == nil {
+		return fmt.Errorf("database connection is not configured")
+	}
+
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return nil
+	}
+
+	const q = `
+DELETE FROM login_assist
+WHERE email_id = $1
+`
+
+	_, err := db.ExecContext(ctx, q, email)
+	return err
+}
+
 func (r *tenantsRepo) UpdateIdentity(ctx context.Context, id, firstName, lastName, role string) (*biz.User, error) {
 	getURL := fmt.Sprintf("%s/admin/identities/%s", r.data.KratosAdminURL(), id)
 
@@ -263,4 +285,81 @@ func (r *tenantsRepo) UpdateIdentity(ctx context.Context, id, firstName, lastNam
 		OrganizationID:   orgID,
 		Role:             role,
 	}, nil
+}
+
+func (r *tenantsRepo) UpsertPendingOidcUser(ctx context.Context, email, role, orgName, orgID string) error {
+	db := r.data.DB()
+	if db == nil {
+		return fmt.Errorf("database connection is not configured")
+	}
+
+	const q = `
+INSERT INTO login_assist (email_id, details, status)
+VALUES (
+		$1::text,
+  jsonb_build_object(
+			'role', $2::text,
+			'organization_name', $3::text,
+			'tenant_id', $4::text
+  ),
+  'pending'
+)
+ON CONFLICT (email_id)
+DO UPDATE SET
+  details = EXCLUDED.details,
+  status = 'pending'
+`
+
+	_, err := db.ExecContext(ctx, q, email, role, orgName, orgID)
+	return err
+}
+
+func (r *tenantsRepo) CheckAndCompletePendingUser(ctx context.Context, email string) (*biz.PendingLoginUser, bool, error) {
+	db := r.data.DB()
+	if db == nil {
+		return nil, false, fmt.Errorf("database connection is not configured")
+	}
+
+	const q = `
+WITH matched AS (
+  SELECT email_id, details
+  FROM login_assist
+  WHERE status = 'pending' AND email_id = $1
+  FOR UPDATE
+), updated AS (
+  UPDATE login_assist l
+  SET status = 'completed'
+  FROM matched m
+  WHERE l.email_id = m.email_id
+  RETURNING m.email_id AS email_id, m.details AS details
+)
+SELECT email_id, details
+FROM updated
+`
+
+	var emailID string
+	var detailsRaw []byte
+	err := db.QueryRowContext(ctx, q, email).Scan(&emailID, &detailsRaw)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+
+	var details struct {
+		Role             string `json:"role"`
+		OrganizationName string `json:"organization_name"`
+		TenantID         string `json:"tenant_id"`
+	}
+	if err := json.Unmarshal(detailsRaw, &details); err != nil {
+		return nil, false, err
+	}
+
+	return &biz.PendingLoginUser{
+		Email:            emailID,
+		Role:             details.Role,
+		OrganizationName: details.OrganizationName,
+		OrganizationID:   details.TenantID,
+	}, true, nil
 }

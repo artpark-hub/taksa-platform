@@ -16,11 +16,21 @@ type User struct {
 	Role             string
 }
 
+type PendingLoginUser struct {
+	Email            string
+	Role             string
+	OrganizationName string
+	OrganizationID   string
+}
+
 type TenantsRepo interface {
 	CreateKratosIdentity(ctx context.Context, email, password, firstName, lastName, orgName, orgID, role string) (*User, error)
 	ListIdentitiesByOrg(ctx context.Context, orgName, orgID string) ([]*User, error)
 	DeleteIdentity(ctx context.Context, id string) error
+	DeletePendingOidcUserByEmail(ctx context.Context, email string) error
 	UpdateIdentity(ctx context.Context, id, firstName, lastName, role string) (*User, error)
+	UpsertPendingOidcUser(ctx context.Context, email, role, orgName, orgID string) error
+	CheckAndCompletePendingUser(ctx context.Context, email string) (*PendingLoginUser, bool, error)
 }
 
 type TenantsUsecase struct {
@@ -55,6 +65,18 @@ func (uc *TenantsUsecase) DeleteIncompleteOidcUser(ctx context.Context, id strin
 	return uc.repo.DeleteIdentity(ctx, id)
 }
 
+func (uc *TenantsUsecase) DeletePendingOidcUserByEmail(ctx context.Context, email string) error {
+	return uc.repo.DeletePendingOidcUserByEmail(ctx, email)
+}
+
 func (uc *TenantsUsecase) UpdateUserProfile(ctx context.Context, id, firstName, lastName, role string) (*User, error) {
 	return uc.repo.UpdateIdentity(ctx, id, firstName, lastName, role)
+}
+
+func (uc *TenantsUsecase) UpsertPendingOidcUser(ctx context.Context, email, role, orgName, orgID string) error {
+	return uc.repo.UpsertPendingOidcUser(ctx, email, role, orgName, orgID)
+}
+
+func (uc *TenantsUsecase) CheckAndCompletePendingUser(ctx context.Context, email string) (*PendingLoginUser, bool, error) {
+	return uc.repo.CheckAndCompletePendingUser(ctx, email)
 }
