@@ -45,22 +45,7 @@ const Instances = () => {
             lastFetchStartedAtRef.current = now;
 
             try {
-                const storedData = localStorage.getItem('taksa_user');
-                const parsedUser = storedData ? JSON.parse(storedData) : null;
-                const createdBy = parsedUser?.email || '';
-
-                if (!createdBy) {
-                    if (!cancelled) {
-                        setFetchError('User email not found. Please log in again.');
-                        setIsLoading(false);
-                    }
-                    return;
-                }
-
-                const params = new URLSearchParams();
-                params.set('created_by', createdBy);
-
-                const response = await fetch(`/api/v1/devicemgmt/devices?${params.toString()}`, {
+                const response = await fetch('/api/v1/devicemgmt/devices', {
                     method: 'GET',
                     headers: {
                         Accept: 'application/json'
@@ -363,6 +348,12 @@ const Instances = () => {
                                                             <span className="level-label">ID:</span>
                                                             <span className="expanded-id-value">{instance.id || '--'}</span>
                                                         </div>
+                                                        {instance.createdBy && (
+                                                            <div className="level-item">
+                                                                <span className="level-label">Created By:</span>
+                                                                <span>{instance.createdBy}</span>
+                                                            </div>
+                                                        )}
                                                         {levels.length > 0 ? (
                                                             levels.map(([level, value]) => (
                                                                 <div className="level-item" key={`${instance.id}-${level}`}>

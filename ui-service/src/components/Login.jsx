@@ -100,22 +100,6 @@ const Login = () => {
         return loginAttemptTs > 0 && Date.now() - loginAttemptTs < 10 * 60 * 1000;
     };
 
-    const hasRequiredOrgTraits = (traits = {}) => {
-        return Boolean(
-            String(traits?.organization_name || '').trim() &&
-            String(traits?.tenant_id || '').trim()
-        );
-    };
-
-    const identityHasNoOrgAndTenant = (identity) => {
-        const traits = identity?.traits || {};
-
-        return Boolean(
-            !String(traits?.organization_name || '').trim() &&
-            !String(traits?.tenant_id || '').trim()
-        );
-    };
-
     const storeUserInLocalStorage = (identity) => {
         const traits = identity?.traits || {};
 
@@ -250,7 +234,69 @@ const Login = () => {
         return organizationId;
     };
 
-    const updateIdentityTraits = async ({ identity, organizationName, tenantId }) => {
+    const checkUserStatus = async (email) => {
+        const normalizedEmail = String(email || '').trim().toLowerCase();
+        if (!normalizedEmail) {
+            return {
+                message: ''
+            };
+        }
+
+        const response = await fetch('/api/v1/um/check_user', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                email: normalizedEmail
+            })
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(
+                data?.message ||
+                data?.error?.message ||
+                'Failed to check user'
+            );
+        }
+
+        const role = String(
+            data?.role ||
+            data?.data?.role ||
+            ''
+        ).trim().toLowerCase();
+
+        const organizationName = String(
+            data?.organization_name ||
+            data?.organizationName ||
+            data?.data?.organization_name ||
+            data?.data?.organizationName ||
+            ''
+        ).trim();
+
+        const tenantId = String(
+            data?.tenant_id ||
+            data?.tenantId ||
+            data?.data?.tenant_id ||
+            data?.data?.tenantId ||
+            ''
+        ).trim();
+
+        const message = String(data?.message || '').trim();
+
+        return {
+            role,
+            organizationName,
+            tenantId,
+            message
+        };
+    };
+
+    const updateIdentityTraits = async ({ identity, organizationName, tenantId, role }) => {
         const traits = identity?.traits || {};
 
         const initRes = await fetch('/self-service/settings/browser', {
@@ -295,7 +341,7 @@ const Login = () => {
                 first: traits.name?.first || '',
                 last: traits.name?.last || ''
             },
-            role: traits.role || 'master',
+            role: String(role || traits.role || 'master').trim().toLowerCase(),
             organization_name: organizationName,
             tenant_id: tenantId
         };
@@ -373,15 +419,46 @@ const Login = () => {
         }
 
         const traits = identity?.traits || {};
+        let finalIdentity = identity;
 
-        if (!hasRequiredOrgTraits(traits)) {
+        const userStatus = await checkUserStatus(traits?.email || '');
+        const normalizedMessage = String(userStatus.message || '').toLowerCase();
+
+        if (normalizedMessage === 'user is already registered.') {
+            const refreshedIdentity = await fetchSessionIdentity();
+            if (refreshedIdentity) {
+                finalIdentity = refreshedIdentity;
+            }
+        } else if (userStatus.organizationName && userStatus.tenantId) {
+            const updated = await updateIdentityTraits({
+                identity,
+                organizationName: userStatus.organizationName,
+                tenantId: userStatus.tenantId,
+                role: userStatus.role
+            });
+
+            if (!updated) {
+                return false;
+            }
+
+            const refreshedIdentity = await fetchSessionIdentity();
+            if (
+                !refreshedIdentity ||
+                !String(refreshedIdentity?.traits?.organization_name || '').trim() ||
+                !String(refreshedIdentity?.traits?.tenant_id || '').trim()
+            ) {
+                throw new Error('Failed to sync matched organization details. Please try again.');
+            }
+
+            finalIdentity = refreshedIdentity;
+        } else {
             openOrganisationModal(identity);
             return false;
         }
 
         clearGoogleLoginState();
 
-        storeUserInLocalStorage(identity);
+        storeUserInLocalStorage(finalIdentity);
         await fetchJwt();
 
         router.push('/dashboard');
@@ -554,7 +631,10 @@ const Login = () => {
             throw new Error('Unable to verify incomplete Google account before deletion.');
         }
 
-        if (!identityHasNoOrgAndTenant(latestIdentity)) {
+        if (
+            String(latestIdentity?.traits?.organization_name || '').trim() ||
+            String(latestIdentity?.traits?.tenant_id || '').trim()
+        ) {
             throw new Error('Account deletion skipped because organisation details already exist.');
         }
 
@@ -651,7 +731,10 @@ const Login = () => {
                 throw new Error('Unable to verify updated session. Please sign in again.');
             }
 
-            if (!hasRequiredOrgTraits(updatedIdentity?.traits || {})) {
+            if (
+                !String(updatedIdentity?.traits?.organization_name || '').trim() ||
+                !String(updatedIdentity?.traits?.tenant_id || '').trim()
+            ) {
                 throw new Error('Organisation details were not saved. Please try again.');
             }
 

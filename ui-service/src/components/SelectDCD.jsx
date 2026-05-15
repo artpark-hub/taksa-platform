@@ -63,21 +63,7 @@ const SelectDCD = () => {
             try {
                 setIsLoading(true);
 
-                const storedData = localStorage.getItem('taksa_user');
-                const parsedUser = storedData ? JSON.parse(storedData) : null;
-                const createdBy = parsedUser?.email || '';
-
-                if (!createdBy) {
-                    if (!cancelled) {
-                        setFetchError('User email not found. Please log in again.');
-                        setDevices([]);
-                        setIsLoading(false);
-                    }
-                    return;
-                }
-
                 const params = new URLSearchParams();
-                params.set('created_by', createdBy);
                 params.set('status', 'ACTIVE');
 
                 const response = await fetch(`/api/v1/devicemgmt/devices?${params.toString()}`, {
