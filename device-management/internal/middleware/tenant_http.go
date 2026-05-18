@@ -95,17 +95,34 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 				return handler(ctx, req)
 			}
 
-			// Try Authorization header first (console APIs via Oathkeeper)
+			bearerFromHeader := ""
+			if authHeader := request.Header.Get("Authorization"); authHeader != "" {
+				bearerFromHeader = extractBearerTokenFromHeader(authHeader)
+			}
+
 			tokenStr := ""
 			fromCookie := false
-			if authHeader := request.Header.Get("Authorization"); authHeader != "" {
-				tokenStr = extractBearerTokenFromHeader(authHeader)
-			}
-			// Fall back to "token" cookie (device APIs after Login)
-			if tokenStr == "" {
-				if cookie, err := request.Cookie("token"); err == nil && cookie.Value != "" {
-					tokenStr = cookie.Value
-					fromCookie = true
+			// Instance routes: accept verified DM bearer OR token cookie (not a non-DM bearer alone).
+			if requiresVerifiedDeviceSessionHTTP(request.URL.Path) {
+				if bearerFromHeader != "" && jwtSecret != "" {
+					if _, _, ok := tryVerifyDeviceJWTHS256(bearerFromHeader, jwtSecret); ok {
+						tokenStr = bearerFromHeader
+					}
+				}
+				if tokenStr == "" {
+					if cookie, err := request.Cookie("token"); err == nil && cookie.Value != "" {
+						tokenStr = cookie.Value
+						fromCookie = true
+					}
+				}
+			} else {
+				// Console and other APIs: Authorization header first, then cookie.
+				tokenStr = bearerFromHeader
+				if tokenStr == "" {
+					if cookie, err := request.Cookie("token"); err == nil && cookie.Value != "" {
+						tokenStr = cookie.Value
+						fromCookie = true
+					}
 				}
 			}
 

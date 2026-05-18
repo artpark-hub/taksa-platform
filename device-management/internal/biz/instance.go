@@ -641,10 +641,21 @@ func actionToJSONContent(action *models.Action) (string, error) {
 //   - content: JSON string with MessageType and Payload
 //   - Payload.actionUUID: Secondary correlation identifier
 //
-// Device ID resolution (in order of preference):
-//  1. umhInstance field in message (if populated by umh-core)
-//  2. jwtDeviceID parameter (extracted from JWT cookie)
-//  3. Error if both missing
+// resolvePushDeviceID binds push handling to the authenticated device. When jwtDeviceID is set,
+// umhInstance must match or be empty; the JWT device id is always used for persistence and sync.
+func resolvePushDeviceID(jwtDeviceID, umhInstance string) (string, error) {
+	if jwtDeviceID == "" {
+		if umhInstance == "" {
+			return "", fmt.Errorf("device instance UUID is empty: not found in message umhInstance or JWT token")
+		}
+		return umhInstance, nil
+	}
+	if umhInstance != "" && umhInstance != jwtDeviceID {
+		return "", fmt.Errorf("umhInstance %q does not match authenticated device %q", umhInstance, jwtDeviceID)
+	}
+	return jwtDeviceID, nil
+}
+
 func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{}, jwtDeviceID string) error {
 	if messages == nil {
 		return nil
@@ -659,27 +670,16 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 			return nil
 		}
 
-		// Extract device ID from first message (primary source)
-		if protoMsgs[0].UmhInstance != "" {
-			deviceID = protoMsgs[0].UmhInstance
-		}
-
-		// Fallback to JWT device ID if message doesn't have it
-		if deviceID == "" && jwtDeviceID != "" {
-			deviceID = jwtDeviceID
-		}
-
-		if deviceID == "" {
-			return fmt.Errorf("device instance UUID is empty: not found in message umhInstance or JWT token")
+		var err error
+		deviceID, err = resolvePushDeviceID(jwtDeviceID, protoMsgs[0].UmhInstance)
+		if err != nil {
+			return err
 		}
 
 		// Get tenant_id from context (set by middleware from JWT)
 		tenantID := middleware.GetTenantID(ctx)
 
-		// last_seen must reflect the authenticated device identity only (not umhInstance body).
-		if id := middleware.GetDeviceID(ctx); id != "" {
-			_ = uc.store.Devices().UpdateLastSeen(ctx, id, time.Now())
-		}
+		_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
 
 		// Track message types for summary
 		messageTypeCount := make(map[string]int)
@@ -781,18 +781,14 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 		return nil
 	}
 
-	// Extract device ID from first message (primary source)
-	if umhInstance, ok := msgSlice[0]["umhInstance"].(string); ok && umhInstance != "" {
-		deviceID = umhInstance
+	umhInstance := ""
+	if v, ok := msgSlice[0]["umhInstance"].(string); ok {
+		umhInstance = v
 	}
-
-	// Fallback to JWT device ID if message doesn't have it
-	if deviceID == "" && jwtDeviceID != "" {
-		deviceID = jwtDeviceID
-	}
-
-	if deviceID == "" {
-		return fmt.Errorf("device instance UUID is empty: not found in message umhInstance or JWT token")
+	var err error
+	deviceID, err = resolvePushDeviceID(jwtDeviceID, umhInstance)
+	if err != nil {
+		return err
 	}
 
 	// Verify device exists
@@ -808,9 +804,7 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 		return fmt.Errorf("missing tenant ID in context")
 	}
 
-	if id := middleware.GetDeviceID(ctx); id != "" {
-		_ = uc.store.Devices().UpdateLastSeen(ctx, id, time.Now())
-	}
+	_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
 
 	// Persist each message
 	for _, msg := range msgSlice {

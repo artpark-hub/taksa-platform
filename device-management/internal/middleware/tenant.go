@@ -21,6 +21,9 @@ const (
 	AuthorizationHeader        = "authorization"
 	TenantIDContextKey  ctxKey = "tenant_id"
 	DeviceIDContextKey  ctxKey = "device_id"
+	// AuthorizationContextKey holds the bearer credential for Login (raw auth token hash).
+	// Same string value as service.AuthorizationKey for HTTP/gRPC Login handlers.
+	AuthorizationContextKey ctxKey = "authorization"
 	// deviceJWTVerifiedCtxKey is set when the request carried a device JWT whose signature
 	// was verified by this service (HTTP cookie, verified Authorization HS256 from Login, or gRPC equivalent).
 	// Edge Instance APIs require this before handlers run (see grpcAuthContext and HTTP tenant middleware).
@@ -51,6 +54,32 @@ func isGRPCInstanceLogin(fullMethod string) bool {
 	return strings.HasSuffix(fullMethod, "InstanceService/Login")
 }
 
+// SetAuthorizationToken stores the Login bearer credential (auth token hash) in context.
+func SetAuthorizationToken(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, AuthorizationContextKey, token)
+}
+
+// GetAuthorizationToken returns the Login bearer credential from context.
+func GetAuthorizationToken(ctx context.Context) string {
+	v, _ := ctx.Value(AuthorizationContextKey).(string)
+	return v
+}
+
+func authorizationFromGRPCMetadata(ctx context.Context) context.Context {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ctx
+	}
+	authHeaders := md.Get(AuthorizationHeader)
+	if len(authHeaders) == 0 {
+		return ctx
+	}
+	if token := extractBearerToken(authHeaders[0]); token != "" {
+		return SetAuthorizationToken(ctx, token)
+	}
+	return ctx
+}
+
 // tryVerifyDeviceJWTHS256 validates a JWT issued by device-management Login (HS256, server secret).
 func tryVerifyDeviceJWTHS256(tokenString, jwtSecret string) (tenantID, deviceID string, ok bool) {
 	if jwtSecret == "" || tokenString == "" {
@@ -76,9 +105,9 @@ func tryVerifyDeviceJWTHS256(tokenString, jwtSecret string) (tenantID, deviceID 
 }
 
 func grpcAuthContext(ctx context.Context, fullMethod, jwtSecret string) (context.Context, error) {
-	// Login uses the raw auth token (not a JWT); do not parse Authorization as JWT.
+	// Login uses the raw auth token (not a JWT); extract bearer hash for the handler.
 	if isGRPCInstanceLogin(fullMethod) {
-		return ctx, nil
+		return authorizationFromGRPCMetadata(ctx), nil
 	}
 
 	md, ok := metadata.FromIncomingContext(ctx)

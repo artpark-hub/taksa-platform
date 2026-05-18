@@ -8,6 +8,8 @@ import (
 	"github.com/go-kratos/kratos/v2/transport"
 	httptransport "github.com/go-kratos/kratos/v2/transport/http"
 	"go.uber.org/zap"
+
+	mw "github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 )
 
 // Context key types for storing values in context
@@ -53,8 +55,7 @@ func AuthMiddleware(logger *zap.Logger) middleware.Middleware {
 					logger.Debug("Authorization header found",
 						zap.Bool("has_token", true),
 					)
-					// Store in context with typed key
-					ctx = context.WithValue(ctx, AuthorizationKey, token)
+					ctx = mw.SetAuthorizationToken(ctx, token)
 				}
 			} else {
 				logger.Debug("No authorization header provided",
