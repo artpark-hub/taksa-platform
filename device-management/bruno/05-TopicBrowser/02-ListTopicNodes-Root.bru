@@ -1,0 +1,49 @@
+meta {
+  name: List Topic Nodes (root)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/topics/nodes/list
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{console_bearer_token}}
+}
+
+body:json {
+  {
+    "device_id": "{{device_id}}",
+    "path_prefix": []
+  }
+}
+
+script:post-response {
+  const b = res.getBody();
+  if (b && b.nodes) {
+    console.log('root nodes:', b.nodes.map(n => n.segment).join(', '));
+    const ent = b.nodes.find(n => n.segment === 'Enterprise');
+    if (ent) bru.setEnvVar('topic_path_prefix', JSON.stringify(['Enterprise']));
+  }
+}
+
+tests {
+  test('Status 200', function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test('Returns nodes array', function() {
+    const b = res.getBody();
+    expect(b).to.have.property('nodes');
+    expect(b.nodes).to.be.an('array');
+  });
+
+  test('Has Enterprise segment when data loaded', function() {
+    const b = res.getBody();
+    const names = (b.nodes || []).map(n => n.segment);
+    expect(names).to.include('Enterprise');
+  });
+}

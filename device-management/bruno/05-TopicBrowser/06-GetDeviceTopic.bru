@@ -1,0 +1,42 @@
+meta {
+  name: Get Device Topic
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/topics/detail?uns_tree_id={{topic_uns_tree_id}}
+}
+
+headers {
+  Authorization: Bearer {{console_bearer_token}}
+}
+
+script:pre-request {
+  const id = bru.getEnvVar('topic_uns_tree_id');
+  if (!id) throw new Error('topic_uns_tree_id not set — run 04-ListDeviceTopics first');
+}
+
+script:post-response {
+  const t = res.getBody();
+  if (t) console.log('topic:', t.topic, 'tree:', t.unsTreeId);
+}
+
+tests {
+  test('Status 200', function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test('Topic has canonical path', function() {
+    const t = res.getBody();
+    expect(t).to.have.property('topic');
+    expect(t.topic).to.be.a('string');
+    expect(t.topic.length).to.be.above(0);
+  });
+
+  test('Has level_0 and name', function() {
+    const t = res.getBody();
+    expect(t).to.have.property('level_0');
+    expect(t).to.have.property('name');
+  });
+}

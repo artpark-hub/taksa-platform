@@ -96,7 +96,7 @@ Implemented in `internal/topicbrowser/merge.go`.
 | Condition | `FullCatalogReplace` | Database effect |
 |-----------|---------------------|-----------------|
 | `topicCount == 0` | `true` | **Clear** all `device_topics` rows for that tenant + device (authoritative empty catalog). |
-| Any decoded bundle has `len(uns_map.entries) == topicCount` and `topicCount > 0` | `true` | **Replace all** rows with the merged row set (full snapshot heuristic). |
+| `unsBundles["0"]` decodes and `len(uns_map.entries) == topicCount` with `topicCount > 0` | `true` | **Replace all** rows (umh-core bootstrap full cache snapshot). |
 | Otherwise | `false` | **Upsert** merged rows only; **no deletes** of topics missing from the payload. |
 
 **Event merging:** For each `uns_tree_id`, the event with the greatest `produced_at_ms` wins across bundles.
@@ -107,7 +107,7 @@ Implemented in `internal/topicbrowser/merge.go`.
 
 ## Full-catalog heuristic: limitations and producer invariants
 
-The condition `len(uns_map.entries) == topicCount` (for some **single** decoded bundle, with `topicCount > 0`) is **not** a proof that the map is complete. It is a **heuristic** that matches the “cache bundle” shape in umh-core: equality is only safe if producers maintain an invariant along the lines of:
+The condition on **bundle index `0` only** (`len(uns_map.entries) == topicCount`) is **not** a proof that the map is complete in all edge cases, but it matches umh-core’s bootstrap snapshot shape. It is a **heuristic** that matches the “cache bundle” shape in umh-core: equality is only safe if producers maintain an invariant along the lines of:
 
 > Whenever a status message includes `topicCount` and an `uns_map` whose entry count equals that number, that map is the **authoritative full** UNS topic set for the device at that time.
 
@@ -154,7 +154,20 @@ Stores canonical path, tree id, level metadata, `metadata_json`, optional serial
 - **`text`** — Case-insensitive substring on `canonical_topic` **or** the text serialization of `metadata_json` (GraphQL-style topic text filter).
 - **`meta`** — AND of exact key/value pairs on metadata (`jsonb_each_text`).
 
-Default page size **20**, maximum **100** (see `DeviceTopicRepo.ListDeviceTopics`).
+Default page size **100**, maximum **500**. Responses include `total_count` and `filtered_count`.
+
+Table: `device_topic_catalog` — per-device sync metadata (`last_synced_at`, counts, `last_sync_mode`, `catalog_stale_warning` via API).
+
+---
+
+## API surface (DM-only enhancements)
+
+| RPC | HTTP | Purpose |
+|-----|------|---------|
+| `ListDeviceTopics` | `POST .../topics/list` | Flat list + `text`, `meta`, `path_prefix`, `omit_last_event`, pagination |
+| `GetDeviceTopic` | `GET .../topics/detail` | Single topic |
+| `GetDeviceTopicCatalogStatus` | `GET .../topics/catalog-status` | Sync metadata and staleness hint |
+| `ListTopicNodes` | `POST .../topics/nodes/list` | Lazy tree children at `path_prefix` |
 
 ---
 

@@ -29,6 +29,14 @@ enum TopicScalarType {
   BOOLEAN = 3;
 }
 
+// How the last status sync updated the materialized catalog.
+enum TopicCatalogSyncMode {
+  TOPIC_CATALOG_SYNC_MODE_UNSPECIFIED = 0;
+  INCREMENTAL = 1;
+  FULL_REPLACE = 2;
+  EMPTY = 3; // topicCount == 0, catalog cleared
+}
+
 // Time-series last event (parity with GraphQL TimeSeriesEvent).
 message TopicTimeSeriesEvent {
   google.protobuf.Timestamp produced_at = 1;
@@ -66,23 +74,64 @@ message DeviceTopic {
 
 message ListDeviceTopicsRequest {
   string device_id = 1;
-  int32 page_size = 2 [json_name = "page_size"]; // Page size (0 = default 20, max 100). Applied after text/meta filters.
+  int32 page_size = 2 [json_name = "page_size"]; // 0 = default 100, max 500
   string page_token = 3 [json_name = "page_token"];
-  // Substring filter on canonical topic path OR metadata keys/values (case-insensitive), same semantics as GraphQL TopicFilter.text.
   string text = 4;
-  // All meta constraints must match (AND), same as GraphQL TopicFilter.meta.
   repeated TopicMetaEq meta = 5;
+  // Canonical path prefix (dot-separated), e.g. "Enterprise.Site.Line1."
+  string path_prefix = 6 [json_name = "path_prefix"];
+  // When true, omit last_event from each topic (smaller payloads for tree shells).
+  bool omit_last_event = 7 [json_name = "omit_last_event"];
 }
 
 message ListDeviceTopicsResponse {
   repeated DeviceTopic topics = 1;
   string next_page_token = 2 [json_name = "next_page_token"];
+  int32 total_count = 3 [json_name = "total_count"];
+  int32 filtered_count = 4 [json_name = "filtered_count"];
 }
 
 message GetDeviceTopicRequest {
   string device_id = 1;
-  // Lookup by stable tree id (hex xxhash), preferred.
   string uns_tree_id = 2 [json_name = "uns_tree_id"];
-  // Exact canonical topic string (same as GraphQL topic(topic: "...")).
   string canonical_topic = 3 [json_name = "canonical_topic"];
+}
+
+// Materialized catalog sync state for a device (from status, no edge changes).
+message DeviceTopicCatalogStatus {
+  string device_id = 1;
+  google.protobuf.Timestamp catalog_last_synced_at = 2;
+  int32 reported_topic_count = 3 [json_name = "reported_topic_count"];
+  int32 materialized_topic_count = 4 [json_name = "materialized_topic_count"];
+  TopicCatalogSyncMode last_sync_mode = 5 [json_name = "last_sync_mode"];
+  google.protobuf.Timestamp last_full_replace_at = 6 [json_name = "last_full_replace_at"];
+  bool last_had_bundle_zero = 7 [json_name = "last_had_bundle_zero"];
+  // True when materialized count exceeds last reported count (incremental-only sync for a while).
+  bool catalog_stale_warning = 8 [json_name = "catalog_stale_warning"];
+}
+
+message GetDeviceTopicCatalogStatusRequest {
+  string device_id = 1;
+}
+
+// One node in the UNS hierarchy (lazy tree expand).
+message TopicTreeNode {
+  string segment = 1;
+  bool is_leaf = 2 [json_name = "is_leaf"];
+  int32 descendant_leaf_count = 3 [json_name = "descendant_leaf_count"];
+  string uns_tree_id = 4 [json_name = "uns_tree_id"];
+  string canonical_topic = 5 [json_name = "canonical_topic"];
+}
+
+message ListTopicNodesRequest {
+  string device_id = 1;
+  // Segments already expanded, e.g. ["Enterprise", "Site"] for children under Enterprise.Site
+  repeated string path_prefix = 2 [json_name = "path_prefix"];
+  string text = 3;
+  repeated TopicMetaEq meta = 4;
+}
+
+message ListTopicNodesResponse {
+  repeated TopicTreeNode nodes = 1;
+  string path_prefix = 2 [json_name = "path_prefix"];
 }

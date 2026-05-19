@@ -26,11 +26,22 @@ type UpsertRow struct {
 	LastEvent      *unsv1.EventTableEntry
 }
 
+// CatalogSyncMode describes how DM should persist this merge.
+type CatalogSyncMode string
+
+const (
+	CatalogSyncIncremental CatalogSyncMode = "INCREMENTAL"
+	CatalogSyncFullReplace CatalogSyncMode = "FULL_REPLACE"
+	CatalogSyncEmpty       CatalogSyncMode = "EMPTY"
+)
+
 // MergeResult is the outcome of merging topicBrowser from one status message.
 type MergeResult struct {
-	Rows                 []UpsertRow
-	FullCatalogReplace   bool // when true, DM should replace all device_topics for this device with Rows (edge sent a full UNS map in one bundle, or empty catalog)
-	ReportedTopicCount   int  // core.topicBrowser.topicCount from status (0 = valid)
+	Rows               []UpsertRow
+	FullCatalogReplace bool // when true, DM should replace all device_topics for this device with Rows
+	ReportedTopicCount int  // core.topicBrowser.topicCount from status (-1 if missing)
+	SyncMode           CatalogSyncMode
+	HadBundleZero      bool // unsBundles contained key "0" with a decodable full snapshot
 }
 
 // MergeFromStatusMessageContent extracts core.topicBrowser from a status message body,
@@ -38,10 +49,10 @@ type MergeResult struct {
 // (latest event per uns_tree_id wins by produced_at_ms).
 //
 // FullCatalogReplace is derived only from fields already present on the wire:
-//   - topicCount == 0  → treat as authoritative empty catalog (replace with no rows).
-//   - some decoded bundle's uns_map has len(entries) == topicCount and topicCount > 0
-//     → that bundle is a full UNS snapshot (same shape as umh-core cache bundle), safe to replace DB rows.
-// Otherwise only incremental topic info is present → callers should upsert without deleting stale keys.
+//   - topicCount == 0  → authoritative empty catalog (clear rows).
+//   - unsBundles["0"] decodes to a bundle whose uns_map has len(entries) == topicCount and topicCount > 0
+//     → bootstrap full snapshot (umh-core sends complete cache as bundle 0 for new subscribers).
+// Otherwise incremental upsert only (no deletes of stale topics).
 func MergeFromStatusMessageContent(messageContent string) (MergeResult, error) {
 	var out MergeResult
 	payload, err := DecodeStatusPayload(messageContent)
@@ -64,13 +75,22 @@ func MergeFromStatusMessageContent(messageContent string) (MergeResult, error) {
 		rawBundles = tb["UnsBundles"]
 	}
 	if rawBundles == nil {
-		// No bundles; still honor empty catalog if edge says so.
-		out.FullCatalogReplace = topicCount == 0
+		if topicCount == 0 {
+			out.FullCatalogReplace = true
+			out.SyncMode = CatalogSyncEmpty
+		} else {
+			out.SyncMode = CatalogSyncIncremental
+		}
 		return out, nil
 	}
 	bundleMap, ok := rawBundles.(map[string]interface{})
 	if !ok || len(bundleMap) == 0 {
-		out.FullCatalogReplace = topicCount == 0
+		if topicCount == 0 {
+			out.FullCatalogReplace = true
+			out.SyncMode = CatalogSyncEmpty
+		} else {
+			out.SyncMode = CatalogSyncIncremental
+		}
 		return out, nil
 	}
 	indices := make([]int, 0, len(bundleMap))
@@ -86,6 +106,7 @@ func MergeFromStatusMessageContent(messageContent string) (MergeResult, error) {
 	topics := make(map[string]*unsv1.TopicInfo)
 	events := make(map[string]*unsv1.EventTableEntry)
 	fullCatalogReplace := false
+	hadBundleZero := false
 
 	if topicCount == 0 {
 		fullCatalogReplace = true
@@ -104,8 +125,10 @@ func MergeFromStatusMessageContent(messageContent string) (MergeResult, error) {
 		}
 		if um := ub.GetUnsMap(); um != nil && um.GetEntries() != nil {
 			n := len(um.GetEntries())
-			if topicCount > 0 && n == topicCount {
+			// Bundle 0 is the umh-core bootstrap full cache snapshot for new subscribers.
+			if idx == 0 && topicCount > 0 && n == topicCount {
 				fullCatalogReplace = true
+				hadBundleZero = true
 			}
 			for id, info := range um.GetEntries() {
 				if info == nil {
@@ -168,6 +191,15 @@ func MergeFromStatusMessageContent(messageContent string) (MergeResult, error) {
 
 	out.Rows = rows
 	out.FullCatalogReplace = fullCatalogReplace
+	out.HadBundleZero = hadBundleZero
+	switch {
+	case topicCount == 0:
+		out.SyncMode = CatalogSyncEmpty
+	case fullCatalogReplace:
+		out.SyncMode = CatalogSyncFullReplace
+	default:
+		out.SyncMode = CatalogSyncIncremental
+	}
 	return out, nil
 }
 

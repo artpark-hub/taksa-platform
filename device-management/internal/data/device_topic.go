@@ -25,11 +25,13 @@ func NewDeviceTopicRepo(d *Data) *DeviceTopicRepo {
 
 // ListDeviceTopicsQuery filters and pages topic rows.
 type ListDeviceTopicsQuery struct {
-	DeviceID string
-	Text     string // substring on canonical path or metadata (ILIKE), GraphQL text filter semantics
-	Meta     []TopicMetaEq
-	Offset   int64
-	Limit    int64 // page size, max 100
+	DeviceID       string
+	Text           string
+	PathPrefix     string
+	Meta           []TopicMetaEq
+	Offset         int64
+	Limit          int64 // page size, max 500
+	OmitLastEvent  bool
 }
 
 // TopicMetaEq is one metadata key = value constraint.
@@ -195,25 +197,17 @@ type DeviceTopicRow struct {
 
 // ListDeviceTopics returns topics ordered by canonical_topic.
 func (r *DeviceTopicRepo) ListDeviceTopics(ctx context.Context, tenantID string, q ListDeviceTopicsQuery) ([]DeviceTopicRow, error) {
-	if q.Limit <= 0 || q.Limit > 100 {
-		q.Limit = 20
+	if q.Limit <= 0 || q.Limit > 500 {
+		q.Limit = 100
 	}
-	args := []interface{}{tenantID, q.DeviceID}
+	args := make([]interface{}, 0, 12)
 	sb := strings.Builder{}
-	sb.WriteString(`SELECT uns_tree_id, canonical_topic, level0, location_sublevels::text, data_contract, virtual_path, name, metadata_json::text, last_event_json::text, last_event_at, updated_at
-FROM device_topics WHERE tenant_id = ? AND device_id = ?`)
-	if q.Text != "" {
-		sb.WriteString(` AND (canonical_topic ILIKE ? OR metadata_json::text ILIKE ?)`)
-		pat := "%" + q.Text + "%"
-		args = append(args, pat, pat)
+	if q.OmitLastEvent {
+		sb.WriteString(`SELECT uns_tree_id, canonical_topic, level0, location_sublevels::text, data_contract, virtual_path, name, metadata_json::text, NULL::text, NULL::timestamptz, updated_at`)
+	} else {
+		sb.WriteString(`SELECT uns_tree_id, canonical_topic, level0, location_sublevels::text, data_contract, virtual_path, name, metadata_json::text, last_event_json::text, last_event_at, updated_at`)
 	}
-	for _, m := range q.Meta {
-		if m.Key == "" {
-			continue
-		}
-		sb.WriteString(` AND EXISTS (SELECT 1 FROM jsonb_each_text(metadata_json) AS e WHERE e.key = ? AND e.value = ?)`)
-		args = append(args, m.Key, m.Eq)
-	}
+	r.appendTopicFilters(&sb, &args, tenantID, q.DeviceID, q.Text, q.PathPrefix, q.Meta)
 	sb.WriteString(` ORDER BY canonical_topic ASC OFFSET ? LIMIT ?`)
 	args = append(args, q.Offset, q.Limit+1)
 

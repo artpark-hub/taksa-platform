@@ -459,3 +459,20 @@ CREATE INDEX IF NOT EXISTS idx_device_topics_tenant_device ON device_topics(tena
 CREATE INDEX IF NOT EXISTS idx_device_topics_canonical ON device_topics(device_id, canonical_topic);
 CREATE INDEX IF NOT EXISTS idx_device_topics_updated ON device_topics(device_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_device_topics_metadata_gin ON device_topics USING gin (metadata_json);
+CREATE INDEX IF NOT EXISTS idx_device_topics_canonical_prefix ON device_topics (tenant_id, device_id, canonical_topic varchar_pattern_ops);
+
+-- Per-device topic catalog sync metadata (from status core.topicBrowser).
+CREATE TABLE IF NOT EXISTS device_topic_catalog (
+  tenant_id UUID NOT NULL,
+  device_id TEXT NOT NULL,
+  last_synced_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reported_topic_count INT NOT NULL DEFAULT -1,
+  materialized_topic_count INT NOT NULL DEFAULT 0,
+  last_sync_mode TEXT NOT NULL DEFAULT 'INCREMENTAL',
+  last_full_replace_at TIMESTAMP WITH TIME ZONE,
+  last_had_bundle_zero BOOLEAN NOT NULL DEFAULT FALSE,
+  PRIMARY KEY (tenant_id, device_id),
+  CONSTRAINT fk_device_topic_catalog_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_topic_catalog_device ON device_topic_catalog(device_id);

@@ -8,8 +8,6 @@ import (
 )
 
 // syncDeviceTopicsFromStatusMessage materializes UNS topics from core.topicBrowser (UnsBundle frames).
-// When the status payload already signals a full catalog (topicCount plus a matching full uns_map bundle,
-// or topicCount == 0), we replace all rows for the device so DM stays aligned without edge changes.
 func (uc *InstanceUsecase) syncDeviceTopicsFromStatusMessage(ctx context.Context, tenantID, deviceID, messageContent string) error {
 	if uc.deviceTopicRepo == nil {
 		return nil
@@ -20,17 +18,25 @@ func (uc *InstanceUsecase) syncDeviceTopicsFromStatusMessage(ctx context.Context
 		return nil
 	}
 
+	recordCatalog := func() {
+		if err := uc.deviceTopicRepo.UpsertDeviceTopicCatalog(ctx, tenantID, deviceID, mr.ReportedTopicCount, mr.SyncMode, mr.HadBundleZero); err != nil {
+			fmt.Printf("Warning: failed to update device topic catalog metadata: %v\n", err)
+		}
+	}
+
 	if mr.FullCatalogReplace {
 		if mr.ReportedTopicCount == 0 {
 			if err := uc.deviceTopicRepo.ClearDeviceTopics(ctx, tenantID, deviceID); err != nil {
 				fmt.Printf("Warning: failed to clear device topics: %v\n", err)
 			}
+			recordCatalog()
 			return nil
 		}
 		if err := uc.deviceTopicRepo.ReplaceAllDeviceTopics(ctx, tenantID, deviceID, mr.Rows); err != nil {
 			fmt.Printf("Warning: failed to replace device topics: %v\n", err)
 			return nil
 		}
+		recordCatalog()
 		return nil
 	}
 
@@ -41,5 +47,6 @@ func (uc *InstanceUsecase) syncDeviceTopicsFromStatusMessage(ctx context.Context
 		fmt.Printf("Warning: failed to upsert device topics: %v\n", err)
 		return nil
 	}
+	recordCatalog()
 	return nil
 }

@@ -5,16 +5,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	unsv1 "github.com/artpark-hub/taksa-platform/device-management/api/uns/v1"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/topicbrowser"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const (
+	defaultTopicPageSize = 100
+	maxTopicPageSize     = 500
 )
 
 // ListDeviceTopics lists materialized UNS topics with GraphQL-equivalent text and metadata filters.
@@ -27,18 +34,13 @@ func (s *DeviceMgmtService) ListDeviceTopics(ctx context.Context, req *v1.ListDe
 		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
 	}
 	if s.deviceTopicRepo == nil {
-		return &v1.ListDeviceTopicsResponse{Topics: []*v1.DeviceTopic{}}, nil
+		return emptyListTopicsResponse(), nil
 	}
 	if _, err := s.deviceUc.GetDevice(ctx, req.DeviceId); err != nil {
 		return nil, status.Error(codes.NotFound, "device not found")
 	}
-	pageSize := req.PageSize
-	if pageSize == 0 {
-		pageSize = 100 // align with umh-core GraphQL default max batch
-	}
-	if pageSize > 100 {
-		pageSize = 100
-	}
+
+	pageSize := normalizeTopicPageSize(req.PageSize)
 	offset := int32(0)
 	if req.PageToken != "" {
 		o, err := decodePageToken(req.PageToken)
@@ -47,19 +49,25 @@ func (s *DeviceMgmtService) ListDeviceTopics(ctx context.Context, req *v1.ListDe
 		}
 		offset = o
 	}
-	meta := make([]data.TopicMetaEq, 0, len(req.Meta))
-	for _, m := range req.Meta {
-		if m == nil || m.Key == "" {
-			continue
-		}
-		meta = append(meta, data.TopicMetaEq{Key: m.Key, Eq: m.Eq})
+	meta := toTopicMetaEq(req.Meta)
+
+	total, err := s.deviceTopicRepo.CountDeviceTopics(ctx, tenantID, req.DeviceId)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("count topics: %v", err))
 	}
+	filtered, err := s.deviceTopicRepo.CountDeviceTopicsFiltered(ctx, tenantID, req.DeviceId, req.Text, req.PathPrefix, meta)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("count filtered topics: %v", err))
+	}
+
 	rows, err := s.deviceTopicRepo.ListDeviceTopics(ctx, tenantID, data.ListDeviceTopicsQuery{
-		DeviceID: req.DeviceId,
-		Text:     req.Text,
-		Meta:     meta,
-		Offset:   int64(offset),
-		Limit:    int64(pageSize),
+		DeviceID:      req.DeviceId,
+		Text:          req.Text,
+		PathPrefix:    req.PathPrefix,
+		Meta:          meta,
+		Offset:        int64(offset),
+		Limit:         int64(pageSize),
+		OmitLastEvent: req.OmitLastEvent,
 	})
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Sprintf("list topics: %v", err))
@@ -71,13 +79,18 @@ func (s *DeviceMgmtService) ListDeviceTopics(ctx context.Context, req *v1.ListDe
 	}
 	out := make([]*v1.DeviceTopic, 0, len(rows))
 	for i := range rows {
-		dt, err := mapDeviceTopicRowToProto(&rows[i])
+		dt, err := mapDeviceTopicRowToProto(&rows[i], req.OmitLastEvent)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		out = append(out, dt)
 	}
-	return &v1.ListDeviceTopicsResponse{Topics: out, NextPageToken: next}, nil
+	return &v1.ListDeviceTopicsResponse{
+		Topics:         out,
+		NextPageToken:  next,
+		TotalCount:     total,
+		FilteredCount:  filtered,
+	}, nil
 }
 
 // GetDeviceTopic returns a single topic by uns_tree_id or exact canonical_topic.
@@ -108,14 +121,132 @@ func (s *DeviceMgmtService) GetDeviceTopic(ctx context.Context, req *v1.GetDevic
 	if row == nil {
 		return nil, status.Error(codes.NotFound, "topic not found")
 	}
-	dt, err := mapDeviceTopicRowToProto(row)
+	dt, err := mapDeviceTopicRowToProto(row, false)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return dt, nil
 }
 
-func mapDeviceTopicRowToProto(row *data.DeviceTopicRow) (*v1.DeviceTopic, error) {
+// GetDeviceTopicCatalogStatus returns materialized catalog sync metadata for a device.
+func (s *DeviceMgmtService) GetDeviceTopicCatalogStatus(ctx context.Context, req *v1.GetDeviceTopicCatalogStatusRequest) (*v1.DeviceTopicCatalogStatus, error) {
+	if req == nil || req.DeviceId == "" {
+		return nil, status.Error(codes.InvalidArgument, "device_id is required")
+	}
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+	if _, err := s.deviceUc.GetDevice(ctx, req.DeviceId); err != nil {
+		return nil, status.Error(codes.NotFound, "device not found")
+	}
+	if s.deviceTopicRepo == nil {
+		return &v1.DeviceTopicCatalogStatus{DeviceId: req.DeviceId}, nil
+	}
+	row, err := s.deviceTopicRepo.GetDeviceTopicCatalog(ctx, tenantID, req.DeviceId)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if row == nil {
+		return &v1.DeviceTopicCatalogStatus{DeviceId: req.DeviceId}, nil
+	}
+	out := &v1.DeviceTopicCatalogStatus{
+		DeviceId:               req.DeviceId,
+		ReportedTopicCount:     row.ReportedTopicCount,
+		MaterializedTopicCount: row.MaterializedTopicCount,
+		LastSyncMode:           mapCatalogSyncMode(row.LastSyncMode),
+		LastHadBundleZero:      row.LastHadBundleZero,
+	}
+	if !row.LastSyncedAt.IsZero() {
+		out.CatalogLastSyncedAt = timestamppb.New(row.LastSyncedAt)
+	}
+	if row.LastFullReplaceAt.Valid {
+		out.LastFullReplaceAt = timestamppb.New(row.LastFullReplaceAt.Time)
+	}
+	if row.ReportedTopicCount >= 0 && row.MaterializedTopicCount > row.ReportedTopicCount {
+		out.CatalogStaleWarning = true
+	}
+	return out, nil
+}
+
+// ListTopicNodes returns child segments for lazy tree expansion.
+func (s *DeviceMgmtService) ListTopicNodes(ctx context.Context, req *v1.ListTopicNodesRequest) (*v1.ListTopicNodesResponse, error) {
+	if req == nil || req.DeviceId == "" {
+		return nil, status.Error(codes.InvalidArgument, "device_id is required")
+	}
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+	if s.deviceTopicRepo == nil {
+		return &v1.ListTopicNodesResponse{PathPrefix: strings.Join(req.PathPrefix, ".")}, nil
+	}
+	if _, err := s.deviceUc.GetDevice(ctx, req.DeviceId); err != nil {
+		return nil, status.Error(codes.NotFound, "device not found")
+	}
+	meta := toTopicMetaEq(req.Meta)
+	rows, err := s.deviceTopicRepo.ListTopicNodes(ctx, tenantID, req.DeviceId, req.PathPrefix, req.Text, meta)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("list topic nodes: %v", err))
+	}
+	nodes := make([]*v1.TopicTreeNode, 0, len(rows))
+	for i := range rows {
+		n := &v1.TopicTreeNode{
+			Segment:               rows[i].Segment,
+			IsLeaf:                rows[i].IsLeaf,
+			DescendantLeafCount:     rows[i].DescendantLeafCount,
+		}
+		if rows[i].IsLeaf {
+			n.UnsTreeId = rows[i].UnsTreeID
+			n.CanonicalTopic = rows[i].CanonicalTopic
+		}
+		nodes = append(nodes, n)
+	}
+	return &v1.ListTopicNodesResponse{
+		PathPrefix: strings.Join(req.PathPrefix, "."),
+		Nodes:      nodes,
+	}, nil
+}
+
+func emptyListTopicsResponse() *v1.ListDeviceTopicsResponse {
+	return &v1.ListDeviceTopicsResponse{Topics: []*v1.DeviceTopic{}}
+}
+
+func normalizeTopicPageSize(pageSize int32) int32 {
+	if pageSize <= 0 {
+		return defaultTopicPageSize
+	}
+	if pageSize > maxTopicPageSize {
+		return maxTopicPageSize
+	}
+	return pageSize
+}
+
+func toTopicMetaEq(in []*v1.TopicMetaEq) []data.TopicMetaEq {
+	meta := make([]data.TopicMetaEq, 0, len(in))
+	for _, m := range in {
+		if m == nil || m.Key == "" {
+			continue
+		}
+		meta = append(meta, data.TopicMetaEq{Key: m.Key, Eq: m.Eq})
+	}
+	return meta
+}
+
+func mapCatalogSyncMode(mode string) v1.TopicCatalogSyncMode {
+	switch topicbrowser.CatalogSyncMode(mode) {
+	case topicbrowser.CatalogSyncFullReplace:
+		return v1.TopicCatalogSyncMode_FULL_REPLACE
+	case topicbrowser.CatalogSyncEmpty:
+		return v1.TopicCatalogSyncMode_EMPTY
+	case topicbrowser.CatalogSyncIncremental:
+		return v1.TopicCatalogSyncMode_INCREMENTAL
+	default:
+		return v1.TopicCatalogSyncMode_TOPIC_CATALOG_SYNC_MODE_UNSPECIFIED
+	}
+}
+
+func mapDeviceTopicRowToProto(row *data.DeviceTopicRow, omitLastEvent bool) (*v1.DeviceTopic, error) {
 	var loc []string
 	if row.LocationJSON != "" {
 		if err := json.Unmarshal([]byte(row.LocationJSON), &loc); err != nil {
@@ -136,16 +267,16 @@ func mapDeviceTopicRowToProto(row *data.DeviceTopicRow) (*v1.DeviceTopic, error)
 		Topic:             row.CanonicalTopic,
 		UnsTreeId:         row.UnsTreeID,
 		Level_0:           row.Level0,
-		LocationSublevels:  loc,
-		DataContract:       row.DataContract,
-		Name:               row.Name,
-		Metadata:           md,
-		UpdatedAt:          timestamppb.New(row.UpdatedAt),
+		LocationSublevels: loc,
+		DataContract:      row.DataContract,
+		Name:              row.Name,
+		Metadata:          md,
+		UpdatedAt:         timestamppb.New(row.UpdatedAt),
 	}
 	if row.VirtualPath.Valid && row.VirtualPath.String != "" {
 		dt.VirtualPath = &row.VirtualPath.String
 	}
-	if row.LastEventJSON.Valid && row.LastEventJSON.String != "" {
+	if !omitLastEvent && row.LastEventJSON.Valid && row.LastEventJSON.String != "" {
 		ev, err := data.ParseStoredEvent(row.LastEventJSON.String)
 		if err != nil {
 			return nil, err
@@ -169,12 +300,9 @@ func mapLastEventIntoDeviceTopic(dt *v1.DeviceTopic, entry *unsv1.EventTableEntr
 func mapTimeSeriesEvent(entry *unsv1.EventTableEntry) *v1.TopicTimeSeriesEvent {
 	ts := time.UnixMilli(int64(entry.GetProducedAtMs()))
 	out := &v1.TopicTimeSeriesEvent{
-		ProducedAt:    timestamppb.New(ts),
-		KafkaHeaders:  mapKafkaHeaders(entry.GetRawKafkaMsg()),
-		ScalarType:    v1.TopicScalarType_TOPIC_SCALAR_TYPE_UNSPECIFIED,
-		NumericValue:  nil,
-		StringValue:   nil,
-		BooleanValue:  nil,
+		ProducedAt:   timestamppb.New(ts),
+		KafkaHeaders: mapKafkaHeaders(entry.GetRawKafkaMsg()),
+		ScalarType:   v1.TopicScalarType_TOPIC_SCALAR_TYPE_UNSPECIFIED,
 	}
 	tsPayload := entry.GetTs()
 	if tsPayload == nil {
@@ -235,9 +363,9 @@ func mapRelationalEvent(entry *unsv1.EventTableEntry) *v1.TopicRelationalEvent {
 		}
 	}
 	return &v1.TopicRelationalEvent{
-		ProducedAt:    timestamppb.New(ts),
-		Json:          st,
-		KafkaHeaders:  mapKafkaHeaders(entry.GetRawKafkaMsg()),
+		ProducedAt:   timestamppb.New(ts),
+		Json:         st,
+		KafkaHeaders: mapKafkaHeaders(entry.GetRawKafkaMsg()),
 	}
 }
 

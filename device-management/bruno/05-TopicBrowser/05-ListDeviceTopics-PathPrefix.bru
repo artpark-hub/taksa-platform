@@ -1,0 +1,36 @@
+meta {
+  name: List Device Topics (path prefix)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/topics/list
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{console_bearer_token}}
+}
+
+body:json {
+  {
+    "device_id": "{{device_id}}",
+    "page_size": 50,
+    "path_prefix": "Enterprise.Site.Line1.",
+    "omit_last_event": true,
+    "text": "Temperature"
+  }
+}
+
+tests {
+  test('Status 200', function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test('Filtered count <= total', function() {
+    const b = res.getBody();
+    expect(b.filteredCount).to.be.at.most(b.totalCount);
+  });
+}

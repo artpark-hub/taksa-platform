@@ -417,6 +417,21 @@ service DeviceMgmtService {
     };
   }
 
+  // Catalog sync metadata for a device (last sync, counts, staleness hint).
+  rpc GetDeviceTopicCatalogStatus(GetDeviceTopicCatalogStatusRequest) returns (DeviceTopicCatalogStatus) {
+    option (google.api.http) = {
+      get: "/api/v1/devicemgmt/devices/{device_id}/topics/catalog-status"
+    };
+  }
+
+  // Lazy tree: list child segments at path_prefix (built from materialized topics).
+  rpc ListTopicNodes(ListTopicNodesRequest) returns (ListTopicNodesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/devicemgmt/devices/{device_id}/topics/nodes/list"
+      body: "*"
+    };
+  }
+
 }
 
   // ============================================================================
