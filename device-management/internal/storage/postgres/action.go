@@ -556,3 +556,29 @@ func (s *ActionStore) listActions(ctx context.Context, whereClause string, args 
 
 	return actions, nil
 }
+
+// NATSMirrorDeployInflight reports whether a UNS-to-NATS mirror deploy is queued or delivered.
+func (s *ActionStore) NATSMirrorDeployInflight(ctx context.Context, tenantID, deviceID string) (bool, error) {
+	return s.NATSMirrorActionInflight(ctx, tenantID, deviceID)
+}
+
+// NATSMirrorActionInflight reports whether a UNS-to-NATS mirror deploy or edit is queued or delivered.
+func (s *ActionStore) NATSMirrorActionInflight(ctx context.Context, tenantID, deviceID string) (bool, error) {
+	if tenantID == "" || deviceID == "" {
+		return false, ErrInvalidInput
+	}
+	const nameMarker = "%UNS-to-NATS-mirror%"
+	var inflight bool
+	err := s.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM actions
+  WHERE tenant_id = $1 AND device_id = $2
+    AND action_type IN ('deploy-data-flow-component', 'edit-data-flow-component')
+    AND payload_data LIKE $3
+    AND status IN (1, 2)
+)`, tenantID, deviceID, nameMarker).Scan(&inflight)
+	if err != nil {
+		return false, fmt.Errorf("nats mirror action inflight query: %w", err)
+	}
+	return inflight, nil
+}

@@ -27,3 +27,5 @@ Populate topic rows via a real device status push (preferred) or the Bruno south
 | File | Description |
 |------|-------------|
 | `001_device_topics.up.sql` | `device_topics`, `device_topic_catalog`, indexes |
+| `002_nats_mirror_device.up.sql` | `devices.nats_mirror_deployed_at` (persistent UNS→NATS mirror state) |
+| `003_nats_mirror_config_fingerprint.up.sql` | `devices.nats_mirror_config_fingerprint` (detect NATS URL config changes) |

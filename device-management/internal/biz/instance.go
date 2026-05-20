@@ -19,6 +19,7 @@ import (
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
 	v2 "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
@@ -216,10 +217,12 @@ type InstanceUsecase struct {
 	dataModelRepo         *data.DataModelRepo
 	streamProcessorRepo   *data.StreamProcessorRepo
 	deviceTopicRepo       *data.DeviceTopicRepo
+	deployment            *conf.Deployment
+	actionUc              *ActionUsecase
 }
 
 // NewInstanceUsecase creates a new InstanceUsecase with the given storage and authentication backends.
-func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo, deviceTopicRepo *data.DeviceTopicRepo) *InstanceUsecase {
+func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo, deviceTopicRepo *data.DeviceTopicRepo, deployment *conf.Deployment, actionUc *ActionUsecase) *InstanceUsecase {
 	return &InstanceUsecase{
 		store:                 store,
 		authUc:                authUc,
@@ -227,6 +230,8 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 		dataModelRepo:         dataModelRepo,
 		streamProcessorRepo:   streamProcessorRepo,
 		deviceTopicRepo:       deviceTopicRepo,
+		deployment:            deployment,
+		actionUc:              actionUc,
 	}
 }
 
@@ -340,6 +345,7 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 
 	// Queue a subscribe so the edge starts emitting status heartbeats.
 	uc.EnsureStatusSubscription(ctx, deviceID)
+	uc.EnsureUNSToNATSMirror(ctx, deviceID)
 
 	return &LoginResponse{
 		JwtToken:            jwtToken,
@@ -1068,6 +1074,7 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 			_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, []byte(resultPayload))
 			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(resultPayload))
 		}
+		uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
 	}
 
 	// 7. Mark tracking as completed
@@ -1158,6 +1165,8 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 	// This mirrors the logic in correlateResponseByTraceId to ensure DB persistence
 	// regardless of which correlation method (trace_id vs actionUUID) is used
 	if finalStatus == models.ActionStatusCompleted && action != nil {
+		actionWithStatus := *action
+		actionWithStatus.Status = finalStatus
 		syncMsg := deviceMsg
 		if syncMsg == nil {
 			syncMsg, err = uc.store.Messages().GetByID(ctx, messageID)
@@ -1166,13 +1175,11 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 			}
 		}
 		if syncMsg != nil {
-			// Create a copy of action with updated status for sync
-			actionWithStatus := *action
-			actionWithStatus.Status = finalStatus
 			_ = uc.syncProtocolConverterActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
 			_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
 			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
 		}
+		uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
 	}
 
 	return nil

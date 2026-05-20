@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/artpark-hub/taksa-platform/device-management/internal/biz"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/utils"
 
@@ -81,7 +82,10 @@ func newZapLogger(logLevel, logFile string) (*zap.Logger, error) {
 	return cfg.Build()
 }
 
-func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server) *kratos.App {
+func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server, instanceUc *biz.InstanceUsecase) *kratos.App {
+	if instanceUc != nil {
+		instanceUc.StartNATSMirrorFleetReconcile()
+	}
 	return kratos.New(
 		kratos.ID(id),
 		kratos.Name(Name),
@@ -140,6 +144,9 @@ func main() {
 	}
 	if dockerImage := os.Getenv("TAKSA_DM_UMH_CORE_DOCKER_IMAGE"); dockerImage != "" {
 		bc.Deployment.UmhCoreDockerImage = dockerImage
+	}
+	if natsURLs := os.Getenv("TAKSA_DM_NATS_MIRROR_URLS"); natsURLs != "" {
+		bc.Deployment.NatsMirrorUrls = natsURLs
 	}
 	if jwtSecret := os.Getenv("TAKSA_DM_JWT_SECRET"); jwtSecret != "" {
 		bc.Server.JwtSecret = jwtSecret
