@@ -37,10 +37,10 @@ func NewInstanceService(instanceUc *biz.InstanceUsecase, authUc *biz.AuthUsecase
 // RPC: POST /api/v2/instance/login
 // NOTE: No request body. Device identification comes from Authorization header and JWT context.
 func (s *InstanceService) Login(ctx context.Context, req *emptypb.Empty) (*v2.LoginResponse, error) {
-	// Extract token hash from context (set by middleware)
+	// Extract token hash from context (HTTP AuthMiddleware or gRPC tenant interceptor on Login).
 	// Device sends: Authorization: Bearer <token-hash>
-	tokenHash, ok := ctx.Value(AuthorizationKey).(string)
-	if !ok || tokenHash == "" {
+	tokenHash := middleware.GetAuthorizationToken(ctx)
+	if tokenHash == "" {
 		s.logger.Warn("Login failed: missing or invalid authorization header")
 		return nil, kerrors.Unauthorized("missing_authorization_token", "missing or invalid authorization header")
 	}
@@ -123,7 +123,7 @@ func (s *InstanceService) Pull(ctx context.Context, req *emptypb.Empty) (*v2.Pul
 		s.logger.Warn("Pull failed: missing tenant_id or device_id in context")
 		return nil, kerrors.Unauthorized("invalid_token", "missing tenant_id or device_id in token")
 	}
-	
+
 	s.logger.Debug("Pull API device context",
 		zap.String("device_id", deviceID),
 		zap.String("tenant_id", tenantID),
@@ -206,7 +206,7 @@ func (s *InstanceService) Push(ctx context.Context, req *v2.PushRequest) (*empty
 		s.logger.Warn("Push failed: missing tenant_id or device_id in context")
 		return nil, kerrors.Unauthorized("invalid_token", "missing tenant_id or device_id in token")
 	}
-	
+
 	s.logger.Debug("Processing push messages",
 		zap.Int("message_count", len(req.UMHMessages)),
 		zap.String("device_id", deviceID),

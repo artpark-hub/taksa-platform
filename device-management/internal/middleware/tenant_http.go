@@ -21,6 +21,7 @@ const (
 	reasonMissingAuthorizationToken  = "missing_authorization_token"
 	reasonInvalidToken               = "invalid_token"
 	reasonTokenExpired               = "token_expired"
+	reasonDeviceJWTSignatureRequired = "device_jwt_signature_required"
 )
 
 // isPublicPath returns true for endpoints that don't require JWT authentication.
@@ -48,12 +49,29 @@ func isPublicPath(urlPath string) bool {
 	}
 }
 
+// requiresVerifiedDeviceSessionHTTP is true for edge Instance routes that must not use
+// unverified Authorization bearer claims alone (cookie or DM-signed HS256 bearer required).
+func requiresVerifiedDeviceSessionHTTP(urlPath string) bool {
+	p := strings.TrimRight(urlPath, "/")
+	if p == "" {
+		p = "/"
+	}
+	if !strings.HasPrefix(p, "/api/v2/instance/") {
+		return false
+	}
+	return p != "/api/v2/instance/login"
+}
+
 // HTTPTenantMiddleware is a Kratos HTTP middleware that extracts tenant_id and device_id
 // from the JWT and stores them in context.
 //
 // Two JWT sources with different trust models:
-//   - Authorization header: JWT validated upstream by Oathkeeper → ParseUnverified (trusted proxy)
+//   - Authorization header: JWT parsed for claims (often validated upstream by Oathkeeper). If the
+//     bearer token is an HS256 JWT signed with jwtSecret (same as Login), it is verified here.
 //   - "token" cookie: JWT issued by this service during Login → signature verified with jwtSecret
+//
+// Edge Instance HTTP paths (/api/v2/instance/* except login) require a signature-verified device JWT
+// (cookie or verified HS256 bearer), not unverified bearer claims alone.
 //
 // Public paths (health, login) are exempt. All other paths MUST have a valid JWT
 // with a tenant_id claim or the request is rejected.
@@ -77,17 +95,34 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 				return handler(ctx, req)
 			}
 
-			// Try Authorization header first (console APIs via Oathkeeper)
+			bearerFromHeader := ""
+			if authHeader := request.Header.Get("Authorization"); authHeader != "" {
+				bearerFromHeader = extractBearerTokenFromHeader(authHeader)
+			}
+
 			tokenStr := ""
 			fromCookie := false
-			if authHeader := request.Header.Get("Authorization"); authHeader != "" {
-				tokenStr = extractBearerTokenFromHeader(authHeader)
-			}
-			// Fall back to "token" cookie (device APIs after Login)
-			if tokenStr == "" {
-				if cookie, err := request.Cookie("token"); err == nil && cookie.Value != "" {
-					tokenStr = cookie.Value
-					fromCookie = true
+			// Instance routes: accept verified DM bearer OR token cookie (not a non-DM bearer alone).
+			if requiresVerifiedDeviceSessionHTTP(request.URL.Path) {
+				if bearerFromHeader != "" && jwtSecret != "" {
+					if _, _, ok := tryVerifyDeviceJWTHS256(bearerFromHeader, jwtSecret); ok {
+						tokenStr = bearerFromHeader
+					}
+				}
+				if tokenStr == "" {
+					if cookie, err := request.Cookie("token"); err == nil && cookie.Value != "" {
+						tokenStr = cookie.Value
+						fromCookie = true
+					}
+				}
+			} else {
+				// Console and other APIs: Authorization header first, then cookie.
+				tokenStr = bearerFromHeader
+				if tokenStr == "" {
+					if cookie, err := request.Cookie("token"); err == nil && cookie.Value != "" {
+						tokenStr = cookie.Value
+						fromCookie = true
+					}
 				}
 			}
 
@@ -150,6 +185,22 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 			// Extract device_id (present in device JWTs, absent in console JWTs)
 			if deviceID, ok := claims["device_id"].(string); ok && deviceID != "" {
 				ctx = context.WithValue(ctx, DeviceIDContextKey, deviceID)
+			}
+
+			// Mark when this service has verified the JWT signature (cookie or HS256 bearer from Login).
+			if fromCookie {
+				ctx = MarkDeviceJWTSignatureVerified(ctx)
+			} else if jwtSecret != "" {
+				if _, _, ok := tryVerifyDeviceJWTHS256(tokenStr, jwtSecret); ok {
+					ctx = MarkDeviceJWTSignatureVerified(ctx)
+				}
+			}
+
+			if requiresVerifiedDeviceSessionHTTP(request.URL.Path) && !IsDeviceJWTSignatureVerified(ctx) {
+				logger.Warn("Rejected: instance API requires verified device JWT (token cookie or Login-issued HS256 bearer)",
+					zap.String("path", request.RequestURI))
+				return nil, unauthorizedHTTP(httpTr, reasonDeviceJWTSignatureRequired,
+					"use token cookie or Authorization bearer JWT signed by device-management (Login)")
 			}
 
 			return handler(ctx, req)

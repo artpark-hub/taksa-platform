@@ -228,7 +228,6 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 	}
 }
 
-
 // Login authenticates a device using a double-hashed token.
 // CRITICAL: Used by /v2/instance/login endpoint
 //
@@ -241,6 +240,7 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 //  1. Call Login with stored auth token to refresh JWT
 //  2. Store returned JWT in "token" cookie
 //  3. Retry the failed Pull request
+//
 // This handles service restarts and token expiry gracefully.
 //
 // MULTI-TENANCY FLOW:
@@ -350,31 +350,6 @@ func (uc *InstanceUsecase) Login(ctx context.Context, tokenHash string) (*LoginR
 	}, nil
 }
 
-// Pull retrieves pending actions for a device.
-// CRITICAL: Used by /v2/instance/pull endpoint
-//
-// Device polls for queued actions. Returns all QUEUED actions for this device.
-// Also records the device's activity timestamp.
-// Multi-tenancy: tenant_id and device_id obtained from JWT context (via middleware)
-func (uc *InstanceUsecase) Pull(ctx context.Context, deviceID string) ([]*models.Action, error) {
-	if deviceID == "" {
-		return nil, fmt.Errorf("device ID is empty")
-	}
-
-	// Get tenant_id from context (set by middleware from JWT)
-	tenantID := middleware.GetTenantID(ctx)
-
-	actions, err := uc.store.Actions().ListPending(ctx, tenantID, deviceID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list pending actions: %w", err)
-	}
-
-	// Record device activity
-	_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
-
-	return actions, nil
-}
-
 // PullMessages retrieves pending actions converted to UMHMessage format.
 // CRITICAL: Used by /v2/instance/pull endpoint
 //
@@ -407,7 +382,6 @@ func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (i
 		return nil, fmt.Errorf("failed to list pending actions: %w", err)
 	}
 
-	// Record device activity
 	_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
 
 	if len(actions) == 0 {
@@ -667,10 +641,21 @@ func actionToJSONContent(action *models.Action) (string, error) {
 //   - content: JSON string with MessageType and Payload
 //   - Payload.actionUUID: Secondary correlation identifier
 //
-// Device ID resolution (in order of preference):
-//  1. umhInstance field in message (if populated by umh-core)
-//  2. jwtDeviceID parameter (extracted from JWT cookie)
-//  3. Error if both missing
+// resolvePushDeviceID binds push handling to the authenticated device. When jwtDeviceID is set,
+// umhInstance must match or be empty; the JWT device id is always used for persistence and sync.
+func resolvePushDeviceID(jwtDeviceID, umhInstance string) (string, error) {
+	if jwtDeviceID == "" {
+		if umhInstance == "" {
+			return "", fmt.Errorf("device instance UUID is empty: not found in message umhInstance or JWT token")
+		}
+		return umhInstance, nil
+	}
+	if umhInstance != "" && umhInstance != jwtDeviceID {
+		return "", fmt.Errorf("umhInstance %q does not match authenticated device %q", umhInstance, jwtDeviceID)
+	}
+	return jwtDeviceID, nil
+}
+
 func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{}, jwtDeviceID string) error {
 	if messages == nil {
 		return nil
@@ -685,29 +670,20 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 			return nil
 		}
 
-		// Extract device ID from first message (primary source)
-		if protoMsgs[0].UmhInstance != "" {
-			deviceID = protoMsgs[0].UmhInstance
-		}
-
-		// Fallback to JWT device ID if message doesn't have it
-		if deviceID == "" && jwtDeviceID != "" {
-			deviceID = jwtDeviceID
-		}
-
-		if deviceID == "" {
-			return fmt.Errorf("device instance UUID is empty: not found in message umhInstance or JWT token")
+		var err error
+		deviceID, err = resolvePushDeviceID(jwtDeviceID, protoMsgs[0].UmhInstance)
+		if err != nil {
+			return err
 		}
 
 		// Get tenant_id from context (set by middleware from JWT)
 		tenantID := middleware.GetTenantID(ctx)
 
-		// Record device activity
 		_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
 
 		// Track message types for summary
 		messageTypeCount := make(map[string]int)
-		
+
 		// Persist each message and handle correlation
 		for _, msg := range protoMsgs {
 			// Extract MessageType from content JSON
@@ -733,9 +709,9 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 				fmt.Printf("ERROR: failed to persist message %s for tenant %s on device %s: %v\n", message.ID, tenantID, deviceID, err)
 				continue
 			}
-			
+
 			fmt.Printf("INFO: successfully persisted message %s for tenant %s on device %s\n", message.ID, tenantID, deviceID)
-			
+
 			// TRACEABILITY: Correlate response to original action request
 			if msgType == "action-result" || msgType == "action-reply" {
 				// Extract action reply state to determine if this is an intermediate or terminal update
@@ -771,7 +747,7 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 							fmt.Printf("Note: Failed to correlate by actionUUID %s: %v\n", actionUUID, err)
 						}
 					}
-					} else if isIntermediateActionState(actionReplyState) {
+				} else if isIntermediateActionState(actionReplyState) {
 					// For intermediate states, just log for debugging (don't finalize)
 					actionUUID := extractActionUUID(msg.Content)
 					fmt.Printf("DEBUG: Received intermediate action state '%s' for action %s - not finalizing yet\n", actionReplyState, actionUUID)
@@ -785,13 +761,13 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 				_ = uc.syncStreamProcessorsFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
 			}
 		}
-		
+
 		// Log summary of message types received in this push batch
 		fmt.Printf("DEBUG: Push batch summary - Total messages: %d, Type breakdown: %v\n", len(protoMsgs), messageTypeCount)
 		if messageTypeCount["status-message"] == 0 && messageTypeCount["StatusMessage"] == 0 && messageTypeCount["status"] == 0 {
 			fmt.Printf("WARNING: No heartbeat status message in push batch. Device must send one of status-message, StatusMessage, or status (1-second heartbeat) to update health_status. Message types: %v\n", messageTypeCount)
 		}
-		
+
 		return nil
 	}
 
@@ -805,18 +781,14 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 		return nil
 	}
 
-	// Extract device ID from first message (primary source)
-	if umhInstance, ok := msgSlice[0]["umhInstance"].(string); ok && umhInstance != "" {
-		deviceID = umhInstance
+	umhInstance := ""
+	if v, ok := msgSlice[0]["umhInstance"].(string); ok {
+		umhInstance = v
 	}
-
-	// Fallback to JWT device ID if message doesn't have it
-	if deviceID == "" && jwtDeviceID != "" {
-		deviceID = jwtDeviceID
-	}
-
-	if deviceID == "" {
-		return fmt.Errorf("device instance UUID is empty: not found in message umhInstance or JWT token")
+	var err error
+	deviceID, err = resolvePushDeviceID(jwtDeviceID, umhInstance)
+	if err != nil {
+		return err
 	}
 
 	// Verify device exists
@@ -832,7 +804,6 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 		return fmt.Errorf("missing tenant ID in context")
 	}
 
-	// Record device activity
 	_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
 
 	// Persist each message
@@ -1561,7 +1532,7 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				if err := uc.protocolConverterRepo.Upsert(ctx, tenantID, action.DeviceId, uuid, newName, converterType, connectionUUID); err != nil {
 					fmt.Printf("Warning: Failed to upsert renamed protocol converter: %v\n", err)
 				}
-				} else {
+			} else {
 				// UUID unchanged (name unchanged) - just update status and details
 				err := uc.protocolConverterRepo.UpdateStatus(ctx,
 					tenantID,
@@ -1986,7 +1957,7 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 						modelVersion = versionObj
 					}
 				}
-				
+
 				fmt.Printf("DEBUG: Edit sync extracted - name: %s, modelName: %s, modelVersion: %s\n", name, modelName, modelVersion)
 
 				// Extract and encode config from request
@@ -2051,24 +2022,24 @@ func (uc *InstanceUsecase) syncStreamProcessorActionResult(ctx context.Context, 
 		// Extract and update status from Get response
 		// GetStreamProcessor returns configuration (uuid, name, model, config, location, etc.)
 		// It does NOT include runtime health state information.
-		// 
+		//
 		// What we CAN infer from a successful Get:
 		// - Processor EXISTS on device (can be retrieved) → deployment_status = "ACTIVE"
-		// 
+		//
 		// What we CANNOT infer without StatusMessage:
 		// - Processor's actual runtime state (running, stopped, failed, etc.)
 		// - Processor's health condition (healthy, degraded, offline, etc.)
-		// 
+		//
 		// Therefore:
 		// - Set deployment_status = "ACTIVE" (exists and is deployed)
 		// - Keep health_status = "UNKNOWN" (wait for StatusMessage with actual Health.Category)
-		// 
+		//
 		// StatusMessage (from device's 1-second heartbeat) will provide the actual health via:
 		//   Health.State → deployment_status mapping
 		//   Health.Category → health_status mapping (active/healthy → ONLINE, degraded/neutral → OFFLINE)
-		
-		deploymentStatus := "ACTIVE"   // Get succeeded = processor exists and is deployed
-		healthStatus := "UNKNOWN"      // Wait for StatusMessage with actual Health.Category
+
+		deploymentStatus := "ACTIVE" // Get succeeded = processor exists and is deployed
+		healthStatus := "UNKNOWN"    // Wait for StatusMessage with actual Health.Category
 		errorMessage := ""
 
 		// Update status and mark as synced
@@ -2204,7 +2175,7 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 				"",        // Clear error message
 			)
 			if err != nil {
-				fmt.Printf("Warning: Failed to mark converter %s as offline: %v\n", dbConverter.UUID, err);
+				fmt.Printf("Warning: Failed to mark converter %s as offline: %v\n", dbConverter.UUID, err)
 			}
 		}
 	}

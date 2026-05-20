@@ -24,8 +24,8 @@ func NewGRPCServer(
 			recovery.Recovery(),
 		),
 		// Extract tenant_id from JWT and store in context
-		grpc.UnaryInterceptor(middleware.UnaryInterceptor()),
-		grpc.StreamInterceptor(middleware.StreamInterceptor()),
+		grpc.UnaryInterceptor(middleware.UnaryInterceptor(c.JwtSecret)),
+		grpc.StreamInterceptor(middleware.StreamInterceptor(c.JwtSecret)),
 	}
 	if c.Grpc.Network != "" {
 		opts = append(opts, grpc.Network(c.Grpc.Network))
