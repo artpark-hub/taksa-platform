@@ -1225,7 +1225,7 @@ func (s *DeviceMgmtService) DeployDataFlowComponent(ctx context.Context, req *v1
 
 	action, err := s.actionUc.QueueAction(ctx, &biz.QueueActionRequest{
 		DeviceID:   req.DeviceId,
-		ActionType: "deploy_data_flow_component",
+		ActionType: "deploy-data-flow-component",
 		Payload:    payload,
 		MaxRetries: 3,
 		TTLSeconds: 3600,
@@ -1255,7 +1255,7 @@ func (s *DeviceMgmtService) EditDataFlowComponent(ctx context.Context, req *v1.E
 
 	action, err := s.actionUc.QueueAction(ctx, &biz.QueueActionRequest{
 		DeviceID:   req.DeviceId,
-		ActionType: "edit_data_flow_component",
+		ActionType: "edit-data-flow-component",
 		Payload:    payload,
 		MaxRetries: 3,
 		TTLSeconds: 3600,
@@ -1285,7 +1285,7 @@ func (s *DeviceMgmtService) GetDataFlowComponent(ctx context.Context, req *v1.Ge
 
 	action, err := s.actionUc.QueueAction(ctx, &biz.QueueActionRequest{
 		DeviceID:   req.DeviceId,
-		ActionType: "get_data_flow_component",
+		ActionType: "get-data-flow-component",
 		Payload:    payload,
 		MaxRetries: 3,
 		TTLSeconds: 1800,
@@ -1315,7 +1315,7 @@ func (s *DeviceMgmtService) DeleteDataFlowComponent(ctx context.Context, req *v1
 
 	action, err := s.actionUc.QueueAction(ctx, &biz.QueueActionRequest{
 		DeviceID:   req.DeviceId,
-		ActionType: "delete_data_flow_component",
+		ActionType: "delete-data-flow-component",
 		Payload:    payload,
 		MaxRetries: 3,
 		TTLSeconds: 3600,

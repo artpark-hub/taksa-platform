@@ -39,6 +39,10 @@ CREATE TABLE IF NOT EXISTS devices (
   last_seen TIMESTAMP WITH TIME ZONE,
   last_login_at TIMESTAMP WITH TIME ZONE,
   auth_token_expires_at TIMESTAMP WITH TIME ZONE,
+
+  -- UNS→NATS mirror (deploy-data-flow-component UNS-to-NATS-mirror); survives actions cleanup
+  nats_mirror_deployed_at TIMESTAMP WITH TIME ZONE,
+  nats_mirror_config_fingerprint TEXT,
   
   UNIQUE(tenant_id, name),  -- Device names unique per tenant
   UNIQUE(uuid)
