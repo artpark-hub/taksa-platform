@@ -140,6 +140,7 @@ func (s *DeviceMgmtService) GetDeviceTopicCatalogStatus(ctx context.Context, req
 	if _, err := s.deviceUc.GetDevice(ctx, req.DeviceId); err != nil {
 		return nil, status.Error(codes.NotFound, "device not found")
 	}
+	s.ensureStatusSubscriptionBestEffort(ctx, req.DeviceId)
 	if s.deviceTopicRepo == nil {
 		return &v1.DeviceTopicCatalogStatus{DeviceId: req.DeviceId}, nil
 	}
