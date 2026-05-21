@@ -166,6 +166,8 @@ const (
 	// subscribeActionDefaultTTLSeconds should be <= edge subscriber TTL to avoid stale subscribe actions piling up.
 	subscribeActionDefaultTTLSeconds int32 = 120
 	subscribeActionPayloadTypeURL          = "type.googleapis.com/taksa.edge.SubscribeMessagePayload"
+	// Edge subscriber TTL is 5 minutes; re-queue subscribe before status push goes silent.
+	statusHeartbeatStaleThreshold = 2 * time.Minute
 )
 
 // EnsureStatusSubscription queues a lightweight "subscribe" action for the device (if not already pending).
@@ -205,6 +207,43 @@ func (uc *InstanceUsecase) EnsureStatusSubscription(ctx context.Context, deviceI
 		}
 		// Non-fatal: health still works without summaries.
 		fmt.Printf("Warning: failed to queue subscribe action for device %s: %v\n", deviceID, err)
+	}
+}
+
+func isStatusMessageType(msgType string) bool {
+	return msgType == "status-message" || msgType == "StatusMessage" || msgType == "status"
+}
+
+// recentStatusHeartbeatAt reports whether any recent message is a status heartbeat newer than threshold.
+func recentStatusHeartbeatAt(messages []*models.Message, threshold time.Duration) bool {
+	cutoff := time.Now().Add(-threshold)
+	for _, msg := range messages {
+		if msg == nil || !isStatusMessageType(msg.Type) {
+			continue
+		}
+		if msg.CreatedAt.After(cutoff) {
+			return true
+		}
+	}
+	return false
+}
+
+func (uc *InstanceUsecase) statusHeartbeatIsStale(ctx context.Context, deviceID string) bool {
+	msgs, err := uc.store.Messages().GetRecentByDevice(ctx, deviceID, 10)
+	if err != nil || len(msgs) == 0 {
+		return true
+	}
+	return !recentStatusHeartbeatAt(msgs, statusHeartbeatStaleThreshold)
+}
+
+// MaybeEnsureStatusSubscription queues subscribe when no recent status heartbeat was persisted.
+// Used from Pull (device is online but push/status may have stopped after subscriber TTL expired).
+func (uc *InstanceUsecase) MaybeEnsureStatusSubscription(ctx context.Context, deviceID string) {
+	if deviceID == "" {
+		return
+	}
+	if uc.statusHeartbeatIsStale(ctx, deviceID) {
+		uc.EnsureStatusSubscription(ctx, deviceID)
 	}
 }
 
@@ -385,6 +424,7 @@ func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (i
 	}
 
 	_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
+	uc.MaybeEnsureStatusSubscription(ctx, deviceID)
 
 	if len(actions) == 0 {
 		return []map[string]interface{}{}, nil
@@ -431,6 +471,13 @@ func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (i
 			fmt.Printf("Warning: Failed to mark action %s as delivered: %v\n", action.Id, err)
 			// Continue even if marking fails - action still needs to be sent
 			// Error will be logged for troubleshooting but won't block Pull response
+		}
+		// Subscribe is handled on the edge without an action-reply; complete immediately so
+		// DM can re-queue subscribe to refresh the edge subscriber TTL (~5 minutes).
+		if action.Type == subscribeActionType {
+			if err := uc.store.Actions().MarkCompleted(ctx, tenantID, action.Id); err != nil {
+				fmt.Printf("Warning: Failed to mark subscribe action %s as completed: %v\n", action.Id, err)
+			}
 		}
 	}
 

@@ -175,6 +175,8 @@ Table: `device_topic_catalog` — per-device sync metadata (`last_synced_at`, co
 
 Topic sync is invoked from the instance usecase when processing push messages whose type is one of: `status-message`, `StatusMessage`, or `status` — the same branch that syncs protocol converters and stream processors (`internal/biz/instance.go`).
 
+Status push requires an active edge **subscriber** (from a `subscribe` action delivered via **pull**). The edge emits status about once per second only while a subscriber exists (~5 minute TTL). Device-management re-queues `subscribe` on login, when **pull** sees no status heartbeat in the last ~2 minutes (`MaybeEnsureStatusSubscription`), and best-effort from northbound APIs such as **GetDeviceHealth**, **GetDeviceTopicCatalogStatus**, and **GetDeviceConfig**. **GetDeviceConfig** alone does not carry topic data; it only helps if the device then pulls `subscribe` and resumes push.
+
 ---
 
 ## API examples
