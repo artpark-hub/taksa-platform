@@ -1,0 +1,26 @@
+meta {
+  name: Ensure Device Status Subscription
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/devicemgmt/devices/{{deviceId}}/status-subscription
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{bearerToken}}
+}
+
+body:json {
+  {
+    "device_id": "{{deviceId}}"
+  }
+}
+
+docs {
+  Queues edge subscribe so status push (core.topicBrowser) resumes.
+  Use when auto_resubscribe_status_messages is false, or to force refresh one device.
+}

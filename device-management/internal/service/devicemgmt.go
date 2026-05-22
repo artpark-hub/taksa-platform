@@ -398,7 +398,7 @@ func (s *DeviceMgmtService) DeleteDevice(ctx context.Context, req *v1.DeleteDevi
 	return &emptypb.Empty{}, nil
 }
 
-// ensureStatusSubscriptionBestEffort re-queues edge subscribe when status push may have stopped.
+// ensureStatusSubscriptionBestEffort re-queues edge subscribe when auto resubscribe is enabled and sync is stale.
 func (s *DeviceMgmtService) ensureStatusSubscriptionBestEffort(ctx context.Context, deviceID string) {
 	if s.instanceUc == nil || deviceID == "" {
 		return

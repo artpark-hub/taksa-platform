@@ -863,6 +863,33 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/status-subscription:
+        post:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue edge subscribe so status push (and topic catalog sync) runs for this device.
+                 Use when device_status_subscription.auto_resubscribe_status_messages is false.
+            operationId: DeviceMgmtService_EnsureDeviceStatusSubscription
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.EnsureDeviceStatusSubscriptionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.EnsureDeviceStatusSubscriptionResponse'
     /api/v1/devicemgmt/devices/{deviceId}/stream-processors:
         get:
             tags:
@@ -1710,6 +1737,32 @@ components:
                         type: string
                 ignoreHealthCheck:
                     type: boolean
+        api.devicemgmt.v1.EnsureDeviceStatusSubscriptionRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                resubscribed:
+                    type: boolean
+                    description: |-
+                        When false, edge treats subscriber as new and may send bootstrap bundle 0 (heavier).
+                         When unset, defaults to true (refresh TTL with incremental status only).
+            description: |-
+                Queue edge subscribe so the DCD emits status (core.topicBrowser) over push.
+                 Use when auto resubscribe on pull is disabled, or to force refresh for one device.
+        api.devicemgmt.v1.EnsureDeviceStatusSubscriptionResponse:
+            type: object
+            properties:
+                action_id:
+                    type: string
+                already_pending:
+                    type: boolean
+                created_at:
+                    type: string
+                    format: date-time
+                expires_at:
+                    type: string
+                    format: date-time
         api.devicemgmt.v1.GetLogsRequest:
             type: object
             properties:

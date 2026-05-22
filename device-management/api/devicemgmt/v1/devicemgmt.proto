@@ -424,6 +424,15 @@ service DeviceMgmtService {
     };
   }
 
+  // Queue edge subscribe so status push (and topic catalog sync) runs for this device.
+  // Use when device_status_subscription.auto_resubscribe_status_messages is false.
+  rpc EnsureDeviceStatusSubscription(EnsureDeviceStatusSubscriptionRequest) returns (EnsureDeviceStatusSubscriptionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/devicemgmt/devices/{device_id}/status-subscription"
+      body: "*"
+    };
+  }
+
   // Lazy tree: list child segments at path_prefix (built from materialized topics).
   rpc ListTopicNodes(ListTopicNodesRequest) returns (ListTopicNodesResponse) {
     option (google.api.http) = {

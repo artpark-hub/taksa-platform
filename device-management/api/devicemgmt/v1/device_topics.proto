@@ -114,6 +114,22 @@ message GetDeviceTopicCatalogStatusRequest {
   string device_id = 1;
 }
 
+// Queue edge subscribe so the DCD emits status (core.topicBrowser) over push.
+// Use when auto resubscribe on pull is disabled, or to force refresh for one device.
+message EnsureDeviceStatusSubscriptionRequest {
+  string device_id = 1;
+  // When false, edge treats subscriber as new and may send bootstrap bundle 0 (heavier).
+  // When unset, defaults to true (refresh TTL with incremental status only).
+  optional bool resubscribed = 2;
+}
+
+message EnsureDeviceStatusSubscriptionResponse {
+  string action_id = 1 [json_name = "action_id"];
+  bool already_pending = 2 [json_name = "already_pending"];
+  google.protobuf.Timestamp created_at = 3 [json_name = "created_at"];
+  google.protobuf.Timestamp expires_at = 4 [json_name = "expires_at"];
+}
+
 // One node in the UNS hierarchy (lazy tree expand).
 message TopicTreeNode {
   string segment = 1;

@@ -19,3 +19,9 @@ data:
 deployment:
   base_url: http://localhost:8000
   umh_core_docker_image: management.umh.app/oci/united-manufacturing-hub/umh-core:v0.43.17
+# Edge status subscribe keepalive (topic catalog + health via push).
+# Set auto_resubscribe_status_messages: false for large fleets; use EnsureDeviceStatusSubscription per device.
+device_status_subscription:
+  auto_resubscribe_status_messages: true
+  catalog_stale_threshold: 120s
+  status_heartbeat_stale_threshold: 120s

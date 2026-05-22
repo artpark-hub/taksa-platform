@@ -167,6 +167,7 @@ Table: `device_topic_catalog` — per-device sync metadata (`last_synced_at`, co
 | `ListDeviceTopics` | `POST .../topics/list` | Flat list + `text`, `meta`, `path_prefix`, `omit_last_event`, pagination |
 | `GetDeviceTopic` | `GET .../topics/detail` | Single topic |
 | `GetDeviceTopicCatalogStatus` | `GET .../topics/catalog-status` | Sync metadata and staleness hint |
+| `EnsureDeviceStatusSubscription` | `POST .../status-subscription` | Queue edge `subscribe` (explicit; use when auto resubscribe is off) |
 | `ListTopicNodes` | `POST .../topics/nodes/list` | Lazy tree children at `path_prefix` |
 
 ---
@@ -175,7 +176,24 @@ Table: `device_topic_catalog` — per-device sync metadata (`last_synced_at`, co
 
 Topic sync is invoked from the instance usecase when processing push messages whose type is one of: `status-message`, `StatusMessage`, or `status` — the same branch that syncs protocol converters and stream processors (`internal/biz/instance.go`).
 
-Status push requires an active edge **subscriber** (from a `subscribe` action delivered via **pull**). The edge emits status about once per second only while a subscriber exists (~5 minute TTL). Device-management re-queues `subscribe` on login, when **pull** sees no status heartbeat in the last ~2 minutes (`MaybeEnsureStatusSubscription`), and best-effort from northbound APIs such as **GetDeviceHealth**, **GetDeviceTopicCatalogStatus**, and **GetDeviceConfig**. **GetDeviceConfig** alone does not carry topic data; it only helps if the device then pulls `subscribe` and resumes push.
+Status push requires an active edge **subscriber** (from a `subscribe` action delivered via **pull**). The edge emits status about once per second only while a subscriber exists (~5 minute TTL).
+
+### Subscribe keepalive (device-management)
+
+| Mechanism | When |
+|-----------|------|
+| **Login** | Always queues `subscribe`. |
+| **Pull (auto)** | When `device_status_subscription.auto_resubscribe_status_messages` is **true** (default) and either persisted status is older than `status_heartbeat_stale_threshold` **or** `catalog_last_synced_at` is older than `catalog_stale_threshold` while `last_seen` is still fresh. |
+| **EnsureDeviceStatusSubscription** | Explicit northbound API — always queues `subscribe` (use when auto is disabled or UI opens a device). |
+| **GetDeviceHealth** (best-effort) | Same as pull auto when enabled. |
+
+Config (`configs/config.yaml` or env):
+
+- `device_status_subscription.auto_resubscribe_status_messages` — default **true**; set **false** for large fleets (e.g. 100+ DCDs with heavy status payloads); then call **EnsureDeviceStatusSubscription** per device that needs catalog sync.
+- `TAKSA_DM_AUTO_RESUBSCRIBE_STATUS_MESSAGES` — `true` (default) or `false`; overrides YAML when set.
+- `catalog_stale_threshold` / `status_heartbeat_stale_threshold` — default **120s**.
+
+**Scale note:** Live subscription implies ~1 status push per second per device (full core snapshot, zstd when large). Auto resubscribe avoids stale catalog without renewing every device on a timer; it only queues `subscribe` when sync is actually stale.
 
 ---
 

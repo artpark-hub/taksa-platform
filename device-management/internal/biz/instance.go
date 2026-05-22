@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
-	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
 
@@ -166,48 +165,11 @@ const (
 	// subscribeActionDefaultTTLSeconds should be <= edge subscriber TTL to avoid stale subscribe actions piling up.
 	subscribeActionDefaultTTLSeconds int32 = 120
 	subscribeActionPayloadTypeURL          = "type.googleapis.com/taksa.edge.SubscribeMessagePayload"
-	// Edge subscriber TTL is 5 minutes; re-queue subscribe before status push goes silent.
-	statusHeartbeatStaleThreshold = 2 * time.Minute
 )
 
-// EnsureStatusSubscription queues a lightweight "subscribe" action for the device (if not already pending).
-// This is used so that taksa-edge-umh will emit MessageType "status" heartbeats even when no UI is open.
+// EnsureStatusSubscription queues subscribe so the edge emits status heartbeats (login path).
 func (uc *InstanceUsecase) EnsureStatusSubscription(ctx context.Context, deviceID string) {
-	if deviceID == "" {
-		return
-	}
-	tenantID := middleware.GetTenantID(ctx)
-	if tenantID == "" {
-		return
-	}
-
-	payloadJSON, err := json.Marshal(map[string]any{
-		"resubscribed": true,
-	})
-	if err != nil {
-		return
-	}
-
-	now := time.Now()
-	action := &models.Action{
-		Id:         generateUUID(),
-		DeviceId:   deviceID,
-		Type:       subscribeActionType,
-		Payload:    &anypb.Any{TypeUrl: subscribeActionPayloadTypeURL, Value: payloadJSON},
-		MaxRetries: 0,
-		RetryCount: 0,
-		Status:     models.ActionStatusQueued,
-		CreatedAt:  now,
-		ExpiresAt:  now.Add(time.Duration(subscribeActionDefaultTTLSeconds) * time.Second),
-	}
-	if err := uc.store.Actions().Save(ctx, tenantID, action); err != nil {
-		// Ignore "already exists" for idempotency across replicas (db-level uniqueness).
-		if err.Error() == "record already exists" {
-			return
-		}
-		// Non-fatal: health still works without summaries.
-		fmt.Printf("Warning: failed to queue subscribe action for device %s: %v\n", deviceID, err)
-	}
+	_, _ = uc.QueueStatusSubscription(ctx, deviceID, true)
 }
 
 func isStatusMessageType(msgType string) bool {
@@ -228,25 +190,6 @@ func recentStatusHeartbeatAt(messages []*models.Message, threshold time.Duration
 	return false
 }
 
-func (uc *InstanceUsecase) statusHeartbeatIsStale(ctx context.Context, deviceID string) bool {
-	msgs, err := uc.store.Messages().GetRecentByDevice(ctx, deviceID, 10)
-	if err != nil || len(msgs) == 0 {
-		return true
-	}
-	return !recentStatusHeartbeatAt(msgs, statusHeartbeatStaleThreshold)
-}
-
-// MaybeEnsureStatusSubscription queues subscribe when no recent status heartbeat was persisted.
-// Used from Pull (device is online but push/status may have stopped after subscriber TTL expired).
-func (uc *InstanceUsecase) MaybeEnsureStatusSubscription(ctx context.Context, deviceID string) {
-	if deviceID == "" {
-		return
-	}
-	if uc.statusHeartbeatIsStale(ctx, deviceID) {
-		uc.EnsureStatusSubscription(ctx, deviceID)
-	}
-}
-
 // InstanceUsecase handles device-facing operations: authentication, message polling, and status reporting.
 type InstanceUsecase struct {
 	store                 storage.Store
@@ -255,10 +198,19 @@ type InstanceUsecase struct {
 	dataModelRepo         *data.DataModelRepo
 	streamProcessorRepo   *data.StreamProcessorRepo
 	deviceTopicRepo       *data.DeviceTopicRepo
+	statusSub             StatusSubscriptionSettings
 }
 
 // NewInstanceUsecase creates a new InstanceUsecase with the given storage and authentication backends.
-func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo, deviceTopicRepo *data.DeviceTopicRepo) *InstanceUsecase {
+func NewInstanceUsecase(
+	store storage.Store,
+	authUc *AuthUsecase,
+	protocolConverterRepo *data.ProtocolConverterRepo,
+	dataModelRepo *data.DataModelRepo,
+	streamProcessorRepo *data.StreamProcessorRepo,
+	deviceTopicRepo *data.DeviceTopicRepo,
+	statusSub StatusSubscriptionSettings,
+) *InstanceUsecase {
 	return &InstanceUsecase{
 		store:                 store,
 		authUc:                authUc,
@@ -266,6 +218,7 @@ func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConver
 		dataModelRepo:         dataModelRepo,
 		streamProcessorRepo:   streamProcessorRepo,
 		deviceTopicRepo:       deviceTopicRepo,
+		statusSub:             statusSub,
 	}
 }
 

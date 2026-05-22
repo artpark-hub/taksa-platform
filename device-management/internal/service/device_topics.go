@@ -140,7 +140,6 @@ func (s *DeviceMgmtService) GetDeviceTopicCatalogStatus(ctx context.Context, req
 	if _, err := s.deviceUc.GetDevice(ctx, req.DeviceId); err != nil {
 		return nil, status.Error(codes.NotFound, "device not found")
 	}
-	s.ensureStatusSubscriptionBestEffort(ctx, req.DeviceId)
 	if s.deviceTopicRepo == nil {
 		return &v1.DeviceTopicCatalogStatus{DeviceId: req.DeviceId}, nil
 	}
@@ -166,6 +165,38 @@ func (s *DeviceMgmtService) GetDeviceTopicCatalogStatus(ctx context.Context, req
 	}
 	if row.ReportedTopicCount >= 0 && row.MaterializedTopicCount > row.ReportedTopicCount {
 		out.CatalogStaleWarning = true
+	}
+	return out, nil
+}
+
+// EnsureDeviceStatusSubscription queues edge subscribe for one device (explicit; ignores auto-disable).
+func (s *DeviceMgmtService) EnsureDeviceStatusSubscription(ctx context.Context, req *v1.EnsureDeviceStatusSubscriptionRequest) (*v1.EnsureDeviceStatusSubscriptionResponse, error) {
+	if req == nil || req.DeviceId == "" {
+		return nil, status.Error(codes.InvalidArgument, "device_id is required")
+	}
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+	if s.instanceUc == nil {
+		return nil, status.Error(codes.Unimplemented, "instance usecase not configured")
+	}
+	if _, err := s.deviceUc.GetDevice(ctx, req.DeviceId); err != nil {
+		return nil, status.Error(codes.NotFound, "device not found")
+	}
+	resubscribed := true
+	if req.Resubscribed != nil {
+		resubscribed = req.GetResubscribed()
+	}
+	result, err := s.instanceUc.QueueStatusSubscription(ctx, req.DeviceId, resubscribed)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	out := &v1.EnsureDeviceStatusSubscriptionResponse{AlreadyPending: result.AlreadyPending}
+	if result.Action != nil {
+		out.ActionId = result.Action.Id
+		out.CreatedAt = timeToProto(result.Action.CreatedAt)
+		out.ExpiresAt = timeToProto(result.Action.ExpiresAt)
 	}
 	return out, nil
 }

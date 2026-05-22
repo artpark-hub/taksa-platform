@@ -45,6 +45,7 @@ Skip `00` if the device already syncs topics from umh-core (e.g. generic-generat
 | 04 | `04-ListDeviceTopics.bru` | Flat list + counts |
 | 05 | `05-ListDeviceTopics-PathPrefix.bru` | Topics under prefix |
 | 06 | `06-GetDeviceTopic.bru` | Single topic detail |
+| 07 | `07-EnsureDeviceStatusSubscription.bru` | Queue edge subscribe (explicit) |
 
 ## Auth (topic APIs = northbound)
 
