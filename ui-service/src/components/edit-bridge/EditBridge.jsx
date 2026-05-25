@@ -17,6 +17,7 @@ const EditBridge = () => {
     const selectedDeviceName = searchParams.get('deviceName') || '';
 
     const [activeTab, setActiveTab] = useState('general');
+    const [visitedTabs, setVisitedTabs] = useState({ general: true });
     const [isDeploying, setIsDeploying] = useState(false);
     const [deployMessage, setDeployMessage] = useState('');
     const [deployError, setDeployError] = useState('');
@@ -422,6 +423,11 @@ const EditBridge = () => {
         router.back();
     };
 
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+    };
+
     const handleSaveDeploy = () => {
         if (!isSaveDeployEnabled || isDeploying) {
             return;
@@ -609,7 +615,7 @@ const EditBridge = () => {
             <div className="bridge-config-tabs">
                 <button
                     className={`bridge-config-tab ${activeTab === 'general' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('general')}
+                    onClick={() => handleTabChange('general')}
                 >
                     <FileText size={20} />
                     General
@@ -617,7 +623,7 @@ const EditBridge = () => {
 
                 <button
                     className={`bridge-config-tab ${activeTab === 'connection' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('connection')}
+                    onClick={() => handleTabChange('connection')}
                 >
                     <Link size={20} />
                     Connection
@@ -625,7 +631,7 @@ const EditBridge = () => {
 
                 <button
                     className={`bridge-config-tab ${activeTab === 'readflow' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('readflow')}
+                    onClick={() => handleTabChange('readflow')}
                 >
                     <Network size={20} />
                     Read Flow
@@ -633,25 +639,31 @@ const EditBridge = () => {
             </div>
 
             <div className="bridge-config-body">
-                {activeTab === 'general' && (
-                    <EditGeneral
-                        bridgeConfig={bridgeConfig}
-                        setBridgeConfig={setBridgeConfig}
-                    />
+                {!isLoadingConfig && visitedTabs.general && (
+                    <div style={{ display: activeTab === 'general' ? 'block' : 'none' }}>
+                        <EditGeneral
+                            bridgeConfig={bridgeConfig}
+                            setBridgeConfig={setBridgeConfig}
+                        />
+                    </div>
                 )}
 
-                {activeTab === 'connection' && (
-                    <EditConnection
-                        bridgeConfig={bridgeConfig}
-                        setBridgeConfig={setBridgeConfig}
-                    />
+                {!isLoadingConfig && visitedTabs.connection && (
+                    <div style={{ display: activeTab === 'connection' ? 'block' : 'none' }}>
+                        <EditConnection
+                            bridgeConfig={bridgeConfig}
+                            setBridgeConfig={setBridgeConfig}
+                        />
+                    </div>
                 )}
 
-                {activeTab === 'readflow' && (
-                    <EditReadflow
-                        bridgeConfig={bridgeConfig}
-                        setBridgeConfig={setBridgeConfig}
-                    />
+                {!isLoadingConfig && visitedTabs.readflow && (
+                    <div style={{ display: activeTab === 'readflow' ? 'block' : 'none' }}>
+                        <EditReadflow
+                            bridgeConfig={bridgeConfig}
+                            setBridgeConfig={setBridgeConfig}
+                        />
+                    </div>
                 )}
             </div>
 
