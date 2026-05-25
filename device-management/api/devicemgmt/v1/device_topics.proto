@@ -59,7 +59,7 @@ message TopicRelationalEvent {
 message DeviceTopic {
   string topic = 1; // Canonical UNS path (same construction as umh-core GraphQL topic field)
   string uns_tree_id = 2;
-  string level_0 = 3 [json_name = "level_0"];
+  string level_0 = 3;
   repeated string location_sublevels = 4;
   string data_contract = 5;
   optional string virtual_path = 6;
@@ -93,21 +93,21 @@ message ListDeviceTopicsResponse {
 
 message GetDeviceTopicRequest {
   string device_id = 1;
-  string uns_tree_id = 2 [json_name = "uns_tree_id"];
-  string canonical_topic = 3 [json_name = "canonical_topic"];
+  string uns_tree_id = 2;
+  string canonical_topic = 3;
 }
 
 // Materialized catalog sync state for a device (from status, no edge changes).
 message DeviceTopicCatalogStatus {
   string device_id = 1;
   google.protobuf.Timestamp catalog_last_synced_at = 2;
-  int32 reported_topic_count = 3 [json_name = "reported_topic_count"];
-  int32 materialized_topic_count = 4 [json_name = "materialized_topic_count"];
-  TopicCatalogSyncMode last_sync_mode = 5 [json_name = "last_sync_mode"];
-  google.protobuf.Timestamp last_full_replace_at = 6 [json_name = "last_full_replace_at"];
-  bool last_had_bundle_zero = 7 [json_name = "last_had_bundle_zero"];
+  int32 reported_topic_count = 3;
+  int32 materialized_topic_count = 4;
+  TopicCatalogSyncMode last_sync_mode = 5;
+  google.protobuf.Timestamp last_full_replace_at = 6;
+  bool last_had_bundle_zero = 7;
   // True when materialized count exceeds last reported count (incremental-only sync for a while).
-  bool catalog_stale_warning = 8 [json_name = "catalog_stale_warning"];
+  bool catalog_stale_warning = 8;
 }
 
 message GetDeviceTopicCatalogStatusRequest {
@@ -124,30 +124,30 @@ message EnsureDeviceStatusSubscriptionRequest {
 }
 
 message EnsureDeviceStatusSubscriptionResponse {
-  string action_id = 1 [json_name = "action_id"];
-  bool already_pending = 2 [json_name = "already_pending"];
-  google.protobuf.Timestamp created_at = 3 [json_name = "created_at"];
-  google.protobuf.Timestamp expires_at = 4 [json_name = "expires_at"];
+  string action_id = 1;
+  bool already_pending = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp expires_at = 4;
 }
 
 // One node in the UNS hierarchy (lazy tree expand).
 message TopicTreeNode {
   string segment = 1;
-  bool is_leaf = 2 [json_name = "is_leaf"];
-  int32 descendant_leaf_count = 3 [json_name = "descendant_leaf_count"];
-  string uns_tree_id = 4 [json_name = "uns_tree_id"];
-  string canonical_topic = 5 [json_name = "canonical_topic"];
+  bool is_leaf = 2;
+  int32 descendant_leaf_count = 3;
+  string uns_tree_id = 4;
+  string canonical_topic = 5;
 }
 
 message ListTopicNodesRequest {
   string device_id = 1;
   // Segments already expanded, e.g. ["Enterprise", "Site"] for children under Enterprise.Site
-  repeated string path_prefix = 2 [json_name = "path_prefix"];
+  repeated string path_prefix = 2;
   string text = 3;
   repeated TopicMetaEq meta = 4;
 }
 
 message ListTopicNodesResponse {
   repeated TopicTreeNode nodes = 1;
-  string path_prefix = 2 [json_name = "path_prefix"];
+  string path_prefix = 2;
 }

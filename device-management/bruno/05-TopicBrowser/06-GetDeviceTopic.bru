@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/topics/detail?uns_tree_id={{topic_uns_tree_id}}
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/topics/detail?unsTreeId={{topic_uns_tree_id}}
 }
 
 headers {
@@ -34,9 +34,9 @@ tests {
     expect(t.topic.length).to.be.above(0);
   });
 
-  test('Has level_0 and name', function() {
+  test('Has level0 and name', function() {
     const t = res.getBody();
-    expect(t).to.have.property('level_0');
+    expect(t).to.have.property('level0');
     expect(t).to.have.property('name');
   });
 }

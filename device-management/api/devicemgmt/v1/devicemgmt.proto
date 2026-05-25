@@ -410,7 +410,7 @@ service DeviceMgmtService {
     };
   }
 
-  // Get a single topic by uns_tree_id or exact canonical_topic (query params).
+  // Get a single topic by unsTreeId or exact canonicalTopic (query params).
   rpc GetDeviceTopic(GetDeviceTopicRequest) returns (DeviceTopic) {
     option (google.api.http) = {
       get: "/api/v1/devicemgmt/devices/{device_id}/topics/detail"
@@ -433,7 +433,7 @@ service DeviceMgmtService {
     };
   }
 
-  // Lazy tree: list child segments at path_prefix (built from materialized topics).
+  // Lazy tree: list child segments at pathPrefix (built from materialized topics).
   rpc ListTopicNodes(ListTopicNodesRequest) returns (ListTopicNodesResponse) {
     option (google.api.http) = {
       post: "/api/v1/devicemgmt/devices/{device_id}/topics/nodes/list"

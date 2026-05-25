@@ -1094,7 +1094,7 @@ paths:
         get:
             tags:
                 - DeviceMgmtService
-            description: Get a single topic by uns_tree_id or exact canonical_topic (query params).
+            description: Get a single topic by unsTreeId or exact canonicalTopic (query params).
             operationId: DeviceMgmtService_GetDeviceTopic
             parameters:
                 - name: deviceId
@@ -1102,11 +1102,11 @@ paths:
                   required: true
                   schema:
                     type: string
-                - name: uns_tree_id
+                - name: unsTreeId
                   in: query
                   schema:
                     type: string
-                - name: canonical_topic
+                - name: canonicalTopic
                   in: query
                   schema:
                     type: string
@@ -1146,7 +1146,7 @@ paths:
         post:
             tags:
                 - DeviceMgmtService
-            description: 'Lazy tree: list child segments at path_prefix (built from materialized topics).'
+            description: 'Lazy tree: list child segments at pathPrefix (built from materialized topics).'
             operationId: DeviceMgmtService_ListTopicNodes
             parameters:
                 - name: deviceId
@@ -1643,7 +1643,7 @@ components:
                     type: string
                 unsTreeId:
                     type: string
-                level_0:
+                level0:
                     type: string
                 locationSublevels:
                     type: array
@@ -1675,21 +1675,21 @@ components:
                 catalogLastSyncedAt:
                     type: string
                     format: date-time
-                reported_topic_count:
+                reportedTopicCount:
                     type: integer
                     format: int32
-                materialized_topic_count:
+                materializedTopicCount:
                     type: integer
                     format: int32
-                last_sync_mode:
+                lastSyncMode:
                     type: integer
                     format: enum
-                last_full_replace_at:
+                lastFullReplaceAt:
                     type: string
                     format: date-time
-                last_had_bundle_zero:
+                lastHadBundleZero:
                     type: boolean
-                catalog_stale_warning:
+                catalogStaleWarning:
                     type: boolean
                     description: True when materialized count exceeds last reported count (incremental-only sync for a while).
             description: Materialized catalog sync state for a device (from status, no edge changes).
@@ -1753,14 +1753,14 @@ components:
         api.devicemgmt.v1.EnsureDeviceStatusSubscriptionResponse:
             type: object
             properties:
-                action_id:
+                actionId:
                     type: string
-                already_pending:
+                alreadyPending:
                     type: boolean
-                created_at:
+                createdAt:
                     type: string
                     format: date-time
-                expires_at:
+                expiresAt:
                     type: string
                     format: date-time
         api.devicemgmt.v1.GetLogsRequest:
@@ -1889,7 +1889,7 @@ components:
             properties:
                 deviceId:
                     type: string
-                path_prefix:
+                pathPrefix:
                     type: array
                     items:
                         type: string
@@ -1907,7 +1907,7 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.TopicTreeNode'
-                path_prefix:
+                pathPrefix:
                     type: string
         api.devicemgmt.v1.LogsActionResponse:
             type: object
@@ -2135,14 +2135,14 @@ components:
             properties:
                 segment:
                     type: string
-                is_leaf:
+                isLeaf:
                     type: boolean
-                descendant_leaf_count:
+                descendantLeafCount:
                     type: integer
                     format: int32
-                uns_tree_id:
+                unsTreeId:
                     type: string
-                canonical_topic:
+                canonicalTopic:
                     type: string
             description: One node in the UNS hierarchy (lazy tree expand).
         api.devicemgmt.v1.UpdateDeviceRequest:

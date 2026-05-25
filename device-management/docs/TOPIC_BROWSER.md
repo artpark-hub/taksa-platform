@@ -61,7 +61,7 @@ flowchart TB
 | List topics | `POST` | `/api/v1/devicemgmt/devices/{device_id}/topics/list` |
 | Get one topic | `GET` | `/api/v1/devicemgmt/devices/{device_id}/topics/detail` |
 
-List uses **POST** so the body can carry `text`, `meta[]`, and pagination without long query strings. Get uses **query parameters** `uns_tree_id` and/or `canonical_topic` (one is required).
+List uses **POST** so the body can carry `text`, `meta[]`, and pagination without long query strings. Get uses **query parameters** `unsTreeId` and/or `canonicalTopic` (one is required). Topic Browser HTTP JSON uses **camelCase** (proto default JSON names), consistent with `ListDevicesResponse` and other DM response bodies.
 
 ---
 
@@ -154,7 +154,7 @@ Stores canonical path, tree id, level metadata, `metadata_json`, optional serial
 - **`text`** — Case-insensitive substring on `canonical_topic` **or** the text serialization of `metadata_json` (GraphQL-style topic text filter).
 - **`meta`** — AND of exact key/value pairs on metadata (`jsonb_each_text`).
 
-Default page size **100**, maximum **500**. Responses include `total_count` and `filtered_count`.
+Default page size **100**, maximum **500**. Responses include `totalCount` and `filteredCount`.
 
 Table: `device_topic_catalog` — per-device sync metadata (`last_synced_at`, counts, `last_sync_mode`, `catalog_stale_warning` via API).
 
@@ -164,11 +164,11 @@ Table: `device_topic_catalog` — per-device sync metadata (`last_synced_at`, co
 
 | RPC | HTTP | Purpose |
 |-----|------|---------|
-| `ListDeviceTopics` | `POST .../topics/list` | Flat list + `text`, `meta`, `path_prefix`, `omit_last_event`, pagination |
+| `ListDeviceTopics` | `POST .../topics/list` | Flat list + `text`, `meta`, `pathPrefix`, `omitLastEvent`, pagination |
 | `GetDeviceTopic` | `GET .../topics/detail` | Single topic |
 | `GetDeviceTopicCatalogStatus` | `GET .../topics/catalog-status` | Sync metadata and staleness hint |
 | `EnsureDeviceStatusSubscription` | `POST .../status-subscription` | Queue edge `subscribe` (explicit; use when auto resubscribe is off) |
-| `ListTopicNodes` | `POST .../topics/nodes/list` | Lazy tree children at `path_prefix` |
+| `ListTopicNodes` | `POST .../topics/nodes/list` | Lazy tree children at `pathPrefix` |
 
 ---
 
@@ -206,9 +206,9 @@ POST /api/v1/devicemgmt/devices/dev-abc123/topics/list
 Content-Type: application/json
 
 {
-  "device_id": "dev-abc123",
-  "page_size": 50,
-  "page_token": "",
+  "deviceId": "dev-abc123",
+  "pageSize": 50,
+  "pageToken": "",
   "text": "Line1",
   "meta": [
     { "key": "line", "eq": "1" }
@@ -219,13 +219,13 @@ Content-Type: application/json
 ### Get topic by tree id
 
 ```http
-GET /api/v1/devicemgmt/devices/dev-abc123/topics/detail?uns_tree_id=a1b2c3d4e5f6...
+GET /api/v1/devicemgmt/devices/dev-abc123/topics/detail?unsTreeId=a1b2c3d4e5f6...
 ```
 
 ### Get topic by canonical path
 
 ```http
-GET /api/v1/devicemgmt/devices/dev-abc123/topics/detail?canonical_topic=Enterprise.Site.Line1._historian.Temperature
+GET /api/v1/devicemgmt/devices/dev-abc123/topics/detail?canonicalTopic=Enterprise.Site.Line1._historian.Temperature
 ```
 
 ---

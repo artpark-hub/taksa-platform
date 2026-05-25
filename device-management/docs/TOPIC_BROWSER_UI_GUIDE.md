@@ -13,7 +13,7 @@ Guide for building a **management console** topic browser against Device Managem
 | Base URL | e.g. `https://<dm-host>:8000` (local: `http://localhost:8000`) |
 | Auth | `Authorization: Bearer <console JWT>` |
 | Content-Type | `application/json` for POST bodies |
-| JSON field names | **camelCase** in request/response bodies (e.g. `nextPageToken`, `pageSize`, `catalogLastSyncedAt`), matching other Device Management list APIs |
+| JSON field names | **camelCase** in request/response bodies and Topic Browser GET query params (e.g. `nextPageToken`, `pageSize`, `catalogLastSyncedAt`, `unsTreeId`), matching other Device Management JSON APIs |
 
 The JWT must include **`tenant_id`** for the tenant that owns the device (from Oathkeeper / console login). Do **not** use the device southbound login cookie for these routes.
 
@@ -47,7 +47,7 @@ Authorization: Bearer eyJhbGciOi...
 |---------|-----|--------|
 | “Is data fresh?” / loading state | `GetDeviceTopicCatalogStatus` | Cheap; call on screen open and after refresh |
 | Expand ISA-95 tree | `ListTopicNodes` | Small payloads; one call per expanded path |
-| Search / filter table | `ListDeviceTopics` | Full rows; use `omit_last_event: true` for tables |
+| Search / filter table | `ListDeviceTopics` | Full rows; use `omitLastEvent: true` for tables |
 | Topic detail panel | `GetDeviceTopic` | Full metadata + last event |
 | Force edge to send status again | `EnsureDeviceStatusSubscription` | When catalog stuck or auto-resubscribe disabled |
 
@@ -119,14 +119,14 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "device_id": "f0521328-915e-462d-8638-b6db8851624e",
+  "deviceId": "f0521328-915e-462d-8638-b6db8851624e",
   "resubscribed": true
 }
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `device_id` | Yes | Same as path `deviceId` |
+| `deviceId` | Yes | Same as path `deviceId` |
 | `resubscribed` | No | Omit to let DM choose: **`false`** when catalog is empty / last sync was `EMPTY` (bootstrap bundle 0); otherwise **`true`** (TTL refresh). Set `false` explicitly to force full snapshot after a cleared catalog |
 
 ### Response
@@ -161,8 +161,8 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "device_id": "f0521328-915e-462d-8638-b6db8851624e",
-  "path_prefix": []
+  "deviceId": "f0521328-915e-462d-8638-b6db8851624e",
+  "pathPrefix": []
 }
 ```
 
@@ -185,8 +185,8 @@ Content-Type: application/json
 
 ```json
 {
-  "device_id": "f0521328-915e-462d-8638-b6db8851624e",
-  "path_prefix": ["Artpark", "Artgarage", "GroundFloor"]
+  "deviceId": "f0521328-915e-462d-8638-b6db8851624e",
+  "pathPrefix": ["Artpark", "Artgarage", "GroundFloor"]
 }
 ```
 
@@ -233,8 +233,8 @@ When `isLeaf` is `true`, use `unsTreeId` and `canonicalTopic` for the detail pan
 
 ```json
 {
-  "device_id": "...",
-  "path_prefix": ["Artpark"],
+  "deviceId": "...",
+  "pathPrefix": ["Artpark"],
   "text": "Line2",
   "meta": [{ "key": "tag_name", "eq": "hello_artpark" }]
 }
@@ -242,7 +242,7 @@ When `isLeaf` is `true`, use `unsTreeId` and `canonicalTopic` for the detail pan
 
 | Field | Description |
 |-------|-------------|
-| `path_prefix` | Segments already expanded (array), **not** a single dotted string |
+| `pathPrefix` | Segments already expanded (array), **not** a single dotted string |
 | `text` | Substring match on canonical topic or metadata text |
 | `meta` | Exact metadata key/value AND filters |
 
@@ -251,8 +251,8 @@ When `isLeaf` is `true`, use `unsTreeId` and `canonicalTopic` for the detail pan
 ```javascript
 async function loadChildren(deviceId, pathPrefixSegments) {
   const res = await post(`/devices/${deviceId}/topics/nodes/list`, {
-    device_id: deviceId,
-    path_prefix: pathPrefixSegments,
+    deviceId,
+    pathPrefix: pathPrefixSegments,
   });
   return res.nodes.map((n) => ({
     id: [...pathPrefixSegments, n.segment].join('.'),
@@ -270,7 +270,7 @@ async function loadChildren(deviceId, pathPrefixSegments) {
 
 Returns **full topic rows** (same shape as detail), paginated. Best for **search results** and **tables**, not for tree shells.
 
-**Recommendation for tables:** set `"omit_last_event": true` and load **`GetDeviceTopic`** when the user selects a row.
+**Recommendation for tables:** set `"omitLastEvent": true` and load **`GetDeviceTopic`** when the user selects a row.
 
 ### Request — first page (compact table)
 
@@ -295,7 +295,7 @@ Content-Type: application/json
     {
       "topic": "Artpark.Artgarage.GroundFloor.Line1._historian.hello_world",
       "unsTreeId": "eb329c21a444dfa1",
-      "level_0": "Artpark",
+      "level0": "Artpark",
       "locationSublevels": ["Artgarage", "GroundFloor", "Line1"],
       "dataContract": "_historian",
       "name": "hello_world",
@@ -333,7 +333,7 @@ Content-Type: application/json
     {
       "topic": "Artpark.Artgarage.GroundFloor.Line2._historian.hello_artpark",
       "unsTreeId": "4393d7af6f3ed0bb",
-      "level_0": "Artpark",
+      "level0": "Artpark",
       "locationSublevels": ["Artgarage", "GroundFloor", "Line2"],
       "dataContract": "_historian",
       "name": "hello_artpark",
@@ -358,7 +358,7 @@ Empty `nextPageToken` → end of list.
 | `pageSize` | Items per page (default **100**, max **500**) |
 | `pageToken` | Omit or `""` for first page; otherwise use previous `nextPageToken` |
 | `totalCount` | All topics for device (ignores filters) |
-| `filteredCount` | Topics matching `text` / `meta` / `path_prefix` |
+| `filteredCount` | Topics matching `text` / `meta` / `pathPrefix` |
 
 ```javascript
 async function listAllTopics(deviceId, filters) {
@@ -385,9 +385,9 @@ async function listAllTopics(deviceId, filters) {
 
 ```json
 {
-  "device_id": "...",
+  "deviceId": "...",
   "text": "Line2",
-  "omit_last_event": true
+  "omitLastEvent": true
 }
 ```
 
@@ -395,22 +395,22 @@ async function listAllTopics(deviceId, filters) {
 
 ```json
 {
-  "device_id": "...",
+  "deviceId": "...",
   "meta": [{ "key": "tag_name", "eq": "hello_artpark" }]
 }
 ```
 
-**Path prefix (`path_prefix`):** dotted string; topics under that path.
+**Path prefix (`pathPrefix`):** dotted string; topics under that path.
 
 ```json
 {
-  "device_id": "...",
-  "path_prefix": "Artpark.Artgarage.GroundFloor.Line1.",
-  "omit_last_event": true
+  "deviceId": "...",
+  "pathPrefix": "Artpark.Artgarage.GroundFloor.Line1.",
+  "omitLastEvent": true
 }
 ```
 
-Note: `path_prefix` here is a **string**, unlike `ListTopicNodes` which uses a **segment array**.
+Note: `pathPrefix` here is a **string**, unlike `ListTopicNodes` which uses a **segment array**.
 
 ### List vs detail payload size
 
@@ -418,7 +418,7 @@ Note: `path_prefix` here is a **string**, unlike `ListTopicNodes` which uses a *
 |--|-------------------|------------------|
 | Identity | `topic`, `unsTreeId`, levels, `name` | Same |
 | Metadata | **Full** array from edge | **Full** |
-| Last value | Optional (`omit_last_event`) | Always included when stored |
+| Last value | Optional (`omitLastEvent`) | Always included when stored |
 
 There is no separate “summary” list type today. For a slim table, show `topic`, `name`, and 1–2 metadata keys (e.g. `tag_name`) client-side, then fetch detail on click.
 
@@ -429,17 +429,17 @@ There is no separate “summary” list type today. For a slim table, show `topi
 ### Request (by tree id — preferred)
 
 ```http
-GET /api/v1/devicemgmt/devices/f0521328-915e-462d-8638-b6db8851624e/topics/detail?uns_tree_id=eb329c21a444dfa1
+GET /api/v1/devicemgmt/devices/f0521328-915e-462d-8638-b6db8851624e/topics/detail?unsTreeId=eb329c21a444dfa1
 Authorization: Bearer <token>
 ```
 
 ### Request (by canonical path)
 
 ```http
-GET /api/v1/devicemgmt/devices/f0521328-915e-462d-8638-b6db8851624e/topics/detail?canonical_topic=Artpark.Artgarage.GroundFloor.Line1._historian.hello_world
+GET /api/v1/devicemgmt/devices/f0521328-915e-462d-8638-b6db8851624e/topics/detail?canonicalTopic=Artpark.Artgarage.GroundFloor.Line1._historian.hello_world
 ```
 
-Provide **one** of `uns_tree_id` or `canonical_topic`, not both.
+Provide **one** of `unsTreeId` or `canonicalTopic`, not both.
 
 ### Response (with last event — example shape)
 
@@ -447,7 +447,7 @@ Provide **one** of `uns_tree_id` or `canonical_topic`, not both.
 {
   "topic": "Artpark.Artgarage.GroundFloor.Line1._historian.hello_world",
   "unsTreeId": "eb329c21a444dfa1",
-  "level_0": "Artpark",
+  "level0": "Artpark",
   "locationSublevels": ["Artgarage", "GroundFloor", "Line1"],
   "dataContract": "_historian",
   "name": "hello_world",
@@ -474,18 +474,18 @@ Last event may be `timeSeries` or `relational` depending on the data contract. I
 
 1. `GET .../topics/catalog-status` → show count + last sync.
 2. If stale → `POST .../status-subscription` → poll catalog status.
-3. `POST .../topics/nodes/list` with `path_prefix: []` → render tree root.
+3. `POST .../topics/nodes/list` with `pathPrefix: []` → render tree root.
 
 ### B. User expands tree node
 
-1. Append segment to `path_prefix` array.
+1. Append segment to `pathPrefix` array.
 2. `POST .../topics/nodes/list` → render children.
-3. If child `isLeaf` → on select, `GET .../topics/detail?uns_tree_id=...`.
+3. If child `isLeaf` → on select, `GET .../topics/detail?unsTreeId=...`.
 
 ### C. User searches in a table
 
-1. `POST .../topics/list` with `text` / `meta`, `omit_last_event: true`, paginate with `nextPageToken`.
-2. On row click → `GET .../topics/detail?uns_tree_id=...`.
+1. `POST .../topics/list` with `text` / `meta`, `omitLastEvent: true`, paginate with `nextPageToken`.
+2. On row click → `GET .../topics/detail?unsTreeId=...`.
 
 ### D. User clicks Refresh
 
@@ -502,7 +502,7 @@ Last event may be `timeSeries` or `relational` depending on the data contract. I
 | `200` | Success |
 | `400` | Invalid `pageToken`, missing `deviceId`, both `unsTreeId` and `canonicalTopic` set |
 | `401` / `403` | Missing/invalid Bearer or wrong tenant |
-| `404` | Unknown `device_id` or topic not found on detail |
+| `404` | Unknown `deviceId` or topic not found on detail |
 | `500` | Server error |
 
 ---

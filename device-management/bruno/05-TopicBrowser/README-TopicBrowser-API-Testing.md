@@ -57,3 +57,7 @@ Set `console_bearer_token` in Bruno environment to a console/Oathkeeper JWT that
 
 Do **not** use the device login cookie for `01`–`06` — that token is for southbound instance routes only (though the server middleware accepts cookie as a fallback for local dev).
 
+## JSON naming
+
+Topic Browser request/response bodies and `GetDeviceTopic` query params use **camelCase** (`deviceId`, `pathPrefix`, `unsTreeId`, `nextPageToken`, etc.), matching other DM JSON APIs. Legacy GET list filters elsewhere in DM still use snake_case query names (`page_size`, `page_token`).
+
