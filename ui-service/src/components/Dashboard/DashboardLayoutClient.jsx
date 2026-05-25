@@ -113,8 +113,8 @@ export default function DashboardLayoutClient({ children }) {
     if (isAuthorizing) {
         return (
             <div className="dashboard-auth-overlay">
-                <div className="dashboard-auth-modal">
-                    <div className="dashboard-auth-loader"></div>
+                <div className="dashboard-auth-modal" role="status" aria-live="polite" aria-busy="true">
+                    <div className="dashboard-auth-loader" role="img" aria-label="Validating user"></div>
                     <h3>Validating user, kindly wait.</h3>
                 </div>
             </div>

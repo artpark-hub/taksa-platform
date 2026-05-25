@@ -581,7 +581,7 @@ ${defaultsCode.split('\n').map((line) => `  ${line}`).join('\n')}`;
                                 }
                             }}
                             disabled={isVisualProcessingDisabled}
-                            title={isVisualProcessingDisabled ? 'Not able to visualise' : undefined}
+                            title={isVisualProcessingDisabled ? 'Unable to render this YAML in Visual mode' : undefined}
                         >
                             Visual
                         </button>

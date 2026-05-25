@@ -561,11 +561,11 @@
     border: 0.3rem solid #e5e7eb;
     border-top-color: #111827;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: dashboard-auth-spin 1s linear infinite;
     margin: 0 auto;
 }
 
-@keyframes spin {
+@keyframes dashboard-auth-spin {
     to {
         transform: rotate(360deg);
     }
