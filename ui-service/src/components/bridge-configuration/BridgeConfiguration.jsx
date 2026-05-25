@@ -266,12 +266,37 @@ const BridgeConfiguration = () => {
                 const resolvedLevels = getLevelsFromDevice(selectedDevice);
 
                 if (!cancelled) {
-                    setBridgeConfig((prev) => ({
-                        ...prev,
-                        instance: resolvedDeviceName,
-                        level0: resolvedLevels[0]?.value || '',
-                        levels: resolvedLevels
-                    }));
+                    setBridgeConfig((prev) => {
+                        const existingLevels = Array.isArray(prev?.levels) ? prev.levels : [];
+                        const userAddedLevels = existingLevels.filter((level) => level?.isUserAdded);
+
+                        if (userAddedLevels.length === 0) {
+                            return {
+                                ...prev,
+                                instance: resolvedDeviceName,
+                                level0: resolvedLevels[0]?.value || '',
+                                levels: resolvedLevels
+                            };
+                        }
+
+                        const mergedLevelsByIndex = new Map(
+                            resolvedLevels.map((level) => [level.index, level])
+                        );
+
+                        userAddedLevels.forEach((level) => {
+                            mergedLevelsByIndex.set(level.index, level);
+                        });
+
+                        const mergedLevels = Array.from(mergedLevelsByIndex.values())
+                            .sort((a, b) => a.index - b.index);
+
+                        return {
+                            ...prev,
+                            instance: resolvedDeviceName,
+                            level0: prev.level0 || resolvedLevels[0]?.value || '',
+                            levels: mergedLevels
+                        };
+                    });
                 }
             } catch (error) {
                 console.error('Failed to load selected device details:', error);
@@ -545,26 +570,26 @@ const BridgeConfiguration = () => {
             </div>
 
             <div className="bridge-config-body">
-                {activeTab === 'general' && (
+                <div style={{ display: activeTab === 'general' ? 'block' : 'none' }}>
                     <General
                         bridgeConfig={bridgeConfig}
                         setBridgeConfig={setBridgeConfig}
                     />
-                )}
+                </div>
 
-                {activeTab === 'connection' && (
+                <div style={{ display: activeTab === 'connection' ? 'block' : 'none' }}>
                     <Connection
                         bridgeConfig={bridgeConfig}
                         setBridgeConfig={setBridgeConfig}
                     />
-                )}
+                </div>
 
-                {activeTab === 'readflow' && (
+                <div style={{ display: activeTab === 'readflow' ? 'block' : 'none' }}>
                     <Readflow
                         bridgeConfig={bridgeConfig}
                         setBridgeConfig={setBridgeConfig}
                     />
-                )}
+                </div>
             </div>
 
             {isDeploying && (

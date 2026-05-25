@@ -633,25 +633,29 @@ const EditBridge = () => {
             </div>
 
             <div className="bridge-config-body">
-                {activeTab === 'general' && (
-                    <EditGeneral
-                        bridgeConfig={bridgeConfig}
-                        setBridgeConfig={setBridgeConfig}
-                    />
-                )}
+                {!isLoadingConfig && (
+                    <>
+                        <div style={{ display: activeTab === 'general' ? 'block' : 'none' }}>
+                            <EditGeneral
+                                bridgeConfig={bridgeConfig}
+                                setBridgeConfig={setBridgeConfig}
+                            />
+                        </div>
 
-                {activeTab === 'connection' && (
-                    <EditConnection
-                        bridgeConfig={bridgeConfig}
-                        setBridgeConfig={setBridgeConfig}
-                    />
-                )}
+                        <div style={{ display: activeTab === 'connection' ? 'block' : 'none' }}>
+                            <EditConnection
+                                bridgeConfig={bridgeConfig}
+                                setBridgeConfig={setBridgeConfig}
+                            />
+                        </div>
 
-                {activeTab === 'readflow' && (
-                    <EditReadflow
-                        bridgeConfig={bridgeConfig}
-                        setBridgeConfig={setBridgeConfig}
-                    />
+                        <div style={{ display: activeTab === 'readflow' ? 'block' : 'none' }}>
+                            <EditReadflow
+                                bridgeConfig={bridgeConfig}
+                                setBridgeConfig={setBridgeConfig}
+                            />
+                        </div>
+                    </>
                 )}
             </div>
 
