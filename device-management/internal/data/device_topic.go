@@ -13,6 +13,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+const deviceTopicInsertBatchSize = 100
+
 // DeviceTopicRepo persists materialized UNS topics from edge status.
 type DeviceTopicRepo struct {
 	data *Data
@@ -40,6 +42,119 @@ type TopicMetaEq struct {
 	Eq  string
 }
 
+type topicRowArgs struct {
+	id, unsTreeID, canonicalTopic, level0, locJSON, dataContract, name, mdJSON string
+	vpathArg, lastEv, lastAt                                                    interface{}
+}
+
+func buildTopicRowArgs(deviceID string, row topicbrowser.UpsertRow) (topicRowArgs, error) {
+	id := deviceID + ":" + row.UnsTreeID
+	locJSON, err := json.Marshal(row.LocationLevels)
+	if err != nil {
+		return topicRowArgs{}, err
+	}
+	mdJSON, err := json.Marshal(row.Metadata)
+	if err != nil {
+		return topicRowArgs{}, err
+	}
+	var lastEv interface{}
+	if row.LastEvent != nil {
+		b, err := protojson.Marshal(row.LastEvent)
+		if err != nil {
+			return topicRowArgs{}, err
+		}
+		lastEv = string(b)
+	}
+	var lastAt interface{}
+	if row.LastEvent != nil && row.LastEvent.GetProducedAtMs() > 0 {
+		lastAt = time.UnixMilli(int64(row.LastEvent.GetProducedAtMs()))
+	}
+	var vpathArg interface{}
+	if row.VirtualPath != "" {
+		vpathArg = row.VirtualPath
+	}
+	return topicRowArgs{
+		id: id, unsTreeID: row.UnsTreeID, canonicalTopic: row.CanonicalTopic,
+		level0: row.Level0, locJSON: string(locJSON), dataContract: row.DataContract,
+		name: row.Name, mdJSON: string(mdJSON), vpathArg: vpathArg, lastEv: lastEv, lastAt: lastAt,
+	}, nil
+}
+
+func appendTopicRowPlaceholders(sb *strings.Builder, n int) {
+	if n > 0 {
+		sb.WriteString(", ")
+	}
+	// 16 columns / 16 placeholders (id..level0=6, location_sublevels::jsonb, data_contract..name=3, metadata/last_event jsonb, last_event_at, last_synced, created_at, updated_at).
+	sb.WriteString("(?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?)")
+}
+
+func (r *topicRowArgs) appendArgs(args *[]interface{}, tenantID, deviceID string, now time.Time) {
+	*args = append(*args,
+		r.id, tenantID, deviceID, r.unsTreeID, r.canonicalTopic,
+		r.level0, r.locJSON, r.dataContract, r.vpathArg, r.name,
+		r.mdJSON, r.lastEv, r.lastAt, now, now, now,
+	)
+}
+
+func execTopicInsertBatch(ctx context.Context, tx *sql.Tx, tenantID, deviceID string, rows []topicbrowser.UpsertRow, upsert bool) error {
+	now := time.Now()
+	for start := 0; start < len(rows); start += deviceTopicInsertBatchSize {
+		end := start + deviceTopicInsertBatchSize
+		if end > len(rows) {
+			end = len(rows)
+		}
+		batch := rows[start:end]
+		var sb strings.Builder
+		if upsert {
+			sb.WriteString(`
+INSERT INTO device_topics (
+  id, tenant_id, device_id, uns_tree_id, canonical_topic,
+  level0, location_sublevels, data_contract, virtual_path, name,
+  metadata_json, last_event_json, last_event_at, last_synced, created_at, updated_at
+) VALUES `)
+		} else {
+			sb.WriteString(`
+INSERT INTO device_topics (
+  id, tenant_id, device_id, uns_tree_id, canonical_topic,
+  level0, location_sublevels, data_contract, virtual_path, name,
+  metadata_json, last_event_json, last_event_at, last_synced, created_at, updated_at
+) VALUES `)
+		}
+		args := make([]interface{}, 0, len(batch)*16)
+		for i, row := range batch {
+			ra, err := buildTopicRowArgs(deviceID, row)
+			if err != nil {
+				return err
+			}
+			appendTopicRowPlaceholders(&sb, i)
+			ra.appendArgs(&args, tenantID, deviceID, now)
+		}
+		if upsert {
+			sb.WriteString(`
+ON CONFLICT (tenant_id, device_id, uns_tree_id) DO UPDATE SET
+  canonical_topic = EXCLUDED.canonical_topic,
+  level0 = EXCLUDED.level0,
+  location_sublevels = EXCLUDED.location_sublevels,
+  data_contract = EXCLUDED.data_contract,
+  virtual_path = EXCLUDED.virtual_path,
+  name = EXCLUDED.name,
+  metadata_json = EXCLUDED.metadata_json,
+  last_event_json = COALESCE(EXCLUDED.last_event_json, device_topics.last_event_json),
+  last_event_at = COALESCE(EXCLUDED.last_event_at, device_topics.last_event_at),
+  last_synced = EXCLUDED.last_synced,
+  updated_at = EXCLUDED.updated_at`)
+		}
+		q := convertPlaceholders(sb.String())
+		if _, err := tx.ExecContext(ctx, q, args...); err != nil {
+			if upsert {
+				return fmt.Errorf("batch upsert device topics: %w", err)
+			}
+			return fmt.Errorf("batch insert device topics: %w", err)
+		}
+	}
+	return nil
+}
+
 // UpsertDeviceTopics merges topic rows from one status sync.
 func (r *DeviceTopicRepo) UpsertDeviceTopics(ctx context.Context, tenantID, deviceID string, rows []topicbrowser.UpsertRow) error {
 	if len(rows) == 0 {
@@ -51,61 +166,8 @@ func (r *DeviceTopicRepo) UpsertDeviceTopics(ctx context.Context, tenantID, devi
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	now := time.Now()
-	for _, row := range rows {
-		id := deviceID + ":" + row.UnsTreeID
-		locJSON, err := json.Marshal(row.LocationLevels)
-		if err != nil {
-			return err
-		}
-		mdJSON, err := json.Marshal(row.Metadata)
-		if err != nil {
-			return err
-		}
-		var lastEv interface{}
-		if row.LastEvent != nil {
-			b, err := protojson.Marshal(row.LastEvent)
-			if err != nil {
-				return err
-			}
-			lastEv = string(b)
-		}
-		var lastAt interface{}
-		if row.LastEvent != nil && row.LastEvent.GetProducedAtMs() > 0 {
-			lastAt = time.UnixMilli(int64(row.LastEvent.GetProducedAtMs()))
-		}
-		var vpathArg interface{}
-		if row.VirtualPath != "" {
-			vpathArg = row.VirtualPath
-		}
-		q := `
-INSERT INTO device_topics (
-  id, tenant_id, device_id, uns_tree_id, canonical_topic,
-  level0, location_sublevels, data_contract, virtual_path, name,
-  metadata_json, last_event_json, last_event_at, last_synced, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?)
-ON CONFLICT (tenant_id, device_id, uns_tree_id) DO UPDATE SET
-  canonical_topic = EXCLUDED.canonical_topic,
-  level0 = EXCLUDED.level0,
-  location_sublevels = EXCLUDED.location_sublevels,
-  data_contract = EXCLUDED.data_contract,
-  virtual_path = EXCLUDED.virtual_path,
-  name = EXCLUDED.name,
-  metadata_json = EXCLUDED.metadata_json,
-  last_event_json = EXCLUDED.last_event_json,
-  last_event_at = EXCLUDED.last_event_at,
-  last_synced = EXCLUDED.last_synced,
-  updated_at = EXCLUDED.updated_at
-`
-		q = convertPlaceholders(q)
-		_, err = tx.ExecContext(ctx, q,
-			id, tenantID, deviceID, row.UnsTreeID, row.CanonicalTopic,
-			row.Level0, string(locJSON), row.DataContract, vpathArg, row.Name,
-			string(mdJSON), lastEv, lastAt, now, now, now,
-		)
-		if err != nil {
-			return fmt.Errorf("upsert device topic %s: %w", row.UnsTreeID, err)
-		}
+	if err := execTopicInsertBatch(ctx, tx, tenantID, deviceID, rows, true); err != nil {
+		return err
 	}
 	return tx.Commit()
 }
@@ -134,48 +196,8 @@ func (r *DeviceTopicRepo) ReplaceAllDeviceTopics(ctx context.Context, tenantID, 
 		return fmt.Errorf("replace device topics delete: %w", err)
 	}
 
-	now := time.Now()
-	for _, row := range rows {
-		id := deviceID + ":" + row.UnsTreeID
-		locJSON, err := json.Marshal(row.LocationLevels)
-		if err != nil {
-			return err
-		}
-		mdJSON, err := json.Marshal(row.Metadata)
-		if err != nil {
-			return err
-		}
-		var lastEv interface{}
-		if row.LastEvent != nil {
-			b, err := protojson.Marshal(row.LastEvent)
-			if err != nil {
-				return err
-			}
-			lastEv = string(b)
-		}
-		var lastAt interface{}
-		if row.LastEvent != nil && row.LastEvent.GetProducedAtMs() > 0 {
-			lastAt = time.UnixMilli(int64(row.LastEvent.GetProducedAtMs()))
-		}
-		var vpathArg interface{}
-		if row.VirtualPath != "" {
-			vpathArg = row.VirtualPath
-		}
-		q := `
-INSERT INTO device_topics (
-  id, tenant_id, device_id, uns_tree_id, canonical_topic,
-  level0, location_sublevels, data_contract, virtual_path, name,
-  metadata_json, last_event_json, last_event_at, last_synced, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?)
-`
-		q = convertPlaceholders(q)
-		if _, err := tx.ExecContext(ctx, q,
-			id, tenantID, deviceID, row.UnsTreeID, row.CanonicalTopic,
-			row.Level0, string(locJSON), row.DataContract, vpathArg, row.Name,
-			string(mdJSON), lastEv, lastAt, now, now, now,
-		); err != nil {
-			return fmt.Errorf("replace device topic insert %s: %w", row.UnsTreeID, err)
-		}
+	if err := execTopicInsertBatch(ctx, tx, tenantID, deviceID, rows, false); err != nil {
+		return err
 	}
 	return tx.Commit()
 }

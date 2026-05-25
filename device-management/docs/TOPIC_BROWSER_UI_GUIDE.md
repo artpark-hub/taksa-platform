@@ -13,6 +13,7 @@ Guide for building a **management console** topic browser against Device Managem
 | Base URL | e.g. `https://<dm-host>:8000` (local: `http://localhost:8000`) |
 | Auth | `Authorization: Bearer <console JWT>` |
 | Content-Type | `application/json` for POST bodies |
+| JSON field names | **camelCase** in request/response bodies (e.g. `nextPageToken`, `pageSize`, `catalogLastSyncedAt`), matching other Device Management list APIs |
 
 The JWT must include **`tenant_id`** for the tenant that owns the device (from Oathkeeper / console login). Do **not** use the device southbound login cookie for these routes.
 
@@ -126,7 +127,7 @@ Content-Type: application/json
 | Field | Required | Description |
 |-------|----------|-------------|
 | `device_id` | Yes | Same as path `deviceId` |
-| `resubscribed` | No | Default `true` — refresh subscriber TTL. `false` may trigger heavier bootstrap snapshot on edge |
+| `resubscribed` | No | Omit to let DM choose: **`false`** when catalog is empty / last sync was `EMPTY` (bootstrap bundle 0); otherwise **`true`** (TTL refresh). Set `false` explicitly to force full snapshot after a cleared catalog |
 
 ### Response
 
@@ -279,10 +280,10 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "device_id": "f0521328-915e-462d-8638-b6db8851624e",
-  "page_size": 20,
-  "page_token": "",
-  "omit_last_event": true
+  "deviceId": "f0521328-915e-462d-8638-b6db8851624e",
+  "pageSize": 20,
+  "pageToken": "",
+  "omitLastEvent": true
 }
 ```
 
@@ -313,14 +314,14 @@ Content-Type: application/json
 
 ### Request — second page
 
-`page_token` is an **offset**, not a page number. `"1"` means “skip the first topic.”
+`pageToken` is an **offset**, not a page number. `"1"` means “skip the first topic.”
 
 ```json
 {
-  "device_id": "f0521328-915e-462d-8638-b6db8851624e",
-  "page_size": 1,
-  "page_token": "1",
-  "omit_last_event": true
+  "deviceId": "f0521328-915e-462d-8638-b6db8851624e",
+  "pageSize": 1,
+  "pageToken": "1",
+  "omitLastEvent": true
 }
 ```
 
@@ -354,8 +355,8 @@ Empty `nextPageToken` → end of list.
 
 | Field | Meaning |
 |-------|---------|
-| `page_size` | Items per page (default **100**, max **500**) |
-| `page_token` | Omit or `""` for first page; otherwise use previous `nextPageToken` |
+| `pageSize` | Items per page (default **100**, max **500**) |
+| `pageToken` | Omit or `""` for first page; otherwise use previous `nextPageToken` |
 | `totalCount` | All topics for device (ignores filters) |
 | `filteredCount` | Topics matching `text` / `meta` / `path_prefix` |
 
@@ -365,10 +366,10 @@ async function listAllTopics(deviceId, filters) {
   let pageToken = '';
   do {
     const res = await post(`/devices/${deviceId}/topics/list`, {
-      device_id: deviceId,
-      page_size: 100,
-      page_token: pageToken,
-      omit_last_event: true,
+      deviceId,
+      pageSize: 100,
+      pageToken,
+      omitLastEvent: true,
       ...filters,
     });
     items.push(...res.topics);
@@ -499,7 +500,7 @@ Last event may be `timeSeries` or `relational` depending on the data contract. I
 | Code | Typical cause |
 |------|----------------|
 | `200` | Success |
-| `400` | Invalid `page_token`, missing `device_id`, both `uns_tree_id` and `canonical_topic` set |
+| `400` | Invalid `pageToken`, missing `deviceId`, both `unsTreeId` and `canonicalTopic` set |
 | `401` / `403` | Missing/invalid Bearer or wrong tenant |
 | `404` | Unknown `device_id` or topic not found on detail |
 | `500` | Server error |

@@ -149,7 +149,8 @@ func main() {
 		if bc.DeviceStatusSubscription == nil {
 			bc.DeviceStatusSubscription = &conf.DeviceStatusSubscription{}
 		}
-		bc.DeviceStatusSubscription.AutoResubscribeStatusMessages = v == "true" || v == "1"
+		enabled := v == "true" || v == "1"
+		bc.DeviceStatusSubscription.AutoResubscribeStatusMessages = &enabled
 	}
 
 	// Get or generate JWT secret (generate-once, persist-under-/data strategy)

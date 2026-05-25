@@ -74,21 +74,21 @@ message DeviceTopic {
 
 message ListDeviceTopicsRequest {
   string device_id = 1;
-  int32 page_size = 2 [json_name = "page_size"]; // 0 = default 100, max 500
-  string page_token = 3 [json_name = "page_token"];
+  int32 page_size = 2; // 0 = default 100, max 500
+  string page_token = 3;
   string text = 4;
   repeated TopicMetaEq meta = 5;
   // Canonical path prefix (dot-separated), e.g. "Enterprise.Site.Line1."
-  string path_prefix = 6 [json_name = "path_prefix"];
+  string path_prefix = 6;
   // When true, omit last_event from each topic (smaller payloads for tree shells).
-  bool omit_last_event = 7 [json_name = "omit_last_event"];
+  bool omit_last_event = 7;
 }
 
 message ListDeviceTopicsResponse {
   repeated DeviceTopic topics = 1;
-  string next_page_token = 2 [json_name = "next_page_token"];
-  int32 total_count = 3 [json_name = "total_count"];
-  int32 filtered_count = 4 [json_name = "filtered_count"];
+  string next_page_token = 2;
+  int32 total_count = 3;
+  int32 filtered_count = 4;
 }
 
 message GetDeviceTopicRequest {

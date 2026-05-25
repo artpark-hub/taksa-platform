@@ -5,19 +5,24 @@ meta {
 }
 
 post {
-  url: {{baseUrl}}/api/v1/devicemgmt/devices/{{deviceId}}/status-subscription
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/status-subscription
   body: json
-  auth: bearer
 }
 
-auth:bearer {
-  token: {{bearerToken}}
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{console_bearer_token}}
 }
 
 body:json {
   {
-    "device_id": "{{deviceId}}"
+    "deviceId": "{{device_id}}"
   }
+}
+
+script:post-response {
+  // When catalog is EMPTY, DM queues resubscribed:false automatically (bootstrap bundle 0).
+  // Override with "resubscribed": true only for TTL refresh when topics already exist.
 }
 
 docs {

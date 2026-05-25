@@ -53,8 +53,12 @@ func (s *ActionStore) Save(ctx context.Context, tenantID string, action *models.
 	WHERE action_type = 'subscribe' AND status = 1
 	DO NOTHING
 	`
-		_, err := s.db.ExecContext(ctx, query, args...)
+		result, err := s.db.ExecContext(ctx, query, args...)
 		if err == nil {
+			rows, raErr := result.RowsAffected()
+			if raErr == nil && rows == 0 {
+				return ErrAlreadyExists
+			}
 			return nil
 		}
 		// Rolling deploy before migration, or mismatched DDL: Postgres returns 42P10 when no matching constraint exists.
@@ -469,6 +473,42 @@ func (s *ActionStore) DeleteByDeviceID(ctx context.Context, tenantID, deviceID s
 	}
 
 	return nil
+}
+
+// HasRecentSubscribeForDevice reports whether a subscribe action was created at or after since.
+func (s *ActionStore) HasRecentSubscribeForDevice(ctx context.Context, tenantID, deviceID string, since time.Time) (bool, error) {
+	if tenantID == "" || deviceID == "" {
+		return false, ErrInvalidInput
+	}
+	var exists bool
+	err := s.db.QueryRowContext(ctx, `
+SELECT EXISTS(
+  SELECT 1 FROM actions
+  WHERE tenant_id = $1 AND device_id = $2 AND action_type = 'subscribe'
+    AND created_at >= $3
+)`, tenantID, deviceID, since).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("has recent subscribe: %w", err)
+	}
+	return exists, nil
+}
+
+// DeleteQueuedSubscribe removes the QUEUED subscribe action for a device so a new one can be inserted.
+func (s *ActionStore) DeleteQueuedSubscribe(ctx context.Context, tenantID, deviceID string) (bool, error) {
+	if tenantID == "" || deviceID == "" {
+		return false, ErrInvalidInput
+	}
+	result, err := s.db.ExecContext(ctx,
+		`DELETE FROM actions WHERE tenant_id = $1 AND device_id = $2 AND action_type = 'subscribe' AND status = $3`,
+		tenantID, deviceID, int32(models.ActionStatusQueued))
+	if err != nil {
+		return false, fmt.Errorf("delete queued subscribe: %w", err)
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // CleanupExpired removes all expired actions

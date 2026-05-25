@@ -47,6 +47,9 @@ func (s *DeviceMgmtService) ListDeviceTopics(ctx context.Context, req *v1.ListDe
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, "invalid page_token")
 		}
+		if o < 0 {
+			return nil, status.Error(codes.InvalidArgument, "page_token must be non-negative")
+		}
 		offset = o
 	}
 	meta := toTopicMetaEq(req.Meta)
@@ -184,11 +187,7 @@ func (s *DeviceMgmtService) EnsureDeviceStatusSubscription(ctx context.Context, 
 	if _, err := s.deviceUc.GetDevice(ctx, req.DeviceId); err != nil {
 		return nil, status.Error(codes.NotFound, "device not found")
 	}
-	resubscribed := true
-	if req.Resubscribed != nil {
-		resubscribed = req.GetResubscribed()
-	}
-	result, err := s.instanceUc.QueueStatusSubscription(ctx, req.DeviceId, resubscribed)
+	result, err := s.instanceUc.QueueStatusSubscription(ctx, req.DeviceId, req.Resubscribed)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -291,9 +290,14 @@ func mapDeviceTopicRowToProto(row *data.DeviceTopicRow, omitLastEvent bool) (*v1
 			return nil, fmt.Errorf("metadata json: %w", err)
 		}
 	}
-	md := make([]*v1.TopicMetadataEntry, 0, len(mdMap))
-	for k, v := range mdMap {
-		md = append(md, &v1.TopicMetadataEntry{Key: k, Value: v})
+	mdKeys := make([]string, 0, len(mdMap))
+	for k := range mdMap {
+		mdKeys = append(mdKeys, k)
+	}
+	sort.Strings(mdKeys)
+	md := make([]*v1.TopicMetadataEntry, 0, len(mdKeys))
+	for _, k := range mdKeys {
+		md = append(md, &v1.TopicMetadataEntry{Key: k, Value: mdMap[k]})
 	}
 	dt := &v1.DeviceTopic{
 		Topic:             row.CanonicalTopic,

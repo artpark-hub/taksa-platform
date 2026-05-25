@@ -69,13 +69,14 @@ func MergeFromStatusMessageContent(messageContent string) (MergeResult, error) {
 	}
 	topicCount := parseTopicCount(tb)
 	out.ReportedTopicCount = topicCount
+	authoritativeEmpty := topicCount == 0 && topicBrowserCatalogAuthoritative(tb)
 
 	rawBundles, ok := tb["unsBundles"]
 	if !ok {
 		rawBundles = tb["UnsBundles"]
 	}
 	if rawBundles == nil {
-		if topicCount == 0 {
+		if authoritativeEmpty {
 			out.FullCatalogReplace = true
 			out.SyncMode = CatalogSyncEmpty
 		} else {
@@ -85,7 +86,7 @@ func MergeFromStatusMessageContent(messageContent string) (MergeResult, error) {
 	}
 	bundleMap, ok := rawBundles.(map[string]interface{})
 	if !ok || len(bundleMap) == 0 {
-		if topicCount == 0 {
+		if authoritativeEmpty {
 			out.FullCatalogReplace = true
 			out.SyncMode = CatalogSyncEmpty
 		} else {
@@ -108,7 +109,7 @@ func MergeFromStatusMessageContent(messageContent string) (MergeResult, error) {
 	fullCatalogReplace := false
 	hadBundleZero := false
 
-	if topicCount == 0 {
+	if authoritativeEmpty {
 		fullCatalogReplace = true
 	}
 
@@ -193,7 +194,7 @@ func MergeFromStatusMessageContent(messageContent string) (MergeResult, error) {
 	out.FullCatalogReplace = fullCatalogReplace
 	out.HadBundleZero = hadBundleZero
 	switch {
-	case topicCount == 0:
+	case authoritativeEmpty:
 		out.SyncMode = CatalogSyncEmpty
 	case fullCatalogReplace:
 		out.SyncMode = CatalogSyncFullReplace
@@ -243,6 +244,82 @@ func parseTopicCount(tb map[string]interface{}) int {
 	}
 }
 
+// topicBrowserCatalogAuthoritative is false when umh-core reports topicCount:0 on a degraded/error
+// topic browser (Go JSON always emits topicCount). Those heartbeats must not wipe DM's catalog.
+func topicBrowserCatalogAuthoritative(tb map[string]interface{}) bool {
+	if tb == nil {
+		return false
+	}
+	h := jsonMap(tb, "health", "Health")
+	if h == nil {
+		return true
+	}
+	switch v := healthCategoryRaw(h); v {
+	case "active", "neutral", "":
+		return true
+	case "degraded", "unknown":
+		return false
+	default:
+		// umh-core HealthCategory is numeric in JSON: 0=Neutral, 1=Active, 2=Degraded
+		switch v {
+		case "0", "1":
+			return true
+		default:
+			return false
+		}
+	}
+}
+
+func healthCategoryRaw(h map[string]interface{}) string {
+	if h == nil {
+		return ""
+	}
+	for _, k := range []string{"category", "Category"} {
+		if v, ok := h[k]; ok {
+			switch t := v.(type) {
+			case string:
+				return strings.ToLower(strings.TrimSpace(t))
+			case float64:
+				return fmt.Sprintf("%d", int(t))
+			case json.Number:
+				i, err := t.Int64()
+				if err != nil {
+					return ""
+				}
+				return fmt.Sprintf("%d", i)
+			case int:
+				return fmt.Sprintf("%d", t)
+			case int32:
+				return fmt.Sprintf("%d", t)
+			case int64:
+				return fmt.Sprintf("%d", t)
+			}
+		}
+	}
+	return ""
+}
+
+func jsonStringField(m map[string]interface{}, keys ...string) string {
+	if m == nil {
+		return ""
+	}
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			if s, ok := v.(string); ok {
+				return s
+			}
+		}
+		for alt, val := range m {
+			if strings.EqualFold(alt, k) {
+				if s, ok := val.(string); ok {
+					return s
+				}
+			}
+		}
+	}
+	return ""
+}
+
 func bundleBytesFromJSONValue(val interface{}) ([]byte, error) {
 	switch t := val.(type) {
 	case string:
@@ -250,13 +327,25 @@ func bundleBytesFromJSONValue(val interface{}) ([]byte, error) {
 	case []byte:
 		return t, nil
 	case []interface{}:
-		return nil, fmt.Errorf("unexpected bundle type slice")
+		b := make([]byte, 0, len(t))
+		for _, elem := range t {
+			switch n := elem.(type) {
+			case float64:
+				b = append(b, byte(n))
+			case json.Number:
+				i, err := n.Int64()
+				if err != nil {
+					return nil, fmt.Errorf("bundle byte: %w", err)
+				}
+				b = append(b, byte(i))
+			default:
+				return nil, fmt.Errorf("unexpected bundle slice element %T", elem)
+			}
+		}
+		return b, nil
 	case json.Number:
 		return nil, fmt.Errorf("unexpected bundle type number")
 	default:
-		if s, ok := t.(string); ok {
-			return base64.StdEncoding.DecodeString(s)
-		}
 		return nil, fmt.Errorf("unexpected bundle type %T", val)
 	}
 }

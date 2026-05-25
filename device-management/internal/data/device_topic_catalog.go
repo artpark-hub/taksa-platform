@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -153,11 +154,31 @@ type TopicTreeNodeRow struct {
 // ListTopicNodes returns distinct child path segments under path_prefix.
 func (r *DeviceTopicRepo) ListTopicNodes(ctx context.Context, tenantID, deviceID string, pathPrefix []string, text string, meta []TopicMetaEq) ([]TopicTreeNodeRow, error) {
 	prefix := strings.Join(pathPrefix, ".")
+	depth := len(pathPrefix) + 1
+
 	var sb strings.Builder
-	args := make([]interface{}, 0, 8)
-	sb.WriteString(`SELECT canonical_topic, uns_tree_id`)
+	args := make([]interface{}, 0, 12)
+	sb.WriteString(`
+SELECT segment, COUNT(*)::int AS descendant_leaf_count,
+       BOOL_OR(canonical_topic = child_path) AS is_leaf,
+       MAX(CASE WHEN canonical_topic = child_path THEN uns_tree_id END) AS uns_tree_id,
+       MAX(CASE WHEN canonical_topic = child_path THEN canonical_topic END) AS canonical_topic
+FROM (
+  SELECT canonical_topic, uns_tree_id,
+         split_part(canonical_topic, '.', ?) AS segment,
+         CASE WHEN ? = '' THEN split_part(canonical_topic, '.', ?)
+              ELSE ? || '.' || split_part(canonical_topic, '.', ?) END AS child_path`)
+	args = append(args, depth, prefix, depth, prefix, depth)
 	r.appendTopicFilters(&sb, &args, tenantID, deviceID, text, prefix, meta)
-	sb.WriteString(` ORDER BY canonical_topic`)
+	if prefix != "" {
+		sb.WriteString(` AND canonical_topic <> ?`)
+		args = append(args, prefix)
+	}
+	sb.WriteString(`
+) AS tagged
+WHERE segment <> ''
+GROUP BY segment
+ORDER BY segment`)
 	q := convertPlaceholders(sb.String())
 	rows, err := r.data.db.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -165,77 +186,24 @@ func (r *DeviceTopicRepo) ListTopicNodes(ctx context.Context, tenantID, deviceID
 	}
 	defer rows.Close()
 
-	type agg struct {
-		exactLeaf           bool
-		unsTreeID           string
-		canonical           string
-		descendantLeafCount int32
-	}
-	children := make(map[string]*agg)
-
-	prefixDot := prefix
-	if prefix != "" {
-		prefixDot = prefix + "."
-	}
-
+	out := make([]TopicTreeNodeRow, 0, 16)
 	for rows.Next() {
-		var canonical, treeID string
-		if err := rows.Scan(&canonical, &treeID); err != nil {
+		var row TopicTreeNodeRow
+		var unsTreeID, canonical sql.NullString
+		if err := rows.Scan(&row.Segment, &row.DescendantLeafCount, &row.IsLeaf, &unsTreeID, &canonical); err != nil {
 			return nil, err
 		}
-		if prefix != "" && canonical == prefix {
-			continue
+		if unsTreeID.Valid {
+			row.UnsTreeID = unsTreeID.String
 		}
-		rest := canonical
-		if prefix != "" {
-			if !strings.HasPrefix(canonical, prefixDot) {
-				continue
-			}
-			rest = strings.TrimPrefix(canonical, prefixDot)
+		if canonical.Valid {
+			row.CanonicalTopic = canonical.String
 		}
-		if rest == "" {
-			continue
-		}
-		seg := rest
-		if i := strings.Index(rest, "."); i >= 0 {
-			seg = rest[:i]
-		}
-		a, ok := children[seg]
-		if !ok {
-			a = &agg{}
-			children[seg] = a
-		}
-		childPath := seg
-		if prefix != "" {
-			childPath = prefix + "." + seg
-		}
-		if canonical == childPath {
-			a.exactLeaf = true
-			a.unsTreeID = treeID
-			a.canonical = canonical
-		}
-		a.descendantLeafCount++
+		out = append(out, row)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-
-	out := make([]TopicTreeNodeRow, 0, len(children))
-	for seg, a := range children {
-		out = append(out, TopicTreeNodeRow{
-			Segment:             seg,
-			IsLeaf:              a.exactLeaf,
-			DescendantLeafCount: a.descendantLeafCount,
-			UnsTreeID:           a.unsTreeID,
-			CanonicalTopic:      a.canonical,
-		})
-	}
-	for i := 0; i < len(out); i++ {
-		for j := i + 1; j < len(out); j++ {
-			if out[j].Segment < out[i].Segment {
-				out[i], out[j] = out[j], out[i]
-			}
-		}
-	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Segment < out[j].Segment })
 	return out, nil
 }

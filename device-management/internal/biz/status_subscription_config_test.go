@@ -17,13 +17,23 @@ func TestResolveStatusSubscriptionSettings(t *testing.T) {
 		t.Fatalf("catalog threshold: got %v", def.CatalogStaleThreshold)
 	}
 
+	falseVal := false
 	cfg := &conf.DeviceStatusSubscription{
-		AutoResubscribeStatusMessages: false,
+		AutoResubscribeStatusMessages: &falseVal,
 		CatalogStaleThreshold:         durationpb.New(90 * time.Second),
 	}
 	off := ResolveStatusSubscriptionSettings(cfg)
 	if off.AutoResubscribeOnPull {
 		t.Fatal("expected auto resubscribe off")
+	}
+
+	// Block present but field omitted => default true.
+	cfgOmitted := &conf.DeviceStatusSubscription{
+		CatalogStaleThreshold: durationpb.New(60 * time.Second),
+	}
+	defOmitted := ResolveStatusSubscriptionSettings(cfgOmitted)
+	if !defOmitted.AutoResubscribeOnPull {
+		t.Fatal("expected auto resubscribe on when field omitted")
 	}
 	if off.CatalogStaleThreshold != 90*time.Second {
 		t.Fatalf("catalog threshold: got %v", off.CatalogStaleThreshold)

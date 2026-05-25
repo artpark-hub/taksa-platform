@@ -169,7 +169,7 @@ const (
 
 // EnsureStatusSubscription queues subscribe so the edge emits status heartbeats (login path).
 func (uc *InstanceUsecase) EnsureStatusSubscription(ctx context.Context, deviceID string) {
-	_, _ = uc.QueueStatusSubscription(ctx, deviceID, true)
+		_, _ = uc.QueueStatusSubscription(ctx, deviceID, nil)
 }
 
 func isStatusMessageType(msgType string) bool {

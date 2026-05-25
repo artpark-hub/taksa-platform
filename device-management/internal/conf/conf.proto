@@ -18,8 +18,8 @@ message Bootstrap {
 // When auto resubscribe is off, use EnsureDeviceStatusSubscription RPC per device (or login).
 message DeviceStatusSubscription {
   // When true (default in configs), DM re-queues subscribe on pull when catalog/status is stale.
-  // Set false for large fleets with heavy status payloads.
-  bool auto_resubscribe_status_messages = 1;
+  // Set false for large fleets with heavy status payloads. Omitted => true (see ResolveStatusSubscriptionSettings).
+  optional bool auto_resubscribe_status_messages = 1;
   // Re-queue subscribe when catalog last_synced_at is older than this while device last_seen is fresh.
   google.protobuf.Duration catalog_stale_threshold = 2;
   // Also treat persisted status messages older than this as stale (covers push gaps).

@@ -102,6 +102,20 @@ func TestMergeFromStatusMessageContent_IncrementalBundleMatchingCountNoReplace(t
 	}
 }
 
+func TestMergeFromStatusMessageContent_DegradedTopicCountZeroNoEmptyClear(t *testing.T) {
+	const payload = `{"core":{"topicBrowser":{"health":{"category":"degraded","message":"starting"},"topicCount":0}}}`
+	mr, err := MergeFromStatusMessageContent(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mr.FullCatalogReplace {
+		t.Fatal("degraded topic browser with topicCount 0 must not trigger full replace / catalog clear")
+	}
+	if mr.SyncMode == CatalogSyncEmpty {
+		t.Fatalf("sync mode: got %s", mr.SyncMode)
+	}
+}
+
 func TestMergeFromStatusMessageContent_MissingTopicCountNoReplace(t *testing.T) {
 	const payload = `{"core":{"topicBrowser":{}}}`
 	mr, err := MergeFromStatusMessageContent(payload)

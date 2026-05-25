@@ -1824,10 +1824,10 @@ components:
             properties:
                 deviceId:
                     type: string
-                page_size:
+                pageSize:
                     type: integer
                     format: int32
-                page_token:
+                pageToken:
                     type: string
                 text:
                     type: string
@@ -1835,10 +1835,10 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetaEq'
-                path_prefix:
+                pathPrefix:
                     type: string
                     description: Canonical path prefix (dot-separated), e.g. "Enterprise.Site.Line1."
-                omit_last_event:
+                omitLastEvent:
                     type: boolean
                     description: When true, omit last_event from each topic (smaller payloads for tree shells).
         api.devicemgmt.v1.ListDeviceTopicsResponse:
@@ -1848,12 +1848,12 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.DeviceTopic'
-                next_page_token:
+                nextPageToken:
                     type: string
-                total_count:
+                totalCount:
                     type: integer
                     format: int32
-                filtered_count:
+                filteredCount:
                     type: integer
                     format: int32
         api.devicemgmt.v1.ListDevicesResponse:

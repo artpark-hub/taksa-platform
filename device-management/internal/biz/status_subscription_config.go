@@ -11,6 +11,7 @@ type StatusSubscriptionSettings struct {
 	AutoResubscribeOnPull         bool
 	CatalogStaleThreshold         time.Duration
 	StatusHeartbeatStaleThreshold time.Duration
+	SubscribeQueueCooldown        time.Duration
 }
 
 // ResolveStatusSubscriptionSettings applies defaults and proto/env overrides.
@@ -19,9 +20,10 @@ func ResolveStatusSubscriptionSettings(cfg *conf.DeviceStatusSubscription) Statu
 		AutoResubscribeOnPull:         true,
 		CatalogStaleThreshold:         2 * time.Minute,
 		StatusHeartbeatStaleThreshold: 2 * time.Minute,
+		SubscribeQueueCooldown:        90 * time.Second,
 	}
-	if cfg != nil {
-		out.AutoResubscribeOnPull = cfg.AutoResubscribeStatusMessages
+	if cfg != nil && cfg.AutoResubscribeStatusMessages != nil {
+		out.AutoResubscribeOnPull = cfg.GetAutoResubscribeStatusMessages()
 		if d := cfg.CatalogStaleThreshold; d != nil {
 			out.CatalogStaleThreshold = d.AsDuration()
 		}
