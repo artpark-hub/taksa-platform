@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
-	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
 
@@ -168,44 +167,27 @@ const (
 	subscribeActionPayloadTypeURL          = "type.googleapis.com/taksa.edge.SubscribeMessagePayload"
 )
 
-// EnsureStatusSubscription queues a lightweight "subscribe" action for the device (if not already pending).
-// This is used so that taksa-edge-umh will emit MessageType "status" heartbeats even when no UI is open.
+// EnsureStatusSubscription queues subscribe so the edge emits status heartbeats (login path).
 func (uc *InstanceUsecase) EnsureStatusSubscription(ctx context.Context, deviceID string) {
-	if deviceID == "" {
-		return
-	}
-	tenantID := middleware.GetTenantID(ctx)
-	if tenantID == "" {
-		return
-	}
+		_, _ = uc.QueueStatusSubscription(ctx, deviceID, nil)
+}
 
-	payloadJSON, err := json.Marshal(map[string]any{
-		"resubscribed": true,
-	})
-	if err != nil {
-		return
-	}
+func isStatusMessageType(msgType string) bool {
+	return msgType == "status-message" || msgType == "StatusMessage" || msgType == "status"
+}
 
-	now := time.Now()
-	action := &models.Action{
-		Id:         generateUUID(),
-		DeviceId:   deviceID,
-		Type:       subscribeActionType,
-		Payload:    &anypb.Any{TypeUrl: subscribeActionPayloadTypeURL, Value: payloadJSON},
-		MaxRetries: 0,
-		RetryCount: 0,
-		Status:     models.ActionStatusQueued,
-		CreatedAt:  now,
-		ExpiresAt:  now.Add(time.Duration(subscribeActionDefaultTTLSeconds) * time.Second),
-	}
-	if err := uc.store.Actions().Save(ctx, tenantID, action); err != nil {
-		// Ignore "already exists" for idempotency across replicas (db-level uniqueness).
-		if err.Error() == "record already exists" {
-			return
+// recentStatusHeartbeatAt reports whether any recent message is a status heartbeat newer than threshold.
+func recentStatusHeartbeatAt(messages []*models.Message, threshold time.Duration) bool {
+	cutoff := time.Now().Add(-threshold)
+	for _, msg := range messages {
+		if msg == nil || !isStatusMessageType(msg.Type) {
+			continue
 		}
-		// Non-fatal: health still works without summaries.
-		fmt.Printf("Warning: failed to queue subscribe action for device %s: %v\n", deviceID, err)
+		if msg.CreatedAt.After(cutoff) {
+			return true
+		}
 	}
+	return false
 }
 
 // InstanceUsecase handles device-facing operations: authentication, message polling, and status reporting.
@@ -215,16 +197,28 @@ type InstanceUsecase struct {
 	protocolConverterRepo *data.ProtocolConverterRepo
 	dataModelRepo         *data.DataModelRepo
 	streamProcessorRepo   *data.StreamProcessorRepo
+	deviceTopicRepo       *data.DeviceTopicRepo
+	statusSub             StatusSubscriptionSettings
 }
 
 // NewInstanceUsecase creates a new InstanceUsecase with the given storage and authentication backends.
-func NewInstanceUsecase(store storage.Store, authUc *AuthUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo) *InstanceUsecase {
+func NewInstanceUsecase(
+	store storage.Store,
+	authUc *AuthUsecase,
+	protocolConverterRepo *data.ProtocolConverterRepo,
+	dataModelRepo *data.DataModelRepo,
+	streamProcessorRepo *data.StreamProcessorRepo,
+	deviceTopicRepo *data.DeviceTopicRepo,
+	statusSub StatusSubscriptionSettings,
+) *InstanceUsecase {
 	return &InstanceUsecase{
 		store:                 store,
 		authUc:                authUc,
 		protocolConverterRepo: protocolConverterRepo,
 		dataModelRepo:         dataModelRepo,
 		streamProcessorRepo:   streamProcessorRepo,
+		deviceTopicRepo:       deviceTopicRepo,
+		statusSub:             statusSub,
 	}
 }
 
@@ -383,6 +377,7 @@ func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (i
 	}
 
 	_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
+	uc.MaybeEnsureStatusSubscription(ctx, deviceID)
 
 	if len(actions) == 0 {
 		return []map[string]interface{}{}, nil
@@ -429,6 +424,13 @@ func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (i
 			fmt.Printf("Warning: Failed to mark action %s as delivered: %v\n", action.Id, err)
 			// Continue even if marking fails - action still needs to be sent
 			// Error will be logged for troubleshooting but won't block Pull response
+		}
+		// Subscribe is handled on the edge without an action-reply; complete immediately so
+		// DM can re-queue subscribe to refresh the edge subscriber TTL (~5 minutes).
+		if action.Type == subscribeActionType {
+			if err := uc.store.Actions().MarkCompleted(ctx, tenantID, action.Id); err != nil {
+				fmt.Printf("Warning: Failed to mark subscribe action %s as completed: %v\n", action.Id, err)
+			}
 		}
 	}
 
@@ -759,6 +761,7 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 			if msgType == "status-message" || msgType == "StatusMessage" || msgType == "status" {
 				_ = uc.syncProtocolConvertersFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
 				_ = uc.syncStreamProcessorsFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
+				_ = uc.syncDeviceTopicsFromStatusMessage(ctx, tenantID, deviceID, msg.Content)
 			}
 		}
 

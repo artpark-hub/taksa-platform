@@ -1,0 +1,42 @@
+meta {
+  name: Push Topic Browser Status
+  type: http
+  seq: 0
+}
+
+post {
+  url: {{base_url}}/api/v2/instance/push
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: token={{jwt_token}}
+}
+
+script:pre-request {
+  const uuid = bru.getEnvVar('device_id');
+  const jwt = bru.getEnvVar('jwt_token');
+  if (!uuid) throw new Error('device_id not set — run RegisterDevice first');
+  if (!jwt) throw new Error('jwt_token not set — run Instance-Login first');
+
+  const raw = bru.readFile('fixtures/push-status-topic-browser.json', 'utf8');
+  const fixture = JSON.parse(raw);
+  req.setBody(JSON.stringify({
+    UMHMessages: [{
+      email: bru.getEnvVar('email') || 'device@example.com',
+      content: fixture.content,
+      umhInstance: uuid
+    }]
+  }));
+}
+
+script:post-response {
+  console.log('Push topic browser status: ' + res.getStatus());
+}
+
+tests {
+  test('Push returns 200', function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

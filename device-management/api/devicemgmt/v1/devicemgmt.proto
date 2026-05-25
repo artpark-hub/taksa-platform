@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "devicemgmt/v1/models.proto";
+import "devicemgmt/v1/device_topics.proto";
 import "umh-core/v2/models.proto";
 
 option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1;v1";
@@ -393,6 +394,50 @@ service DeviceMgmtService {
   rpc GetStreamProcessorActionResponse(ActionResultRequest) returns (StreamProcessorActionResponse) {
     option (google.api.http) = {
       get: "/api/v1/devicemgmt/devices/{device_id}/stream-processors/{action_id}/result"
+    };
+  }
+
+  // ============================================================================
+  // Topic browser (SYNCHRONOUS) — materialized from device StatusMessage (core.topicBrowser)
+  // Filter/limit semantics align with umh-core GraphQL topics / topic queries.
+  // ============================================================================
+
+  // List UNS topics for a device (paginated, filterable). POST body carries GraphQL-equivalent filters (text, meta[], limit).
+  rpc ListDeviceTopics(ListDeviceTopicsRequest) returns (ListDeviceTopicsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/devicemgmt/devices/{device_id}/topics/list"
+      body: "*"
+    };
+  }
+
+  // Get a single topic by unsTreeId or exact canonicalTopic (query params).
+  rpc GetDeviceTopic(GetDeviceTopicRequest) returns (DeviceTopic) {
+    option (google.api.http) = {
+      get: "/api/v1/devicemgmt/devices/{device_id}/topics/detail"
+    };
+  }
+
+  // Catalog sync metadata for a device (last sync, counts, staleness hint).
+  rpc GetDeviceTopicCatalogStatus(GetDeviceTopicCatalogStatusRequest) returns (DeviceTopicCatalogStatus) {
+    option (google.api.http) = {
+      get: "/api/v1/devicemgmt/devices/{device_id}/topics/catalog-status"
+    };
+  }
+
+  // Queue edge subscribe so status push (and topic catalog sync) runs for this device.
+  // Use when device_status_subscription.auto_resubscribe_status_messages is false.
+  rpc EnsureDeviceStatusSubscription(EnsureDeviceStatusSubscriptionRequest) returns (EnsureDeviceStatusSubscriptionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/devicemgmt/devices/{device_id}/status-subscription"
+      body: "*"
+    };
+  }
+
+  // Lazy tree: list child segments at pathPrefix (built from materialized topics).
+  rpc ListTopicNodes(ListTopicNodesRequest) returns (ListTopicNodesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/devicemgmt/devices/{device_id}/topics/nodes/list"
+      body: "*"
     };
   }
 

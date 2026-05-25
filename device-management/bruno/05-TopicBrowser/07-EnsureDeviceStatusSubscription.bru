@@ -1,0 +1,31 @@
+meta {
+  name: Ensure Device Status Subscription
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/status-subscription
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{console_bearer_token}}
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}"
+  }
+}
+
+script:post-response {
+  // When catalog is EMPTY, DM queues resubscribed:false automatically (bootstrap bundle 0).
+  // Override with "resubscribed": true only for TTL refresh when topics already exist.
+}
+
+docs {
+  Queues edge subscribe so status push (core.topicBrowser) resumes.
+  Use when auto_resubscribe_status_messages is false, or to force refresh one device.
+}

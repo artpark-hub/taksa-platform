@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"time"
 
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 )
@@ -49,6 +50,12 @@ type ActionStore interface {
 
 	// CleanupExpired removes all expired actions
 	CleanupExpired(ctx context.Context) error
+
+	// HasRecentSubscribeForDevice is true when a subscribe action was created at or after since.
+	HasRecentSubscribeForDevice(ctx context.Context, tenantID, deviceID string, since time.Time) (bool, error)
+
+	// DeleteQueuedSubscribe removes a pending QUEUED subscribe for the device (if any).
+	DeleteQueuedSubscribe(ctx context.Context, tenantID, deviceID string) (bool, error)
 }
 
 // ActionListFilter defines filtering and pagination for action listing

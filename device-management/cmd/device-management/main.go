@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/artpark-hub/taksa-platform/device-management/internal/biz"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/utils"
 
@@ -144,6 +145,13 @@ func main() {
 	if jwtSecret := os.Getenv("TAKSA_DM_JWT_SECRET"); jwtSecret != "" {
 		bc.Server.JwtSecret = jwtSecret
 	}
+	if v := os.Getenv("TAKSA_DM_AUTO_RESUBSCRIBE_STATUS_MESSAGES"); v != "" {
+		if bc.DeviceStatusSubscription == nil {
+			bc.DeviceStatusSubscription = &conf.DeviceStatusSubscription{}
+		}
+		enabled := v == "true" || v == "1"
+		bc.DeviceStatusSubscription.AutoResubscribeStatusMessages = &enabled
+	}
 
 	// Get or generate JWT secret (generate-once, persist-under-/data strategy)
 	// Treat quoted empty strings ("" or \"\" from YAML) as needing generation
@@ -188,7 +196,8 @@ func main() {
 		zap.String("database.source", bc.Data.Database.Source),
 	)
 
-	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Deployment, logger, zapLogger)
+	statusSub := biz.ResolveStatusSubscriptionSettings(bc.DeviceStatusSubscription)
+	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Deployment, statusSub, logger, zapLogger)
 	if err != nil {
 		zapLogger.Fatal("Failed to wire app", zap.Error(err))
 	}

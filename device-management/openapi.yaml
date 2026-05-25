@@ -863,6 +863,33 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/status-subscription:
+        post:
+            tags:
+                - DeviceMgmtService
+            description: |-
+                Queue edge subscribe so status push (and topic catalog sync) runs for this device.
+                 Use when device_status_subscription.auto_resubscribe_status_messages is false.
+            operationId: DeviceMgmtService_EnsureDeviceStatusSubscription
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.EnsureDeviceStatusSubscriptionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.EnsureDeviceStatusSubscriptionResponse'
     /api/v1/devicemgmt/devices/{deviceId}/stream-processors:
         get:
             tags:
@@ -1044,6 +1071,102 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/topics/catalog-status:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Catalog sync metadata for a device (last sync, counts, staleness hint).
+            operationId: DeviceMgmtService_GetDeviceTopicCatalogStatus
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.DeviceTopicCatalogStatus'
+    /api/v1/devicemgmt/devices/{deviceId}/topics/detail:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Get a single topic by unsTreeId or exact canonicalTopic (query params).
+            operationId: DeviceMgmtService_GetDeviceTopic
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: unsTreeId
+                  in: query
+                  schema:
+                    type: string
+                - name: canonicalTopic
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.DeviceTopic'
+    /api/v1/devicemgmt/devices/{deviceId}/topics/list:
+        post:
+            tags:
+                - DeviceMgmtService
+            description: List UNS topics for a device (paginated, filterable). POST body carries GraphQL-equivalent filters (text, meta[], limit).
+            operationId: DeviceMgmtService_ListDeviceTopics
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.ListDeviceTopicsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ListDeviceTopicsResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/topics/nodes/list:
+        post:
+            tags:
+                - DeviceMgmtService
+            description: 'Lazy tree: list child segments at pathPrefix (built from materialized topics).'
+            operationId: DeviceMgmtService_ListTopicNodes
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.ListTopicNodesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ListTopicNodesResponse'
     /api/v2/instance/login:
         post:
             tags:
@@ -1513,6 +1636,63 @@ components:
             description: |-
                 DeviceSummary represents a lightweight device summary for list/overview responses
                  Contains only essential device information without certificate data or extended company details
+        api.devicemgmt.v1.DeviceTopic:
+            type: object
+            properties:
+                topic:
+                    type: string
+                unsTreeId:
+                    type: string
+                level0:
+                    type: string
+                locationSublevels:
+                    type: array
+                    items:
+                        type: string
+                dataContract:
+                    type: string
+                virtualPath:
+                    type: string
+                name:
+                    type: string
+                metadata:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetadataEntry'
+                timeSeries:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.TopicTimeSeriesEvent'
+                relational:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.TopicRelationalEvent'
+                updatedAt:
+                    type: string
+                    format: date-time
+            description: One UNS topic row materialized from device status (core.topicBrowser).
+        api.devicemgmt.v1.DeviceTopicCatalogStatus:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                catalogLastSyncedAt:
+                    type: string
+                    format: date-time
+                reportedTopicCount:
+                    type: integer
+                    format: int32
+                materializedTopicCount:
+                    type: integer
+                    format: int32
+                lastSyncMode:
+                    type: integer
+                    format: enum
+                lastFullReplaceAt:
+                    type: string
+                    format: date-time
+                lastHadBundleZero:
+                    type: boolean
+                catalogStaleWarning:
+                    type: boolean
+                    description: True when materialized count exceeds last reported count (incremental-only sync for a while).
+            description: Materialized catalog sync state for a device (from status, no edge changes).
         api.devicemgmt.v1.EditDataModelRequest:
             type: object
             properties:
@@ -1557,6 +1737,32 @@ components:
                         type: string
                 ignoreHealthCheck:
                     type: boolean
+        api.devicemgmt.v1.EnsureDeviceStatusSubscriptionRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                resubscribed:
+                    type: boolean
+                    description: |-
+                        When false, edge treats subscriber as new and may send bootstrap bundle 0 (heavier).
+                         When unset, defaults to true (refresh TTL with incremental status only).
+            description: |-
+                Queue edge subscribe so the DCD emits status (core.topicBrowser) over push.
+                 Use when auto resubscribe on pull is disabled, or to force refresh for one device.
+        api.devicemgmt.v1.EnsureDeviceStatusSubscriptionResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                alreadyPending:
+                    type: boolean
+                createdAt:
+                    type: string
+                    format: date-time
+                expiresAt:
+                    type: string
+                    format: date-time
         api.devicemgmt.v1.GetLogsRequest:
             type: object
             properties:
@@ -1613,6 +1819,43 @@ components:
                         $ref: '#/components/schemas/api.devicemgmt.v1.DataModelSummary'
                 nextPageToken:
                     type: string
+        api.devicemgmt.v1.ListDeviceTopicsRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                pageSize:
+                    type: integer
+                    format: int32
+                pageToken:
+                    type: string
+                text:
+                    type: string
+                meta:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetaEq'
+                pathPrefix:
+                    type: string
+                    description: Canonical path prefix (dot-separated), e.g. "Enterprise.Site.Line1."
+                omitLastEvent:
+                    type: boolean
+                    description: When true, omit last_event from each topic (smaller payloads for tree shells).
+        api.devicemgmt.v1.ListDeviceTopicsResponse:
+            type: object
+            properties:
+                topics:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.DeviceTopic'
+                nextPageToken:
+                    type: string
+                totalCount:
+                    type: integer
+                    format: int32
+                filteredCount:
+                    type: integer
+                    format: int32
         api.devicemgmt.v1.ListDevicesResponse:
             type: object
             properties:
@@ -1640,6 +1883,31 @@ components:
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.StreamProcessorSummary'
                 nextPageToken:
+                    type: string
+        api.devicemgmt.v1.ListTopicNodesRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                pathPrefix:
+                    type: array
+                    items:
+                        type: string
+                    description: Segments already expanded, e.g. ["Enterprise", "Site"] for children under Enterprise.Site
+                text:
+                    type: string
+                meta:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetaEq'
+        api.devicemgmt.v1.ListTopicNodesResponse:
+            type: object
+            properties:
+                nodes:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicTreeNode'
+                pathPrefix:
                     type: string
         api.devicemgmt.v1.LogsActionResponse:
             type: object
@@ -1809,6 +2077,74 @@ components:
                     type: string
                 errorMessage:
                     type: string
+        api.devicemgmt.v1.TopicMetaEq:
+            type: object
+            properties:
+                key:
+                    type: string
+                eq:
+                    type: string
+            description: 'Exact metadata match filter (parity with GraphQL MetaExpr: key + eq).'
+        api.devicemgmt.v1.TopicMetadataEntry:
+            type: object
+            properties:
+                key:
+                    type: string
+                value:
+                    type: string
+            description: Topic metadata key/value (parity with umh-core GraphQL MetadataEntry).
+        api.devicemgmt.v1.TopicRelationalEvent:
+            type: object
+            properties:
+                producedAt:
+                    type: string
+                    format: date-time
+                json:
+                    type: object
+                kafkaHeaders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetadataEntry'
+            description: Relational last event (parity with GraphQL RelationalEvent JSON).
+        api.devicemgmt.v1.TopicTimeSeriesEvent:
+            type: object
+            properties:
+                producedAt:
+                    type: string
+                    format: date-time
+                sourceTs:
+                    type: string
+                    format: date-time
+                scalarType:
+                    type: integer
+                    format: enum
+                numericValue:
+                    type: number
+                    format: double
+                stringValue:
+                    type: string
+                booleanValue:
+                    type: boolean
+                kafkaHeaders:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.TopicMetadataEntry'
+            description: Time-series last event (parity with GraphQL TimeSeriesEvent).
+        api.devicemgmt.v1.TopicTreeNode:
+            type: object
+            properties:
+                segment:
+                    type: string
+                isLeaf:
+                    type: boolean
+                descendantLeafCount:
+                    type: integer
+                    format: int32
+                unsTreeId:
+                    type: string
+                canonicalTopic:
+                    type: string
+            description: One node in the UNS hierarchy (lazy tree expand).
         api.devicemgmt.v1.UpdateDeviceRequest:
             type: object
             properties:

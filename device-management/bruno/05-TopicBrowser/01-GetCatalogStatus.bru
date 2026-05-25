@@ -1,0 +1,39 @@
+meta {
+  name: Get Topic Catalog Status
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/topics/catalog-status
+}
+
+headers {
+  Authorization: Bearer {{console_bearer_token}}
+}
+
+script:post-response {
+  const b = res.getBody();
+  if (b) {
+    console.log('materialized:', b.materializedTopicCount, 'reported:', b.reportedTopicCount);
+    console.log('lastSyncMode:', b.lastSyncMode, 'stale:', b.catalogStaleWarning);
+  }
+}
+
+tests {
+  test('Status 200', function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test('Has device id', function() {
+    const b = res.getBody();
+    expect(b).to.have.property('deviceId');
+  });
+
+  test('Materialized count >= 0 after sync or seed', function() {
+    const b = res.getBody();
+    if (b.materializedTopicCount !== undefined) {
+      expect(b.materializedTopicCount).to.be.at.least(0);
+    }
+  });
+}

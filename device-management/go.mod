@@ -3,6 +3,7 @@ module github.com/artpark-hub/taksa-platform/device-management
 go 1.26.1
 
 require (
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/go-kratos/kratos/v2 v2.9.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0

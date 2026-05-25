@@ -131,10 +131,11 @@ type DeviceMgmtService struct {
 	protocolConverterRepo *data.ProtocolConverterRepo
 	dataModelRepo         *data.DataModelRepo
 	streamProcessorRepo   *data.StreamProcessorRepo
+	deviceTopicRepo       *data.DeviceTopicRepo
 }
 
 // NewDeviceMgmtService creates a new device management service
-func NewDeviceMgmtService(deviceUc *biz.DeviceUsecase, actionUc *biz.ActionUsecase, instanceUc *biz.InstanceUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo) *DeviceMgmtService {
+func NewDeviceMgmtService(deviceUc *biz.DeviceUsecase, actionUc *biz.ActionUsecase, instanceUc *biz.InstanceUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo, deviceTopicRepo *data.DeviceTopicRepo) *DeviceMgmtService {
 	return &DeviceMgmtService{
 		deviceUc:              deviceUc,
 		actionUc:              actionUc,
@@ -142,6 +143,7 @@ func NewDeviceMgmtService(deviceUc *biz.DeviceUsecase, actionUc *biz.ActionUseca
 		protocolConverterRepo: protocolConverterRepo,
 		dataModelRepo:         dataModelRepo,
 		streamProcessorRepo:   streamProcessorRepo,
+		deviceTopicRepo:       deviceTopicRepo,
 	}
 }
 
@@ -327,16 +329,7 @@ func (s *DeviceMgmtService) GetDeviceHealth(ctx context.Context, req *v1.GetDevi
 		return nil, status.Error(codes.InvalidArgument, "device_id is required")
 	}
 
-	// Ensure the edge has a "subscriber" so it emits periodic status heartbeats (MessageType "status").
-	// This is best-effort; do not block the health call on subscription maintenance.
-	if s.instanceUc != nil {
-		deviceID := req.DeviceId
-		go func() {
-			subscriptionCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-			defer cancel()
-			s.instanceUc.EnsureStatusSubscription(subscriptionCtx, deviceID)
-		}()
-	}
+	s.ensureStatusSubscriptionBestEffort(ctx, req.DeviceId)
 
 	// Call business logic
 	resp, err := s.deviceUc.GetDeviceHealth(ctx, req.DeviceId)
@@ -405,12 +398,29 @@ func (s *DeviceMgmtService) DeleteDevice(ctx context.Context, req *v1.DeleteDevi
 	return &emptypb.Empty{}, nil
 }
 
+// ensureStatusSubscriptionBestEffort re-queues edge subscribe when auto resubscribe is enabled and sync is stale.
+func (s *DeviceMgmtService) ensureStatusSubscriptionBestEffort(ctx context.Context, deviceID string) {
+	if s.instanceUc == nil || deviceID == "" {
+		return
+	}
+	go func() {
+		subscriptionCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+			subscriptionCtx = middleware.SetTenantID(subscriptionCtx, tenantID)
+		}
+		s.instanceUc.MaybeEnsureStatusSubscription(subscriptionCtx, deviceID)
+	}()
+}
+
 // GetDeviceConfig retrieves device configuration
 // RPC: GET /api/v1/devicemgmt/devices/{device_id}/config
 func (s *DeviceMgmtService) GetDeviceConfig(ctx context.Context, req *v1.GetDeviceConfigRequest) (*v1.ActionQueuedResponse, error) {
 	if req == nil || req.DeviceId == "" {
 		return nil, status.Error(codes.InvalidArgument, "device_id is required")
 	}
+
+	s.ensureStatusSubscriptionBestEffort(ctx, req.DeviceId)
 
 	// Queue a get-config-file action (umh-core GetConfigFile doesn't use payload)
 	// Default TTL: 5 minutes (300 seconds)

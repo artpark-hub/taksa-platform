@@ -1,0 +1,292 @@
+package data
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	unsv1 "github.com/artpark-hub/taksa-platform/device-management/api/uns/v1"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/topicbrowser"
+	"google.golang.org/protobuf/encoding/protojson"
+)
+
+const deviceTopicInsertBatchSize = 100
+
+// DeviceTopicRepo persists materialized UNS topics from edge status.
+type DeviceTopicRepo struct {
+	data *Data
+}
+
+// NewDeviceTopicRepo constructs a repo bound to the data layer.
+func NewDeviceTopicRepo(d *Data) *DeviceTopicRepo {
+	return &DeviceTopicRepo{data: d}
+}
+
+// ListDeviceTopicsQuery filters and pages topic rows.
+type ListDeviceTopicsQuery struct {
+	DeviceID       string
+	Text           string
+	PathPrefix     string
+	Meta           []TopicMetaEq
+	Offset         int64
+	Limit          int64 // page size, max 500
+	OmitLastEvent  bool
+}
+
+// TopicMetaEq is one metadata key = value constraint.
+type TopicMetaEq struct {
+	Key string
+	Eq  string
+}
+
+type topicRowArgs struct {
+	id, unsTreeID, canonicalTopic, level0, locJSON, dataContract, name, mdJSON string
+	vpathArg, lastEv, lastAt                                                    interface{}
+}
+
+func buildTopicRowArgs(deviceID string, row topicbrowser.UpsertRow) (topicRowArgs, error) {
+	id := deviceID + ":" + row.UnsTreeID
+	locJSON, err := json.Marshal(row.LocationLevels)
+	if err != nil {
+		return topicRowArgs{}, err
+	}
+	mdJSON, err := json.Marshal(row.Metadata)
+	if err != nil {
+		return topicRowArgs{}, err
+	}
+	var lastEv interface{}
+	if row.LastEvent != nil {
+		b, err := protojson.Marshal(row.LastEvent)
+		if err != nil {
+			return topicRowArgs{}, err
+		}
+		lastEv = string(b)
+	}
+	var lastAt interface{}
+	if row.LastEvent != nil && row.LastEvent.GetProducedAtMs() > 0 {
+		lastAt = time.UnixMilli(int64(row.LastEvent.GetProducedAtMs()))
+	}
+	var vpathArg interface{}
+	if row.VirtualPath != "" {
+		vpathArg = row.VirtualPath
+	}
+	return topicRowArgs{
+		id: id, unsTreeID: row.UnsTreeID, canonicalTopic: row.CanonicalTopic,
+		level0: row.Level0, locJSON: string(locJSON), dataContract: row.DataContract,
+		name: row.Name, mdJSON: string(mdJSON), vpathArg: vpathArg, lastEv: lastEv, lastAt: lastAt,
+	}, nil
+}
+
+func appendTopicRowPlaceholders(sb *strings.Builder, n int) {
+	if n > 0 {
+		sb.WriteString(", ")
+	}
+	// 16 columns / 16 placeholders (id..level0=6, location_sublevels::jsonb, data_contract..name=3, metadata/last_event jsonb, last_event_at, last_synced, created_at, updated_at).
+	sb.WriteString("(?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?)")
+}
+
+func (r *topicRowArgs) appendArgs(args *[]interface{}, tenantID, deviceID string, now time.Time) {
+	*args = append(*args,
+		r.id, tenantID, deviceID, r.unsTreeID, r.canonicalTopic,
+		r.level0, r.locJSON, r.dataContract, r.vpathArg, r.name,
+		r.mdJSON, r.lastEv, r.lastAt, now, now, now,
+	)
+}
+
+func execTopicInsertBatch(ctx context.Context, tx *sql.Tx, tenantID, deviceID string, rows []topicbrowser.UpsertRow, upsert bool) error {
+	now := time.Now()
+	for start := 0; start < len(rows); start += deviceTopicInsertBatchSize {
+		end := start + deviceTopicInsertBatchSize
+		if end > len(rows) {
+			end = len(rows)
+		}
+		batch := rows[start:end]
+		var sb strings.Builder
+		if upsert {
+			sb.WriteString(`
+INSERT INTO device_topics (
+  id, tenant_id, device_id, uns_tree_id, canonical_topic,
+  level0, location_sublevels, data_contract, virtual_path, name,
+  metadata_json, last_event_json, last_event_at, last_synced, created_at, updated_at
+) VALUES `)
+		} else {
+			sb.WriteString(`
+INSERT INTO device_topics (
+  id, tenant_id, device_id, uns_tree_id, canonical_topic,
+  level0, location_sublevels, data_contract, virtual_path, name,
+  metadata_json, last_event_json, last_event_at, last_synced, created_at, updated_at
+) VALUES `)
+		}
+		args := make([]interface{}, 0, len(batch)*16)
+		for i, row := range batch {
+			ra, err := buildTopicRowArgs(deviceID, row)
+			if err != nil {
+				return err
+			}
+			appendTopicRowPlaceholders(&sb, i)
+			ra.appendArgs(&args, tenantID, deviceID, now)
+		}
+		if upsert {
+			sb.WriteString(`
+ON CONFLICT (tenant_id, device_id, uns_tree_id) DO UPDATE SET
+  canonical_topic = EXCLUDED.canonical_topic,
+  level0 = EXCLUDED.level0,
+  location_sublevels = EXCLUDED.location_sublevels,
+  data_contract = EXCLUDED.data_contract,
+  virtual_path = EXCLUDED.virtual_path,
+  name = EXCLUDED.name,
+  metadata_json = EXCLUDED.metadata_json,
+  last_event_json = COALESCE(EXCLUDED.last_event_json, device_topics.last_event_json),
+  last_event_at = COALESCE(EXCLUDED.last_event_at, device_topics.last_event_at),
+  last_synced = EXCLUDED.last_synced,
+  updated_at = EXCLUDED.updated_at`)
+		}
+		q := convertPlaceholders(sb.String())
+		if _, err := tx.ExecContext(ctx, q, args...); err != nil {
+			if upsert {
+				return fmt.Errorf("batch upsert device topics: %w", err)
+			}
+			return fmt.Errorf("batch insert device topics: %w", err)
+		}
+	}
+	return nil
+}
+
+// UpsertDeviceTopics merges topic rows from one status sync.
+func (r *DeviceTopicRepo) UpsertDeviceTopics(ctx context.Context, tenantID, deviceID string, rows []topicbrowser.UpsertRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	tx, err := r.data.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := execTopicInsertBatch(ctx, tx, tenantID, deviceID, rows, true); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ClearDeviceTopics removes all materialized topics for a device (authoritative empty catalog).
+func (r *DeviceTopicRepo) ClearDeviceTopics(ctx context.Context, tenantID, deviceID string) error {
+	q := convertPlaceholders(`DELETE FROM device_topics WHERE tenant_id = ? AND device_id = ?`)
+	_, err := r.data.db.ExecContext(ctx, q, tenantID, deviceID)
+	if err != nil {
+		return fmt.Errorf("clear device topics: %w", err)
+	}
+	return nil
+}
+
+// ReplaceAllDeviceTopics replaces the entire topic set for a device in one transaction
+// (used when status indicates a full UNS map snapshot — see topicbrowser.MergeResult).
+func (r *DeviceTopicRepo) ReplaceAllDeviceTopics(ctx context.Context, tenantID, deviceID string, rows []topicbrowser.UpsertRow) error {
+	tx, err := r.data.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	del := convertPlaceholders(`DELETE FROM device_topics WHERE tenant_id = ? AND device_id = ?`)
+	if _, err := tx.ExecContext(ctx, del, tenantID, deviceID); err != nil {
+		return fmt.Errorf("replace device topics delete: %w", err)
+	}
+
+	if err := execTopicInsertBatch(ctx, tx, tenantID, deviceID, rows, false); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// DeviceTopicRow is a DB row for API mapping.
+type DeviceTopicRow struct {
+	UnsTreeID      string
+	CanonicalTopic string
+	Level0         string
+	LocationJSON   string
+	DataContract   string
+	VirtualPath    sql.NullString
+	Name           string
+	MetadataJSON   string
+	LastEventJSON  sql.NullString
+	LastEventAt    sql.NullTime
+	UpdatedAt      time.Time
+}
+
+// ListDeviceTopics returns topics ordered by canonical_topic.
+func (r *DeviceTopicRepo) ListDeviceTopics(ctx context.Context, tenantID string, q ListDeviceTopicsQuery) ([]DeviceTopicRow, error) {
+	if q.Limit <= 0 || q.Limit > 500 {
+		q.Limit = 100
+	}
+	args := make([]interface{}, 0, 12)
+	sb := strings.Builder{}
+	if q.OmitLastEvent {
+		sb.WriteString(`SELECT uns_tree_id, canonical_topic, level0, location_sublevels::text, data_contract, virtual_path, name, metadata_json::text, NULL::text, NULL::timestamptz, updated_at`)
+	} else {
+		sb.WriteString(`SELECT uns_tree_id, canonical_topic, level0, location_sublevels::text, data_contract, virtual_path, name, metadata_json::text, last_event_json::text, last_event_at, updated_at`)
+	}
+	r.appendTopicFilters(&sb, &args, tenantID, q.DeviceID, q.Text, q.PathPrefix, q.Meta)
+	sb.WriteString(` ORDER BY canonical_topic ASC OFFSET ? LIMIT ?`)
+	args = append(args, q.Offset, q.Limit+1)
+
+	query := convertPlaceholders(sb.String())
+	rows, err := r.data.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DeviceTopicRow
+	for rows.Next() {
+		var tr DeviceTopicRow
+		if err := rows.Scan(&tr.UnsTreeID, &tr.CanonicalTopic, &tr.Level0, &tr.LocationJSON, &tr.DataContract, &tr.VirtualPath, &tr.Name, &tr.MetadataJSON, &tr.LastEventJSON, &tr.LastEventAt, &tr.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, tr)
+	}
+	return out, rows.Err()
+}
+
+// GetDeviceTopic returns one topic by tree id or exact canonical path.
+func (r *DeviceTopicRepo) GetDeviceTopic(ctx context.Context, tenantID, deviceID, unsTreeID, canonicalTopic string) (*DeviceTopicRow, error) {
+	if unsTreeID == "" && canonicalTopic == "" {
+		return nil, fmt.Errorf("uns_tree_id or canonical_topic required")
+	}
+	var q string
+	args := []interface{}{tenantID, deviceID}
+	if unsTreeID != "" {
+		q = `SELECT uns_tree_id, canonical_topic, level0, location_sublevels::text, data_contract, virtual_path, name, metadata_json::text, last_event_json::text, last_event_at, updated_at
+FROM device_topics WHERE tenant_id = ? AND device_id = ? AND uns_tree_id = ? LIMIT 1`
+		args = append(args, unsTreeID)
+	} else {
+		q = `SELECT uns_tree_id, canonical_topic, level0, location_sublevels::text, data_contract, virtual_path, name, metadata_json::text, last_event_json::text, last_event_at, updated_at
+FROM device_topics WHERE tenant_id = ? AND device_id = ? AND canonical_topic = ? LIMIT 1`
+		args = append(args, canonicalTopic)
+	}
+	q = convertPlaceholders(q)
+	row := r.data.db.QueryRowContext(ctx, q, args...)
+	var tr DeviceTopicRow
+	err := row.Scan(&tr.UnsTreeID, &tr.CanonicalTopic, &tr.Level0, &tr.LocationJSON, &tr.DataContract, &tr.VirtualPath, &tr.Name, &tr.MetadataJSON, &tr.LastEventJSON, &tr.LastEventAt, &tr.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &tr, nil
+}
+
+// ParseStoredEvent unmarshals last_event_json into protobuf.
+func ParseStoredEvent(lastJSON string) (*unsv1.EventTableEntry, error) {
+	if lastJSON == "" {
+		return nil, nil
+	}
+	var ev unsv1.EventTableEntry
+	if err := protojson.Unmarshal([]byte(lastJSON), &ev); err != nil {
+		return nil, err
+	}
+	return &ev, nil
+}

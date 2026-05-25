@@ -1,0 +1,53 @@
+meta {
+  name: List Device Topics
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/topics/list
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+  Authorization: Bearer {{console_bearer_token}}
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}",
+    "pageSize": 100,
+    "omitLastEvent": false
+  }
+}
+
+script:post-response {
+  const b = res.getBody();
+  if (b) {
+    console.log('topics:', (b.topics || []).length, 'total:', b.totalCount, 'filtered:', b.filteredCount);
+    const t = (b.topics || [])[0];
+    if (t) {
+      bru.setEnvVar('topic_uns_tree_id', t.unsTreeId);
+      bru.setEnvVar('topic_canonical', t.topic);
+    }
+  }
+}
+
+tests {
+  test('Status 200', function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test('Response shape', function() {
+    const b = res.getBody();
+    expect(b).to.have.property('topics');
+    expect(b).to.have.property('totalCount');
+    expect(b).to.have.property('filteredCount');
+  });
+
+  test('At least one topic when data loaded', function() {
+    const b = res.getBody();
+    expect((b.topics || []).length).to.be.at.least(1);
+  });
+}
