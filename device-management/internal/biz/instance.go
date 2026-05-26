@@ -1077,6 +1077,8 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(resultPayload))
 		}
 		uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
+	} else if action != nil {
+		uc.HandleNATSMirrorActionFailure(ctx, action, finalStatus, errorMessage)
 	}
 
 	// 7. Mark tracking as completed
@@ -1182,6 +1184,8 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
 		}
 		uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
+	} else if action != nil {
+		uc.HandleNATSMirrorActionFailure(ctx, action, finalStatus, errorMessage)
 	}
 
 	return nil

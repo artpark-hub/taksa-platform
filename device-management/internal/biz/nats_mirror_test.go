@@ -44,6 +44,16 @@ func TestBuildNATSMirrorEditActionPayload_hasUUID(t *testing.T) {
 	}
 }
 
+func TestIsNATSMirrorEditNotFoundError(t *testing.T) {
+	msg := `edit(UNS-to-NATS-mirror): failed to edit dataflow component: dataflow component with UUID 95d80fc0-d68b-5f99-865e-4de41b9ad51e not found`
+	if !isNATSMirrorEditNotFoundError(msg) {
+		t.Fatal("expected not found")
+	}
+	if isNATSMirrorEditNotFoundError("connection refused") {
+		t.Fatal("expected false for unrelated error")
+	}
+}
+
 func TestNATSMirrorConfigFingerprint_orderIndependent(t *testing.T) {
 	a := NATSMirrorConfigFingerprint([]string{"nats://b:4222", "nats://a:4222"})
 	b := NATSMirrorConfigFingerprint([]string{"nats://a:4222", "nats://b:4222"})

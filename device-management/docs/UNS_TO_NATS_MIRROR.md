@@ -156,7 +156,11 @@ flowchart TD
 
 When the instance service correlates a **successful** action reply (`correlateResponseByTraceId` / `correlateResponseByActionUUID`), `RecordNATSMirrorDeploySuccess` runs for deploy or edit actions and calls `SetNATSMirrorApplied` with the **current** deployment fingerprint (`internal/biz/nats_mirror.go`).
 
-Failed actions do not update the device row; a later login or reconcile can retry (subject to inflight checks).
+Failed actions do not update the device row, except:
+
+- **Edit failed with “not found”** (DFC removed on the edge while DM still has `nats_mirror_deployed_at`): `HandleNATSMirrorActionFailure` clears `nats_mirror_deployed_at` and `nats_mirror_config_fingerprint`, then queues **`deploy-data-flow-component`** immediately (same push correlation path as success).
+
+Other edit failures still require manual intervention or a later login/reconcile.
 
 ---
 
@@ -201,9 +205,9 @@ Unit tests: `internal/biz/nats_mirror_test.go`.
 
 2. Restart DM.
 
-3. **Fleet reconcile** (~3s after startup) queues `edit-data-flow-component` for every device where:
-   - `nats_mirror_deployed_at IS NOT NULL`, and
-   - `nats_mirror_config_fingerprint` is `NULL` or differs from the new hash.
+3. **Fleet reconcile** (~3s after startup) queues deploy or edit for every device where:
+   - `nats_mirror_deployed_at IS NULL` (never successfully applied), or
+   - `nats_mirror_config_fingerprint` is `NULL` or differs from the current hash.
 
 4. Online devices pick up actions on pull; offline devices update on **next login** (same `ensureNATSMirrorForDevice` logic).
 

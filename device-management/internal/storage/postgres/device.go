@@ -851,15 +851,41 @@ func (s *DeviceStore) SetNATSMirrorApplied(ctx context.Context, deviceID string,
 	return nil
 }
 
-// ListNATSMirrorDevicesNeedingUpdate lists devices with mirror deployed but stale or missing fingerprint.
+// ClearNATSMirrorApplied resets mirror state so the next ensure queues deploy instead of edit.
+func (s *DeviceStore) ClearNATSMirrorApplied(ctx context.Context, deviceID string) error {
+	if deviceID == "" {
+		return ErrInvalidInput
+	}
+	query := `UPDATE devices SET nats_mirror_deployed_at = NULL, nats_mirror_config_fingerprint = NULL WHERE id = $1`
+	args := []interface{}{deviceID}
+	if tenantID := middleware.GetTenantID(ctx); tenantID != "" {
+		query = `UPDATE devices SET nats_mirror_deployed_at = NULL, nats_mirror_config_fingerprint = NULL WHERE id = $1 AND tenant_id = $2`
+		args = append(args, tenantID)
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("clear nats mirror applied: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("clear nats mirror applied rows: %w", err)
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListNATSMirrorDevicesNeedingUpdate lists devices that need deploy (never applied) or edit (stale fingerprint).
 func (s *DeviceStore) ListNATSMirrorDevicesNeedingUpdate(ctx context.Context, currentFingerprint string) ([]storage.NATSMirrorDeviceRef, error) {
 	if currentFingerprint == "" {
 		return nil, ErrInvalidInput
 	}
 	rows, err := s.db.QueryContext(ctx, `
 SELECT id, tenant_id FROM devices
-WHERE nats_mirror_deployed_at IS NOT NULL
-  AND (nats_mirror_config_fingerprint IS NULL OR nats_mirror_config_fingerprint <> $1)
+WHERE nats_mirror_deployed_at IS NULL
+   OR nats_mirror_config_fingerprint IS NULL
+   OR nats_mirror_config_fingerprint <> $1
 ORDER BY tenant_id, id`, currentFingerprint)
 	if err != nil {
 		return nil, fmt.Errorf("list nats mirror devices needing update: %w", err)

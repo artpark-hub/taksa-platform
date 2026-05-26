@@ -55,7 +55,10 @@ type DeviceStore interface {
 	// SetNATSMirrorApplied records successful deploy or edit of UNS-to-NATS-mirror on the device row.
 	SetNATSMirrorApplied(ctx context.Context, deviceID string, deployedAt time.Time, configFingerprint string) error
 
-	// ListNATSMirrorDevicesNeedingUpdate returns devices with mirror deployed but a different config fingerprint.
+	// ClearNATSMirrorApplied clears mirror deploy state (e.g. after edit fails because DFC missing on edge).
+	ClearNATSMirrorApplied(ctx context.Context, deviceID string) error
+
+	// ListNATSMirrorDevicesNeedingUpdate returns devices needing mirror deploy or edit (never applied or stale fingerprint).
 	ListNATSMirrorDevicesNeedingUpdate(ctx context.Context, currentFingerprint string) ([]NATSMirrorDeviceRef, error)
 }
 

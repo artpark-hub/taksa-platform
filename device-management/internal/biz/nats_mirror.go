@@ -317,3 +317,27 @@ func (uc *InstanceUsecase) recordNATSMirrorApplySuccess(ctx context.Context, act
 		fmt.Printf("Warning: SetNATSMirrorApplied for device %s: %v\n", action.DeviceId, err)
 	}
 }
+
+func isNATSMirrorEditNotFoundError(errorMessage string) bool {
+	return strings.Contains(strings.ToLower(errorMessage), "not found")
+}
+
+// HandleNATSMirrorActionFailure clears mirror state when an edit fails because the DFC is gone on the edge,
+// then queues deploy (if NATS URLs are configured and no mirror action is inflight).
+func (uc *InstanceUsecase) HandleNATSMirrorActionFailure(ctx context.Context, action *models.Action, finalStatus models.ActionStatus, errorMessage string) {
+	if uc == nil || action == nil || !IsNATSMirrorEditAction(action) {
+		return
+	}
+	if finalStatus != models.ActionStatusFailed {
+		return
+	}
+	if !isNATSMirrorEditNotFoundError(errorMessage) {
+		return
+	}
+	if err := uc.store.Devices().ClearNATSMirrorApplied(ctx, action.DeviceId); err != nil {
+		fmt.Printf("Warning: ClearNATSMirrorApplied for device %s after edit not found: %v\n", action.DeviceId, err)
+		return
+	}
+	fmt.Printf("Info: NATS mirror edit not found on device %s; cleared mirror state and re-queuing deploy\n", action.DeviceId)
+	uc.ensureNATSMirrorForDevice(ctx, action.DeviceId)
+}
