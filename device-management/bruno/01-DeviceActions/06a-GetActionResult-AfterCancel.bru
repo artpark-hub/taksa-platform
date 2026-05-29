@@ -1,0 +1,51 @@
+meta {
+  name: Get Action Result After Cancel
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/config/{{action_id_cancel}}/result
+}
+
+docs {
+  Step 3 of cancel flow: poll result and verify terminal CANCELLED status.
+  
+  Any GetXActionResponse endpoint works; config result is used here because the queued action was get-config-file.
+  
+  Terminal statuses: COMPLETED, FAILED, FAILED_PARSING_RESPONSE, EXPIRED, CANCELLED
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp) {
+    console.log("✓ Action result after cancel");
+    console.log("  status: " + resp.status);
+    console.log("  completedAt: " + (resp.completedAt || "(none)"));
+    console.log("  errorMessage: " + (resp.errorMessage || "(none)"));
+  }
+}
+
+tests {
+  test("Result retrieval successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Status is CANCELLED", function() {
+    const resp = res.getBody();
+    const cancelled = resp.status === 'CANCELLED' || resp.status === 7;
+    expect(cancelled).to.equal(true);
+  });
+  
+  test("completedAt is set", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('completedAt');
+  });
+  
+  test("No result payload for cancelled action", function() {
+    const resp = res.getBody();
+    const hasConfigResult = resp.result && (resp.result.getConfigResponse || resp.result.setConfigResponse);
+    expect(hasConfigResult).to.not.equal(true);
+  });
+}

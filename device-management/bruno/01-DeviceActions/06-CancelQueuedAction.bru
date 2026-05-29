@@ -1,0 +1,79 @@
+meta {
+  name: Cancel Queued Action
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/actions/{{action_id_cancel}}/cancel
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}",
+    "actionId": "{{action_id_cancel}}"
+  }
+}
+
+docs {
+  Cancel a QUEUED action before the device pulls it.
+  
+  Endpoint: POST /api/v1/devicemgmt/devices/{device_id}/actions/{action_id}/cancel
+  
+  Rules:
+  - Only QUEUED actions can be cancelled
+  - DELIVERED / PROCESSING actions must finish via device push (returns 400 FailedPrecondition)
+  - Race-safe: if device pull claims the action first, cancel fails
+  
+  Prerequisites:
+  1. Run 06-QueueActionForCancel.bru (sets action_id_cancel)
+  2. Do NOT run Instance-Pull before this request
+  
+  Next: 06a-GetActionResult-AfterCancel.bru to verify status=CANCELLED
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp) {
+    console.log("✓ Cancel response");
+    console.log("  actionId: " + resp.actionId);
+    console.log("  status: " + resp.status);
+    console.log("  errorMessage: " + (resp.errorMessage || "(none)"));
+  }
+}
+
+tests {
+  test("Cancel successful", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.equal(bru.getEnvVar('action_id_cancel'));
+  });
+  
+  test("Status is CANCELLED", function() {
+    const resp = res.getBody();
+    const cancelled = resp.status === 'CANCELLED' || resp.status === 7;
+    expect(cancelled).to.equal(true);
+  });
+  
+  test("completedAt is set", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('completedAt');
+    expect(resp.completedAt).to.be.a('string');
+  });
+  
+  test("errorMessage indicates user cancel", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('errorMessage');
+    expect(resp.errorMessage).to.include('Cancelled');
+  });
+}

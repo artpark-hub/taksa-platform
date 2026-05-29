@@ -96,6 +96,7 @@ func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server, instanceUc *biz
 		opts = append(opts,
 			kratos.BeforeStart(func(ctx context.Context) error {
 				instanceUc.StartNATSMirrorFleetReconcile(ctx)
+				instanceUc.StartActionCleanupLoop()
 				return nil
 			}),
 			kratos.AfterStop(func(ctx context.Context) error {

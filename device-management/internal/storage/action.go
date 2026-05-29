@@ -24,6 +24,19 @@ type ActionStore interface {
 	// ListPending retrieves all pending (QUEUED) actions for a device
 	ListPending(ctx context.Context, tenantID, deviceID string) ([]*models.Action, error)
 
+	// ClaimQueuedForDevice atomically transitions QUEUED actions to DELIVERED for pull.
+	// Skips actions whose per-action expires_at is in the past (see ExpireQueuedPastDeadline).
+	ClaimQueuedForDevice(ctx context.Context, tenantID, deviceID string) ([]*models.Action, error)
+
+	// CancelQueued atomically transitions a QUEUED action to CANCELLED.
+	CancelQueued(ctx context.Context, tenantID, id, errorMessage string) error
+
+	// ExpireQueuedPastDeadline marks QUEUED actions past their per-action expires_at as EXPIRED.
+	ExpireQueuedPastDeadline(ctx context.Context) error
+
+	// ExpireQueuedOlderThan marks QUEUED actions created before the cutoff as EXPIRED (auto-expire sweep).
+	ExpireQueuedOlderThan(ctx context.Context, before time.Time, errorMessage string) error
+
 	// UpdateStatus updates an action's status
 	UpdateStatus(ctx context.Context, tenantID, id string, status models.ActionStatus) error
 
@@ -50,6 +63,11 @@ type ActionStore interface {
 
 	// CleanupExpired removes all expired actions
 	CleanupExpired(ctx context.Context) error
+
+	// CleanupTerminal removes terminal actions older than before.
+	// Terminal actions are those that will not transition any further:
+	// COMPLETED, FAILED, FAILED_PARSING_RESPONSE, CANCELLED, EXPIRED.
+	CleanupTerminal(ctx context.Context, before time.Time) error
 
 	// HasRecentSubscribeForDevice is true when a subscribe action was created at or after since.
 	HasRecentSubscribeForDevice(ctx context.Context, tenantID, deviceID string, since time.Time) (bool, error)

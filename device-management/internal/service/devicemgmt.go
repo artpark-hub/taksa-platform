@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -553,6 +554,41 @@ func (s *DeviceMgmtService) GetDeviceConfigActionResponse(ctx context.Context, r
 	}
 
 	return resp, nil
+}
+
+// CancelAction cancels a QUEUED action before the device pulls it.
+// RPC: POST /api/v1/devicemgmt/devices/{device_id}/actions/{action_id}/cancel
+func (s *DeviceMgmtService) CancelAction(ctx context.Context, req *v1.CancelActionRequest) (*v1.CancelActionResponse, error) {
+	if req == nil || req.DeviceId == "" {
+		return nil, status.Error(codes.InvalidArgument, "device_id is required")
+	}
+	if req.ActionId == "" {
+		return nil, status.Error(codes.InvalidArgument, "action_id is required")
+	}
+
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
+	action, err := s.actionUc.CancelAction(ctx, tenantID, req.ActionId)
+	if err != nil {
+		if errors.Is(err, storage.ErrActionNotCancellable) {
+			return nil, status.Error(codes.FailedPrecondition, err.Error())
+		}
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("action not found or not cancellable: %v", err))
+	}
+
+	if action.DeviceId != req.DeviceId {
+		return nil, status.Error(codes.PermissionDenied, "action does not belong to device")
+	}
+
+	return &v1.CancelActionResponse{
+		ActionId:     action.Id,
+		Status:       actionStatusToProto(action.Status),
+		CompletedAt:  timeToProto(action.CompletedAt),
+		ErrorMessage: action.ErrorMessage,
+	}, nil
 }
 
 // GetLogs retrieves device logs

@@ -139,6 +139,36 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.devicemgmt.v1.Device'
+    /api/v1/devicemgmt/devices/{deviceId}/actions/{actionId}/cancel:
+        post:
+            tags:
+                - DeviceMgmtService
+            description: Cancel a QUEUED action (UI timeout / user abort). Only QUEUED actions may be cancelled.
+            operationId: DeviceMgmtService_CancelAction
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: actionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.CancelActionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.CancelActionResponse'
     /api/v1/devicemgmt/devices/{deviceId}/config:
         get:
             tags:
@@ -1321,6 +1351,27 @@ components:
                     type: string
                 structure:
                     type: object
+        api.devicemgmt.v1.CancelActionRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                actionId:
+                    type: string
+            description: CancelActionRequest cancels a QUEUED action before the device pulls it.
+        api.devicemgmt.v1.CancelActionResponse:
+            type: object
+            properties:
+                actionId:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                completedAt:
+                    type: string
+                    format: date-time
+                errorMessage:
+                    type: string
         api.devicemgmt.v1.DataFlowComponentActionResponse:
             type: object
             properties:

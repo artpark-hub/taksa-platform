@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
+
+const cancelledByUserMessage = "Cancelled by user"
 
 // ActionUsecase handles action business logic (queuing, status tracking)
 type ActionUsecase struct {
@@ -78,28 +81,27 @@ func (uc *ActionUsecase) QueueAction(ctx context.Context, req *QueueActionReques
 	return action, nil
 }
 
-// CancelAction cancels a pending action
-func (uc *ActionUsecase) CancelAction(ctx context.Context, tenantID, actionID string) error {
+// CancelAction cancels a QUEUED action. Only QUEUED actions may be cancelled.
+func (uc *ActionUsecase) CancelAction(ctx context.Context, tenantID, actionID string) (*models.Action, error) {
 	if actionID == "" {
-		return fmt.Errorf("action ID is empty")
+		return nil, fmt.Errorf("action ID is empty")
 	}
 	if tenantID == "" {
-		return fmt.Errorf("tenant ID is empty")
+		return nil, fmt.Errorf("tenant ID is empty")
 	}
 
-	// Get action
-	action, err := uc.store.Actions().GetByID(ctx, tenantID, actionID)
-	if err != nil {
-		return fmt.Errorf("action not found: %w", err)
+	if err := uc.store.Actions().CancelQueued(ctx, tenantID, actionID, cancelledByUserMessage); err != nil {
+		if errors.Is(err, storage.ErrActionNotCancellable) {
+			action, getErr := uc.store.Actions().GetByID(ctx, tenantID, actionID)
+			if getErr != nil {
+				return nil, fmt.Errorf("action not found: %w", getErr)
+			}
+			return nil, fmt.Errorf("cannot cancel action in %s status: %w", action.Status, storage.ErrActionNotCancellable)
+		}
+		return nil, fmt.Errorf("failed to cancel action: %w", err)
 	}
 
-	// Can only cancel queued/delivered actions
-	if action.Status != models.ActionStatusQueued && action.Status != models.ActionStatusDelivered {
-		return fmt.Errorf("cannot cancel action in %s status", action.Status)
-	}
-
-	// Mark as cancelled
-	return uc.store.Actions().UpdateStatus(ctx, tenantID, actionID, models.ActionStatusCancelled)
+	return uc.store.Actions().GetByID(ctx, tenantID, actionID)
 }
 
 // ListActions retrieves actions for a device

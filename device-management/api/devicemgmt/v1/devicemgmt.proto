@@ -441,6 +441,14 @@ service DeviceMgmtService {
     };
   }
 
+  // Cancel a QUEUED action (UI timeout / user abort). Only QUEUED actions may be cancelled.
+  rpc CancelAction(CancelActionRequest) returns (CancelActionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/devicemgmt/devices/{device_id}/actions/{action_id}/cancel"
+      body: "*"
+    };
+  }
+
 }
 
   // ============================================================================
@@ -602,6 +610,19 @@ message ActionQueuedResponse {
 message ActionResultRequest {
   string device_id = 1;
   string action_id = 2;
+}
+
+// CancelActionRequest cancels a QUEUED action before the device pulls it.
+message CancelActionRequest {
+  string device_id = 1;
+  string action_id = 2;
+}
+
+message CancelActionResponse {
+  string                    action_id     = 1;
+  ActionStatus              status        = 2;
+  google.protobuf.Timestamp completed_at  = 3;
+  string                    error_message = 4;
 }
 
 // ============================================================================

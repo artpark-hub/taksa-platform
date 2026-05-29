@@ -50,6 +50,9 @@ Async action responses return `status` as an integer:
 | **5** | `FAILED` | Action failed |
 | **6** | `EXPIRED` | Action expired without completion |
 | **7** | `CANCELLED` | Action was cancelled |
+| **8** | `FAILED_PARSING_RESPONSE` | Device reply could not be parsed |
+
+**Lifecycle, expiry, cancellation, and retention cleanup:** see [ACTION_MANAGEMENT.md](./ACTION_MANAGEMENT.md).
 
 ---
 
