@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Copy, Info, Maximize2, Trash2, X } from 'lucide-react';
 import './Readflow.css';
+import OpcuaReadflow, { defaultOpcuaYaml } from './OpcuaReadflow';
 
 const defaultModbusYaml = `modbus:
   addresses:
@@ -20,14 +21,10 @@ const defaultModbusYaml = `modbus:
   timeBetweenReads: 1s
   timeout: 1s`;
 
-const defaultOpcuaYaml = `opcua:
-  endpoint: 'opc.tcp://{{ .IP }}:{{ .PORT }}' # OPC UA server endpoint
-  nodeIDs:
-    - "ns=2;s=MyVariable" # Node ID to subscribe to. Adjust as necessary
-  subscribeInterval: '1s' # Interval for subscription updates`;
+const normalizeProtocol = (protocol) => String(protocol || '').toLowerCase().replace(/[\s_-]/g, '');
 
 const getDefaultInputYaml = (protocol) => {
-    if (String(protocol || '').toLowerCase() === 'opcua') {
+    if (normalizeProtocol(protocol) === 'opcua') {
         return defaultOpcuaYaml;
     }
     return defaultModbusYaml;
@@ -195,7 +192,7 @@ return msg;`);
             return 'Processing (Tag Processor) - Code';
         }
 
-        return 'Input (YAML)';
+        return normalizeProtocol(bridgeConfig?.protocol) === 'opcua' ? 'Input (OPC UA)' : 'Input (YAML)';
     };
 
     const getLineNumbers = (value) => {
@@ -320,13 +317,18 @@ ${defaultsCode.split('\n').map((line) => `  ${line}`).join('\n')}`;
     };
 
     useEffect(() => {
+        const readInputType = normalizeProtocol(bridgeConfig?.protocol || 'modbus');
+
         setBridgeConfig((prev) => ({
             ...prev,
             readInputYaml: inputYaml,
-            readProcessorType: 'tag_processor',
-            readProcessorYaml: toTagProcessorYaml(processingCodeYaml),
+            ...(readInputType === 'opcua' ? {} : {
+                readProcessorType: 'tag_processor',
+                readProcessorYaml: toTagProcessorYaml(processingCodeYaml),
+                readTemplateVariables: []
+            }),
             readRawYamlInject: injectYamlValue,
-            readInputType: String(bridgeConfig?.protocol || 'modbus').toLowerCase()
+            readInputType
         }));
     }, [bridgeConfig?.protocol, inputYaml, injectYamlValue, processingCodeYaml, setBridgeConfig]);
 
@@ -392,6 +394,8 @@ ${defaultsCode.split('\n').map((line) => `  ${line}`).join('\n')}`;
         });
     };
 
+    const isOpcuaProtocol = normalizeProtocol(bridgeConfig?.protocol) === 'opcua';
+
     return (
         <div className="bridge-readflow-container">
             <div className="bridge-readflow-config-card">
@@ -443,41 +447,52 @@ ${defaultsCode.split('\n').map((line) => `  ${line}`).join('\n')}`;
                 </div>
             </div>
 
-            <div className="bridge-readflow-section-card">
-                <h2>Input (YAML)</h2>
-                <p>
-                    Configure your input in YAML format. See the{' '}
-                    <button>Benthos-UMH input documentation.</button>
-                </p>
+            {isOpcuaProtocol ? (
+                <OpcuaReadflow
+                    inputYaml={inputYaml}
+                    setInputYaml={setInputYaml}
+                    setBridgeConfig={setBridgeConfig}
+                    handleYamlKeyDown={handleYamlKeyDown}
+                    openFullscreenEditor={openFullscreenEditor}
+                />
+            ) : (
+                <div className="bridge-readflow-section-card">
+                    <h2>Input (YAML)</h2>
+                    <p>
+                        Configure your input in YAML format. See the{' '}
+                        <button>Benthos-UMH input documentation.</button>
+                    </p>
 
-                <div
-                    className="bridge-code-editor"
-                    onClick={() => setIsEditingInputYaml(true)}
-                >
-                    {!isEditingInputYaml && <span className="bridge-code-edit-label">Click to edit</span>}
-                    <textarea
-                        ref={inputYamlRef}
-                        className="bridge-code-textarea"
-                        value={inputYaml}
-                        onChange={(e) => setInputYaml(e.target.value)}
-                        onFocus={() => setIsEditingInputYaml(true)}
-                        onBlur={() => setIsEditingInputYaml(false)}
-                        onKeyDown={(e) => handleYamlKeyDown(e, inputYaml, setInputYaml)}
-                        spellCheck={false}
-                    />
-                    <button
-                        type="button"
-                        className="bridge-code-expand-btn"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            openFullscreenEditor('input');
-                        }}
+                    <div
+                        className="bridge-code-editor"
+                        onClick={() => setIsEditingInputYaml(true)}
                     >
-                        <Maximize2 size={18} />
-                    </button>
+                        {!isEditingInputYaml && <span className="bridge-code-edit-label">Click to edit</span>}
+                        <textarea
+                            ref={inputYamlRef}
+                            className="bridge-code-textarea"
+                            value={inputYaml}
+                            onChange={(e) => setInputYaml(e.target.value)}
+                            onFocus={() => setIsEditingInputYaml(true)}
+                            onBlur={() => setIsEditingInputYaml(false)}
+                            onKeyDown={(e) => handleYamlKeyDown(e, inputYaml, setInputYaml)}
+                            spellCheck={false}
+                        />
+                        <button
+                            type="button"
+                            className="bridge-code-expand-btn"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                openFullscreenEditor('input');
+                            }}
+                        >
+                            <Maximize2 size={18} />
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
 
+            {!isOpcuaProtocol && (
             <div className="bridge-readflow-section-card">
                 <div className="bridge-processing-header">
                     <div className="bridge-processing-title">
@@ -661,6 +676,7 @@ ${defaultsCode.split('\n').map((line) => `  ${line}`).join('\n')}`;
                     </div>
                 )}
             </div>
+            )}
 
             <div className="bridge-readflow-section-card">
                 <h2>Output (Unified Namespace)</h2>

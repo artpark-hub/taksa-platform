@@ -36,7 +36,8 @@ const BridgeConfiguration = () => {
         readInputYaml: '',
         readProcessorType: 'tag_processor',
         readProcessorYaml: '',
-        readRawYamlInject: 'buffer:\n  none: {}'
+        readRawYamlInject: 'buffer:\n  none: {}',
+        readTemplateVariables: []
     });
 
     const getErrorMessage = (data, fallback) => {
@@ -77,10 +78,17 @@ const BridgeConfiguration = () => {
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const sanitizeProtocolMeta = (protocol) => {
-        const normalized = String(protocol || '').trim().toLowerCase();
+        const normalized = String(protocol || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[\s_-]/g, '');
 
-        if (normalized === 'modbus') {
+        if (normalized === 'modbus' || normalized === 'modbustcp') {
             return 'modbus_tcp';
+        }
+
+        if (normalized === 'opcua') {
+            return 'opcua';
         }
 
         return normalized || 'modbus_tcp';
@@ -408,6 +416,23 @@ const BridgeConfiguration = () => {
 
                 setDeployMessage('Adding configurations, please wait.');
 
+                const protocolMeta = sanitizeProtocolMeta(bridgeConfig?.protocol);
+                const normalizedReadInputType = String(bridgeConfig?.readInputType || bridgeConfig?.protocol || 'modbus')
+                    .toLowerCase()
+                    .replace(/[\s_-]/g, '');
+                const isOpcuaPatch = protocolMeta === 'opcua' || normalizedReadInputType === 'opcua' || normalizedReadInputType === 'benthosopcua';
+                const readInputType = isOpcuaPatch ? 'benthos_opcua' : normalizedReadInputType;
+                const readTemplateVariables = Array.isArray(bridgeConfig?.readTemplateVariables)
+                    ? bridgeConfig.readTemplateVariables
+                    : [];
+                const templateInfoVariables = isOpcuaPatch
+                    ? readTemplateVariables
+                    : [
+                        { label: 'IP', value: bridgeConfig?.ipAddress || '' },
+                        { label: 'PORT', value: String(parsedPort || '') },
+                        ...readTemplateVariables
+                    ];
+
                 const editPayload = {
                     uuid: converterUuid,
                     name: bridgeConfig?.name || '',
@@ -417,9 +442,9 @@ const BridgeConfiguration = () => {
                     },
                     location,
                     readDFC: {
-                        ignoreErrors: true,
+                        ignoreErrors: !isOpcuaPatch,
                         inputs: {
-                            type: String(bridgeConfig?.readInputType || bridgeConfig?.protocol || 'modbus').toLowerCase(),
+                            type: readInputType,
                             data: toMultilineString(bridgeConfig?.readInputYaml)
                         },
                         pipeline: {
@@ -435,16 +460,17 @@ const BridgeConfiguration = () => {
                             data: toMultilineString(bridgeConfig?.readRawYamlInject, 'buffer:\n  none: {}')
                         }
                     },
-                    templateInfo: {
-                        variables: [
-                            { label: 'IP', value: bridgeConfig?.ipAddress || '' },
-                            { label: 'PORT', value: String(parsedPort || '') }
-                        ]
-                    },
                     meta: {
-                        protocol: sanitizeProtocolMeta(bridgeConfig?.protocol)
+                        protocol: protocolMeta,
+                        ...(isOpcuaPatch ? { processingMode: 'streaming' } : {})
                     }
                 };
+
+                if (templateInfoVariables.length > 0) {
+                    editPayload.templateInfo = {
+                        variables: templateInfoVariables
+                    };
+                }
 
                 try {
                     const editActionId = await queueProtocolConverterUpdate(converterUuid, editPayload);
