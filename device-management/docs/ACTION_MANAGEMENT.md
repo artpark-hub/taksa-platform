@@ -129,9 +129,46 @@ When queueing, `TTLSeconds > 0` sets `expires_at` on the row. Before pull (and o
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `DM_ACTION_AUTO_EXPIRE_MINUTES` | **unset (disabled)** | When set, `QUEUED` actions with `created_at` older than N minutes → `EXPIRED` |
+| `DM_ACTION_AUTO_EXPIRE_MINUTES` | **unset (disabled)** | When set, `QUEUED` **UI/async** actions with `created_at` older than N minutes → `EXPIRED` |
 
 Use when devices may be offline for long periods and the UI does not cancel explicitly. **Not** the same as per-action `TTLSeconds`.
+
+**Excluded from auto-expire** (still subject to per-action `expires_at` via mechanism 1):
+
+| Action | Why |
+|--------|-----|
+| `subscribe` | Status subscription keepalive (`action_type` is always the literal `subscribe`); re-queued on pull when catalog/heartbeat is stale |
+| `deploy-data-flow-component` / `edit-data-flow-component` whose JSON payload has **`"name": "UNS-to-NATS-mirror"`** (top-level field only) | Platform mirror; device row fingerprint + login/fleet reconcile re-drive |
+
+Implementation: `ExpireQueuedOlderThan` uses `payload_data::jsonb ->> 'name'`; `models.IsNATSMirrorDeployOrEditPayload()` parses JSON the same way in Go. Inflight mirror detection uses the same `name` rule.
+
+Other `deploy-data-flow-component` / `edit-data-flow-component` actions (e.g. protocol converters with a different top-level `"name"`) are **not** excluded and follow `DM_ACTION_AUTO_EXPIRE_MINUTES` when set.
+
+### Terminal `error_message` values (expiry)
+
+| Message | Mechanism |
+|---------|-----------|
+| `Per-action TTL exceeded` | `expires_at` passed (`ExpireQueuedPastDeadline`) |
+| `Queued action auto-expired (device did not pull in time)` | `DM_ACTION_AUTO_EXPIRE_MINUTES` sweep |
+
+Example: `status-subscription` sets `expires_at` ≈ **120s** after queue. With device offline, subscribe often shows `EXPIRED` with **Per-action TTL exceeded** around 2 minutes — that is **not** auto-expire (subscribe is exempt from `DM_ACTION_AUTO_EXPIRE_MINUTES`).
+
+---
+
+## Infrastructure actions (subscribe, UNS→NATS mirror)
+
+These are **not** console async actions. They use the same `actions` table but different queue paths and retention of truth outside the row.
+
+| Action | `action_type` | Typical `expires_at` | Exempt from `DM_ACTION_AUTO_EXPIRE_MINUTES`? | How work is re-driven |
+|--------|---------------|----------------------|---------------------------------------------|------------------------|
+| Status subscription | `subscribe` (only this string) | **120s** after queue | Yes | Pull when catalog/heartbeat stale; `POST .../status-subscription`; login |
+| UNS→NATS mirror | `deploy-data-flow-component` or `edit-data-flow-component` with **`"name": "UNS-to-NATS-mirror"`** | **3600s** (1h) | Yes | Login; fleet reconcile ~3s after DM start; see [UNS_TO_NATS_MIRROR.md](./UNS_TO_NATS_MIRROR.md) |
+
+**Subscribe:** At most one `QUEUED` subscribe per device (DB unique index). On pull, subscribe is claimed then immediately marked `COMPLETED` (no action-reply).
+
+**NATS mirror:** Success is recorded on `devices.nats_mirror_deployed_at` and `devices.nats_mirror_config_fingerprint` (survives action row deletion). To test re-queue without the DCD online: clear or drift fingerprint in DB, restart DM (fleet reconcile) or wait for login — mirror `QUEUED` rows can sit for hours without auto-expire when `DM_ACTION_AUTO_EXPIRE_MINUTES` is set.
+
+**Cancel API** applies only to user/async actions; infrastructure rows are not intended to be cancelled from the UI.
 
 ---
 
@@ -187,12 +224,39 @@ QUEUED → (pull) → DELIVERED → (push confirmed) → PROCESSING → (push su
 
 ---
 
+## Testing (manual)
+
+Use aggressive `.env` for short feedback loops, then restore production-like values:
+
+```bash
+DM_ACTION_RETENTION_MINUTES=2
+DM_ACTION_CLEANUP_INTERVAL_MINUTES=1
+DM_ACTION_AUTO_EXPIRE_MINUTES=2
+```
+
+Restart DM after changing `.env`. Wait **≥1 minute** before expecting the first cleanup tick.
+
+| Scenario | Device | Expect |
+|----------|--------|--------|
+| GetConfig | Offline | `EXPIRED` ~2–3 min; message **auto-expired…** |
+| Cancel before pull | Offline | `CANCELLED` via `POST .../actions/{id}/cancel` |
+| `status-subscription` | Offline ~2+ min | `EXPIRED`; message **Per-action TTL exceeded** (120s TTL) |
+| Mirror edit/deploy (`name` = UNS-to-NATS-mirror) | Offline 10+ min | Stays `QUEUED` (exempt from auto-expire) |
+| Other DFC deploy | Offline | `EXPIRED` ~2–3 min (not name-exempt) |
+
+**Bruno:** cancel flow in [bruno/01-DeviceActions/README-DeviceActions-API-Testing.md](../bruno/01-DeviceActions/README-DeviceActions-API-Testing.md). **NATS mirror re-queue:** [UNS_TO_NATS_MIRROR.md](./UNS_TO_NATS_MIRROR.md) (DB fingerprint + DM restart or login).
+
+---
+
 ## Key source files
 
 | Area | Path |
 |------|------|
 | Pull / push / PROCESSING | `internal/biz/instance.go` |
 | Queue / cancel biz | `internal/biz/action.go` |
+| Subscribe queue | `internal/biz/instance_status_subscription.go` |
+| NATS mirror queue | `internal/biz/nats_mirror.go` |
+| Payload `name` check | `internal/models/action.go` (`IsNATSMirrorDeployOrEditPayload`) |
 | Cleanup / auto-expire loop | `internal/biz/action_cleanup.go` |
 | Storage (claim, cancel, expire) | `internal/storage/postgres/action.go` |
 | Cancel RPC | `api/devicemgmt/v1/devicemgmt.proto`, `internal/service/devicemgmt.go` |

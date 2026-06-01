@@ -326,7 +326,7 @@ func natsMirrorActionPayloadMatches(action *models.Action) bool {
 	if action.Payload == nil || len(action.Payload.Value) == 0 {
 		return false
 	}
-	return strings.Contains(string(action.Payload.Value), natsMirrorDataFlowName)
+	return models.IsNATSMirrorDeployOrEditPayload(action.Payload.Value)
 }
 
 // RecordNATSMirrorDeploySuccess persists mirror success on the device row (survives actions cleanup).

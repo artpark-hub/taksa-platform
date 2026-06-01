@@ -334,6 +334,8 @@ WHERE status = $3
 }
 
 // ExpireQueuedOlderThan marks stale QUEUED actions as EXPIRED (cross-tenant auto-expire sweep).
+// Infrastructure actions (subscribe, UNS→NATS mirror deploy/edit) are excluded; they use per-action TTL
+// and dedicated re-queue paths (pull staleness, login, fleet reconcile).
 func (s *ActionStore) ExpireQueuedOlderThan(ctx context.Context, before time.Time, errorMessage string) error {
 	if errorMessage == "" {
 		errorMessage = autoExpireQueuedMessage
@@ -341,8 +343,14 @@ func (s *ActionStore) ExpireQueuedOlderThan(ctx context.Context, before time.Tim
 	_, err := s.db.ExecContext(ctx, `
 UPDATE actions
 SET status = $1, completed_at = CURRENT_TIMESTAMP, error_message = $2
-WHERE status = $3 AND created_at < $4`,
-		int32(models.ActionStatusExpired), errorMessage, int32(models.ActionStatusQueued), before.Format(time.RFC3339))
+WHERE status = $3 AND created_at < $4
+  AND action_type <> $5
+  AND NOT (
+    action_type IN ('deploy-data-flow-component', 'edit-data-flow-component')
+    AND payload_data::jsonb ->> 'name' = $6
+  )`,
+		int32(models.ActionStatusExpired), errorMessage, int32(models.ActionStatusQueued), before.Format(time.RFC3339),
+		models.ActionTypeSubscribe, models.NATSMirrorPayloadMarker)
 	if err != nil {
 		return fmt.Errorf("failed to auto-expire queued actions: %w", err)
 	}
@@ -764,9 +772,9 @@ SELECT EXISTS (
   SELECT 1 FROM actions
   WHERE tenant_id = $1 AND device_id = $2
     AND action_type = $3
-    AND payload_data LIKE $4
+    AND payload_data::jsonb ->> 'name' = $4
     AND status IN ($5, $6, $7)
-)`, tenantID, deviceID, actionType, natsMirrorNameMarker,
+)`, tenantID, deviceID, actionType, models.NATSMirrorPayloadMarker,
 		int(models.ActionStatusQueued),
 		int(models.ActionStatusDelivered),
 		int(models.ActionStatusProcessing),

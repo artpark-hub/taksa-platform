@@ -150,7 +150,7 @@ flowchart TD
   G -->|yes| I["Queue edit-data-flow-component"]
 ```
 
-**Inflight** = row in `actions` for this tenant/device with mirror payload and status `QUEUED`, `DELIVERED`, or `PROCESSING`. `NATSMirrorDeployInflight` checks deploy only; `NATSMirrorActionInflight` checks deploy or edit (`internal/storage/postgres/action.go`).
+**Inflight** = row in `actions` for this tenant/device with type `deploy-data-flow-component` or `edit-data-flow-component`, JSON payload with top-level **`"name": "UNS-to-NATS-mirror"`** (`payload_data::jsonb ->> 'name'`), and status `QUEUED`, `DELIVERED`, or `PROCESSING` (`internal/storage/postgres/action.go`). Mirror actions are **excluded** from `DM_ACTION_AUTO_EXPIRE_MINUTES`; see [ACTION_MANAGEMENT.md](./ACTION_MANAGEMENT.md).
 
 ### Success handling
 
@@ -251,7 +251,7 @@ Compute `<current_sha256_hex>` the same way as DM: sort URLs, join with `,`, SHA
 
 ### Inflight / stuck actions
 
-Check `actions` for the device with `action_type` in (`deploy-data-flow-component`, `edit-data-flow-component`) and payload containing `UNS-to-NATS-mirror`. Status `1`/`2` block duplicate queueing until the action completes or is cleaned up.
+Check `actions` for the device with `action_type` in (`deploy-data-flow-component`, `edit-data-flow-component`) and `payload_data::jsonb ->> 'name' = 'UNS-to-NATS-mirror'`. Status `1`/`2` block duplicate queueing until the action completes or is cleaned up.
 
 ---
 

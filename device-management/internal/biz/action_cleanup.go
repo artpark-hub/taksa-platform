@@ -44,7 +44,8 @@ func envIntPositive(name string) (int, bool) {
 // Configuration:
 // - DM_ACTION_RETENTION_MINUTES: how long terminal actions/messages are retained (default: 60)
 // - DM_ACTION_CLEANUP_INTERVAL_MINUTES: how often cleanup runs (default: 10)
-// - DM_ACTION_AUTO_EXPIRE_MINUTES: optional; when set, QUEUED actions older than this are marked EXPIRED
+// - DM_ACTION_AUTO_EXPIRE_MINUTES: optional; when set, QUEUED UI/async actions older than this are marked EXPIRED
+//   (excludes subscribe and UNS→NATS mirror deploy/edit — see models.Action.ExcludedFromAutoExpire)
 //
 // Retention uses message.created_at and a derived action "terminal timestamp"
 // (COALESCE(completed_at, delivered_at, created_at)).

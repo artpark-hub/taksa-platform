@@ -39,7 +39,7 @@ Terminal action **deletion** is performed by a background loop inside DM, not vi
 |---------|---------|---------|
 | `DM_ACTION_RETENTION_MINUTES` | 60 | How long terminal rows are kept |
 | `DM_ACTION_CLEANUP_INTERVAL_MINUTES` | 10 | How often the sweep runs |
-| `DM_ACTION_AUTO_EXPIRE_MINUTES` | *(unset)* | Optional: mark stale `QUEUED` as `EXPIRED` |
+| `DM_ACTION_AUTO_EXPIRE_MINUTES` | *(unset)* | Optional: mark stale `QUEUED` UI actions as `EXPIRED` (not subscribe / NATS mirror) |
 
 There is no Bruno request for cleanup. To verify manually after retention elapses:
 
@@ -57,14 +57,16 @@ DM_ACTION_CLEANUP_INTERVAL_MINUTES=1
 
 ## Auto-expire (optional)
 
-When `DM_ACTION_AUTO_EXPIRE_MINUTES` is set, `QUEUED` actions older than that threshold become `EXPIRED` on the cleanup tick (not on queue).
+When `DM_ACTION_AUTO_EXPIRE_MINUTES` is set, `QUEUED` **UI/async** actions older than that threshold become `EXPIRED` on the cleanup tick (not on queue). **Excluded:** `subscribe`, and mirror deploy/edit with `"name": "UNS-to-NATS-mirror"`.
 
-Bruno flow to observe expiry:
+**Subscribe** still expires via its own **120s** `expires_at` (`error_message`: `Per-action TTL exceeded`) — test with `POST .../status-subscription` and SQL, not GetConfig result polling.
 
-1. Queue an action (`06-QueueActionForCancel.bru`) — do **not** cancel or pull.
-2. Set `DM_ACTION_AUTO_EXPIRE_MINUTES=1` and restart DM.
-3. Wait ~2 minutes (one interval + margin).
-4. Poll with `06a-GetActionResult-AfterCancel.bru` (adjust URL/action id) — expect `EXPIRED`.
+Bruno flow to observe **UI** auto-expire:
+
+1. Queue GetConfig (`06-QueueActionForCancel.bru` or `01-GetDeviceConfig.bru`) — do **not** cancel or pull.
+2. Set `DM_ACTION_AUTO_EXPIRE_MINUTES=2` and restart DM.
+3. Wait ~2–3 minutes.
+4. Poll config result — expect `EXPIRED` with **auto-expired** message (not per-action TTL for GetConfig until 5 min).
 
 ## Environment variables
 
