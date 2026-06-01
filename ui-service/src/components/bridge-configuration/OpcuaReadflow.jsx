@@ -338,11 +338,15 @@ const stripTagProcessorRoot = (yaml) => {
     return stripBlockIndent(text.split('\n').slice(1).join('\n'));
 };
 
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const extractYamlSection = (yaml, key, nextKeys = []) => {
     const text = stripTagProcessorRoot(yaml);
-    const nextPattern = nextKeys.length ? `(?=\n\s*(?:${nextKeys.join('|')}):|$)` : '$';
-    const blockPattern = new RegExp(`(?:^|\n)\s*${key}:\s*(?:\|-?)?\n([\s\S]*?)${nextPattern}`);
-    const inlinePattern = new RegExp(`(?:^|\n)\s*${key}:\s*([^\n]+)`);
+    const escapedKey = escapeRegExp(key);
+    const escapedNextKeys = nextKeys.map(escapeRegExp).join('|');
+    const nextPattern = escapedNextKeys ? `(?=\\n\\s*(?:${escapedNextKeys}):|$)` : '$';
+    const blockPattern = new RegExp(`(?:^|\\n)\\s*${escapedKey}:\\s*(?:\\|[-]?)?\\n([\\s\\S]*?)${nextPattern}`);
+    const inlinePattern = new RegExp(`(?:^|\\n)\\s*${escapedKey}:\\s*([^\\n]+)`);
     const blockMatch = text.match(blockPattern);
 
     if (blockMatch) {
