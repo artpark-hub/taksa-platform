@@ -262,17 +262,43 @@ func (uc *InstanceUsecase) ReconcileNATSMirrorFleet(ctx context.Context) {
 		return
 	}
 	for _, ref := range refs {
+		if ctx.Err() != nil {
+			return
+		}
 		deviceCtx := middleware.SetTenantID(ctx, ref.TenantID)
 		uc.ensureNATSMirrorForDevice(deviceCtx, ref.ID)
 	}
 }
 
-// StartNATSMirrorFleetReconcile runs ReconcileNATSMirrorFleet once after a short delay (DB ready).
-func (uc *InstanceUsecase) StartNATSMirrorFleetReconcile() {
+// StartNATSMirrorFleetReconcile schedules one fleet reconcile after startup (parent ctx from app lifecycle).
+func (uc *InstanceUsecase) StartNATSMirrorFleetReconcile(ctx context.Context) {
+	if uc == nil || ctx == nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	uc.natsMirrorReconcileCancel = cancel
+	uc.natsMirrorReconcileWG.Add(1)
 	go func() {
-		time.Sleep(3 * time.Second)
-		uc.ReconcileNATSMirrorFleet(context.Background())
+		defer uc.natsMirrorReconcileWG.Done()
+		timer := time.NewTimer(3 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+		uc.ReconcileNATSMirrorFleet(ctx)
 	}()
+}
+
+// StopNATSMirrorFleetReconcile cancels an in-flight fleet reconcile (call from app shutdown).
+func (uc *InstanceUsecase) StopNATSMirrorFleetReconcile() {
+	if uc == nil || uc.natsMirrorReconcileCancel == nil {
+		return
+	}
+	uc.natsMirrorReconcileCancel()
+	uc.natsMirrorReconcileWG.Wait()
+	uc.natsMirrorReconcileCancel = nil
 }
 
 // IsNATSMirrorDeployAction reports whether the queued action deploys the platform UNS→NATS mirror DFC.

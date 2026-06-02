@@ -597,28 +597,60 @@ func (s *ActionStore) listActions(ctx context.Context, whereClause string, args 
 	return actions, nil
 }
 
-// NATSMirrorDeployInflight reports whether a UNS-to-NATS mirror deploy is queued or delivered.
+const natsMirrorNameMarker = "%UNS-to-NATS-mirror%"
+
+// NATSMirrorDeployInflight reports whether a UNS-to-NATS mirror deploy is queued, delivered, or processing.
 func (s *ActionStore) NATSMirrorDeployInflight(ctx context.Context, tenantID, deviceID string) (bool, error) {
-	return s.NATSMirrorActionInflight(ctx, tenantID, deviceID)
+	return s.natsMirrorInflight(ctx, tenantID, deviceID, "deploy-data-flow-component")
 }
 
-// NATSMirrorActionInflight reports whether a UNS-to-NATS mirror deploy or edit is queued or delivered.
+// NATSMirrorActionInflight reports whether a UNS-to-NATS mirror deploy or edit is queued, delivered, or processing.
 func (s *ActionStore) NATSMirrorActionInflight(ctx context.Context, tenantID, deviceID string) (bool, error) {
 	if tenantID == "" || deviceID == "" {
 		return false, ErrInvalidInput
 	}
-	const nameMarker = "%UNS-to-NATS-mirror%"
+	const (
+		deployType = "deploy-data-flow-component"
+		editType   = "edit-data-flow-component"
+	)
 	var inflight bool
 	err := s.db.QueryRowContext(ctx, `
 SELECT EXISTS (
   SELECT 1 FROM actions
   WHERE tenant_id = $1 AND device_id = $2
-    AND action_type IN ('deploy-data-flow-component', 'edit-data-flow-component')
-    AND payload_data LIKE $3
-    AND status IN (1, 2)
-)`, tenantID, deviceID, nameMarker).Scan(&inflight)
+    AND action_type IN ($3, $4)
+    AND payload_data LIKE $5
+    AND status IN ($6, $7, $8)
+)`, tenantID, deviceID, deployType, editType, natsMirrorNameMarker,
+		int(models.ActionStatusQueued),
+		int(models.ActionStatusDelivered),
+		int(models.ActionStatusProcessing),
+	).Scan(&inflight)
 	if err != nil {
 		return false, fmt.Errorf("nats mirror action inflight query: %w", err)
+	}
+	return inflight, nil
+}
+
+func (s *ActionStore) natsMirrorInflight(ctx context.Context, tenantID, deviceID, actionType string) (bool, error) {
+	if tenantID == "" || deviceID == "" || actionType == "" {
+		return false, ErrInvalidInput
+	}
+	var inflight bool
+	err := s.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM actions
+  WHERE tenant_id = $1 AND device_id = $2
+    AND action_type = $3
+    AND payload_data LIKE $4
+    AND status IN ($5, $6, $7)
+)`, tenantID, deviceID, actionType, natsMirrorNameMarker,
+		int(models.ActionStatusQueued),
+		int(models.ActionStatusDelivered),
+		int(models.ActionStatusProcessing),
+	).Scan(&inflight)
+	if err != nil {
+		return false, fmt.Errorf("nats mirror inflight query: %w", err)
 	}
 	return inflight, nil
 }

@@ -57,10 +57,10 @@ type ActionStore interface {
 	// DeleteQueuedSubscribe removes a pending QUEUED subscribe for the device (if any).
 	DeleteQueuedSubscribe(ctx context.Context, tenantID, deviceID string) (bool, error)
 
-	// NATSMirrorDeployInflight returns whether a UNS-to-NATS-mirror deploy is queued or delivered but not finished.
+	// NATSMirrorDeployInflight returns whether a UNS-to-NATS-mirror deploy is in progress (queued, delivered, or processing).
 	NATSMirrorDeployInflight(ctx context.Context, tenantID, deviceID string) (bool, error)
 
-	// NATSMirrorActionInflight returns whether a UNS-to-NATS-mirror deploy or edit is queued or delivered but not finished.
+	// NATSMirrorActionInflight returns whether a UNS-to-NATS-mirror deploy or edit is in progress.
 	NATSMirrorActionInflight(ctx context.Context, tenantID, deviceID string) (bool, error)
 }
 

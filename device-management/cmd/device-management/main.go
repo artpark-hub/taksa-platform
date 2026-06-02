@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -83,20 +84,27 @@ func newZapLogger(logLevel, logFile string) (*zap.Logger, error) {
 }
 
 func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server, instanceUc *biz.InstanceUsecase) *kratos.App {
-	if instanceUc != nil {
-		instanceUc.StartNATSMirrorFleetReconcile()
-	}
-	return kratos.New(
+	opts := []kratos.Option{
 		kratos.ID(id),
 		kratos.Name(Name),
 		kratos.Version(Version),
 		kratos.Metadata(map[string]string{}),
 		kratos.Logger(logger),
-		kratos.Server(
-			gs,
-			hs,
-		),
-	)
+		kratos.Server(gs, hs),
+	}
+	if instanceUc != nil {
+		opts = append(opts,
+			kratos.BeforeStart(func(ctx context.Context) error {
+				instanceUc.StartNATSMirrorFleetReconcile(ctx)
+				return nil
+			}),
+			kratos.AfterStop(func(ctx context.Context) error {
+				instanceUc.StopNATSMirrorFleetReconcile()
+				return nil
+			}),
+		)
+	}
+	return kratos.New(opts...)
 }
 
 func main() {

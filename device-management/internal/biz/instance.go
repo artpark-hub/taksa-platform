@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -202,6 +203,9 @@ type InstanceUsecase struct {
 	statusSub             StatusSubscriptionSettings
 	deployment            *conf.Deployment
 	actionUc              *ActionUsecase
+
+	natsMirrorReconcileCancel context.CancelFunc
+	natsMirrorReconcileWG     sync.WaitGroup
 }
 
 // NewInstanceUsecase creates a new InstanceUsecase with the given storage and authentication backends.

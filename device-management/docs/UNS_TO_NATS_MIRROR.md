@@ -130,7 +130,7 @@ See `db/migrations/README.md` for the full list.
 ### When mirror is ensured
 
 1. **Device login** — `InstanceUsecase.Login` calls `EnsureUNSToNATSMirror` after `EnsureStatusSubscription` (`internal/biz/instance.go`).
-2. **DM startup** — `newApp` (wired from `cmd/device-management/main.go`) calls `StartNATSMirrorFleetReconcile()`, which runs `ReconcileNATSMirrorFleet` once ~3s after start for all devices with a stale or missing fingerprint.
+2. **DM startup** — Kratos `BeforeStart` calls `StartNATSMirrorFleetReconcile(ctx)`, which runs `ReconcileNATSMirrorFleet` once ~3s later (cancellable via `AfterStop` on shutdown).
 
 ### Decision logic (`ensureNATSMirrorForDevice`)
 
@@ -150,7 +150,7 @@ flowchart TD
   G -->|yes| I["Queue edit-data-flow-component"]
 ```
 
-**Inflight** = row in `actions` for this tenant/device with type `deploy-data-flow-component` or `edit-data-flow-component`, payload containing `UNS-to-NATS-mirror`, status queued or delivered (`internal/storage/postgres/action.go`).
+**Inflight** = row in `actions` for this tenant/device with mirror payload and status `QUEUED`, `DELIVERED`, or `PROCESSING`. `NATSMirrorDeployInflight` checks deploy only; `NATSMirrorActionInflight` checks deploy or edit (`internal/storage/postgres/action.go`).
 
 ### Success handling
 
