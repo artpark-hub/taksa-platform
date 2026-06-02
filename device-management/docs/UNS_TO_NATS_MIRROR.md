@@ -150,7 +150,7 @@ flowchart TD
   G -->|yes| I["Queue edit-data-flow-component"]
 ```
 
-**Inflight** = row in `actions` for this tenant/device with type `deploy-data-flow-component` or `edit-data-flow-component`, JSON payload with top-level **`"name": "UNS-to-NATS-mirror"`** (`payload_data::jsonb ->> 'name'`), and status `QUEUED`, `DELIVERED`, or `PROCESSING` (`internal/storage/postgres/action.go`). Mirror actions are **excluded** from `DM_ACTION_AUTO_EXPIRE_MINUTES`; see [ACTION_MANAGEMENT.md](./ACTION_MANAGEMENT.md).
+**Inflight** = row in `actions` for this tenant/device with type `deploy-data-flow-component` or `edit-data-flow-component`, JSON payload with top-level **`"name": "UNS-to-NATS-mirror"`** (`payload_data::jsonb ->> 'name'`), and status `QUEUED`, `DELIVERED`, or `PROCESSING` (`internal/storage/postgres/action.go`). Mirror actions are **excluded** from `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES`; see [ACTION_MANAGEMENT.md](./ACTION_MANAGEMENT.md).
 
 ### Success handling
 

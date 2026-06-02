@@ -14,6 +14,12 @@ const (
 	autoExpireQueuedMessage             = "Queued action auto-expired (device did not pull in time)"
 )
 
+const (
+	actionRetentionEnvVar      = "TAKSA_DM_ACTION_RETENTION_MINUTES"
+	actionCleanupIntervalEnvVar = "TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES"
+	actionAutoExpireEnvVar     = "TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES"
+)
+
 func envInt(name string, defaultValue int) int {
 	v := os.Getenv(name)
 	if v == "" {
@@ -55,9 +61,9 @@ func envIntPositive(name string) (int, bool) {
 // StartActionCleanupLoop starts a background loop that deletes terminal actions and old messages.
 //
 // Configuration:
-// - DM_ACTION_RETENTION_MINUTES: how long terminal actions/messages are retained (default: 60)
-// - DM_ACTION_CLEANUP_INTERVAL_MINUTES: how often cleanup runs (default: 10). <= 0 disables loop.
-// - DM_ACTION_AUTO_EXPIRE_MINUTES: optional; when set, QUEUED UI/async actions older than this are marked EXPIRED
+// - TAKSA_DM_ACTION_RETENTION_MINUTES: how long terminal actions/messages are retained (default: 60)
+// - TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES: how often cleanup runs (default: 10). <= 0 disables loop.
+// - TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES: optional; when set, QUEUED UI/async actions older than this are marked EXPIRED
 //   (excludes subscribe and UNS→NATS mirror deploy/edit — see models.Action.ExcludedFromAutoExpire)
 //
 // Retention uses message.created_at and a derived action "terminal timestamp"
@@ -67,15 +73,15 @@ func (uc *InstanceUsecase) StartActionCleanupLoop() {
 		return
 	}
 
-	retentionMinutes, _ := envIntWarn("DM_ACTION_RETENTION_MINUTES", defaultActionRetentionMinutes)
-	intervalMinutes, _ := envIntWarn("DM_ACTION_CLEANUP_INTERVAL_MINUTES", defaultActionCleanupIntervalMinutes)
+	retentionMinutes, _ := envIntWarn(actionRetentionEnvVar, defaultActionRetentionMinutes)
+	intervalMinutes, _ := envIntWarn(actionCleanupIntervalEnvVar, defaultActionCleanupIntervalMinutes)
 
 	if retentionMinutes <= 0 {
-		fmt.Printf("WARNING: DM_ACTION_RETENTION_MINUTES=%d is invalid; clamping to default %d\n", retentionMinutes, defaultActionRetentionMinutes)
+		fmt.Printf("WARNING: %s=%d is invalid; clamping to default %d\n", actionRetentionEnvVar, retentionMinutes, defaultActionRetentionMinutes)
 		retentionMinutes = defaultActionRetentionMinutes
 	}
 	if intervalMinutes <= 0 {
-		fmt.Printf("WARNING: DM_ACTION_CLEANUP_INTERVAL_MINUTES=%d disables cleanup loop\n", intervalMinutes)
+		fmt.Printf("WARNING: %s=%d disables cleanup loop\n", actionCleanupIntervalEnvVar, intervalMinutes)
 		return
 	}
 
@@ -97,7 +103,7 @@ func (uc *InstanceUsecase) StartActionCleanupLoop() {
 				fmt.Printf("WARNING: per-action TTL expiry failed: %v\n", err)
 			}
 
-			if autoExpireMinutes, ok := envIntPositive("DM_ACTION_AUTO_EXPIRE_MINUTES"); ok {
+			if autoExpireMinutes, ok := envIntPositive(actionAutoExpireEnvVar); ok {
 				expireBefore := time.Now().Add(-time.Duration(autoExpireMinutes) * time.Minute)
 				if err := uc.store.Actions().ExpireQueuedOlderThan(ctx, expireBefore, autoExpireQueuedMessage); err != nil {
 					fmt.Printf("WARNING: queued action auto-expire failed: %v\n", err)

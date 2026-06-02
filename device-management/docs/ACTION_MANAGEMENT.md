@@ -28,7 +28,7 @@ stateDiagram-v2
 
     QUEUED --> DELIVERED : Device pull (atomic claim)
     QUEUED --> CANCELLED : POST .../cancel (UI timeout)
-    QUEUED --> EXPIRED : Per-action expires_at OR DM_ACTION_AUTO_EXPIRE_MINUTES
+    QUEUED --> EXPIRED : Per-action expires_at OR TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES
 
     DELIVERED --> PROCESSING : Push: action-confirmed / action-executing
     DELIVERED --> COMPLETED : Push: action-success (e.g. subscribe)
@@ -129,7 +129,7 @@ When queueing, `TTLSeconds > 0` sets `expires_at` on the row. Before pull (and o
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `DM_ACTION_AUTO_EXPIRE_MINUTES` | **unset (disabled)** | When set, `QUEUED` **UI/async** actions with `created_at` older than N minutes → `EXPIRED` |
+| `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` | **unset (disabled)** | When set, `QUEUED` **UI/async** actions with `created_at` older than N minutes → `EXPIRED` |
 
 Use when devices may be offline for long periods and the UI does not cancel explicitly. **Not** the same as per-action `TTLSeconds`.
 
@@ -142,16 +142,16 @@ Use when devices may be offline for long periods and the UI does not cancel expl
 
 Implementation: `ExpireQueuedOlderThan` uses `payload_data::jsonb ->> 'name'`; `models.IsNATSMirrorDeployOrEditPayload()` parses JSON the same way in Go. Inflight mirror detection uses the same `name` rule.
 
-Other `deploy-data-flow-component` / `edit-data-flow-component` actions (e.g. protocol converters with a different top-level `"name"`) are **not** excluded and follow `DM_ACTION_AUTO_EXPIRE_MINUTES` when set.
+Other `deploy-data-flow-component` / `edit-data-flow-component` actions (e.g. protocol converters with a different top-level `"name"`) are **not** excluded and follow `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` when set.
 
 ### Terminal `error_message` values (expiry)
 
 | Message | Mechanism |
 |---------|-----------|
 | `Per-action TTL exceeded` | `expires_at` passed (`ExpireQueuedPastDeadline`) |
-| `Queued action auto-expired (device did not pull in time)` | `DM_ACTION_AUTO_EXPIRE_MINUTES` sweep |
+| `Queued action auto-expired (device did not pull in time)` | `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` sweep |
 
-Example: `status-subscription` sets `expires_at` ≈ **120s** after queue. With device offline, subscribe often shows `EXPIRED` with **Per-action TTL exceeded** around 2 minutes — that is **not** auto-expire (subscribe is exempt from `DM_ACTION_AUTO_EXPIRE_MINUTES`).
+Example: `status-subscription` sets `expires_at` ≈ **120s** after queue. With device offline, subscribe often shows `EXPIRED` with **Per-action TTL exceeded** around 2 minutes — that is **not** auto-expire (subscribe is exempt from `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES`).
 
 ---
 
@@ -159,14 +159,14 @@ Example: `status-subscription` sets `expires_at` ≈ **120s** after queue. With 
 
 These are **not** console async actions. They use the same `actions` table but different queue paths and retention of truth outside the row.
 
-| Action | `action_type` | Typical `expires_at` | Exempt from `DM_ACTION_AUTO_EXPIRE_MINUTES`? | How work is re-driven |
+| Action | `action_type` | Typical `expires_at` | Exempt from `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES`? | How work is re-driven |
 |--------|---------------|----------------------|---------------------------------------------|------------------------|
 | Status subscription | `subscribe` (only this string) | **120s** after queue | Yes | Pull when catalog/heartbeat stale; `POST .../status-subscription`; login |
 | UNS→NATS mirror | `deploy-data-flow-component` or `edit-data-flow-component` with **`"name": "UNS-to-NATS-mirror"`** | **3600s** (1h) | Yes | Login; fleet reconcile ~3s after DM start; see [UNS_TO_NATS_MIRROR.md](./UNS_TO_NATS_MIRROR.md) |
 
 **Subscribe:** At most one `QUEUED` subscribe per device (DB unique index). On pull, subscribe is claimed then immediately marked `COMPLETED` (no action-reply).
 
-**NATS mirror:** Success is recorded on `devices.nats_mirror_deployed_at` and `devices.nats_mirror_config_fingerprint` (survives action row deletion). To test re-queue without the DCD online: clear or drift fingerprint in DB, restart DM (fleet reconcile) or wait for login — mirror `QUEUED` rows can sit for hours without auto-expire when `DM_ACTION_AUTO_EXPIRE_MINUTES` is set.
+**NATS mirror:** Success is recorded on `devices.nats_mirror_deployed_at` and `devices.nats_mirror_config_fingerprint` (survives action row deletion). To test re-queue without the DCD online: clear or drift fingerprint in DB, restart DM (fleet reconcile) or wait for login — mirror `QUEUED` rows can sit for hours without auto-expire when `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` is set.
 
 **Cancel API** applies only to user/async actions; infrastructure rows are not intended to be cancelled from the UI.
 
@@ -178,8 +178,8 @@ Terminal rows and old messages are **deleted** periodically. There is **no HTTP 
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `DM_ACTION_RETENTION_MINUTES` | 60 | Delete terminal actions + messages older than this |
-| `DM_ACTION_CLEANUP_INTERVAL_MINUTES` | 10 | Ticker interval between sweeps (<= 0 disables the loop) |
+| `TAKSA_DM_ACTION_RETENTION_MINUTES` | 60 | Delete terminal actions + messages older than this |
+| `TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES` | 10 | Ticker interval between sweeps (<= 0 disables the loop) |
 
 **Terminal statuses deleted:** `COMPLETED`, `FAILED`, `FAILED_PARSING_RESPONSE`, `CANCELLED`, `EXPIRED`.
 
@@ -197,11 +197,11 @@ Implementation: `StartActionCleanupLoop` in `internal/biz/action_cleanup.go`.
 
 ```bash
 # Retention / deletion
-DM_ACTION_RETENTION_MINUTES=60
-DM_ACTION_CLEANUP_INTERVAL_MINUTES=10   # <= 0 disables cleanup loop
+TAKSA_DM_ACTION_RETENTION_MINUTES=60
+TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES=10   # <= 0 disables cleanup loop
 
 # Optional: auto-expire stale QUEUED (unset = off)
-# DM_ACTION_AUTO_EXPIRE_MINUTES=30
+# TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES=30
 ```
 
 Pass through Docker Compose (`docker-compose.yml`) or `.env` for local runs.
@@ -229,9 +229,9 @@ QUEUED → (pull) → DELIVERED → (push confirmed) → PROCESSING → (push su
 Use aggressive `.env` for short feedback loops, then restore production-like values:
 
 ```bash
-DM_ACTION_RETENTION_MINUTES=2
-DM_ACTION_CLEANUP_INTERVAL_MINUTES=1
-DM_ACTION_AUTO_EXPIRE_MINUTES=2
+TAKSA_DM_ACTION_RETENTION_MINUTES=2
+TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES=1
+TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES=2
 ```
 
 Restart DM after changing `.env`. Wait **≥1 minute** before expecting the first cleanup tick.

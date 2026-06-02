@@ -37,9 +37,9 @@ Terminal action **deletion** is performed by a background loop inside DM, not vi
 
 | Env var | Default | Purpose |
 |---------|---------|---------|
-| `DM_ACTION_RETENTION_MINUTES` | 60 | How long terminal rows are kept |
-| `DM_ACTION_CLEANUP_INTERVAL_MINUTES` | 10 | How often the sweep runs |
-| `DM_ACTION_AUTO_EXPIRE_MINUTES` | *(unset)* | Optional: mark stale `QUEUED` UI actions as `EXPIRED` (not subscribe / NATS mirror) |
+| `TAKSA_DM_ACTION_RETENTION_MINUTES` | 60 | How long terminal rows are kept |
+| `TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES` | 10 | How often the sweep runs |
+| `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` | *(unset)* | Optional: mark stale `QUEUED` UI actions as `EXPIRED` (not subscribe / NATS mirror) |
 
 There is no Bruno request for cleanup. To verify manually after retention elapses:
 
@@ -51,20 +51,20 @@ SELECT id, status, completed_at FROM actions WHERE id = '<action_id_cancel>';
 For fast local verification, set aggressive values in `.env`, restart DM, wait ≥ one cleanup interval:
 
 ```
-DM_ACTION_RETENTION_MINUTES=2
-DM_ACTION_CLEANUP_INTERVAL_MINUTES=1
+TAKSA_DM_ACTION_RETENTION_MINUTES=2
+TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES=1
 ```
 
 ## Auto-expire (optional)
 
-When `DM_ACTION_AUTO_EXPIRE_MINUTES` is set, `QUEUED` **UI/async** actions older than that threshold become `EXPIRED` on the cleanup tick (not on queue). **Excluded:** `subscribe`, and mirror deploy/edit with `"name": "UNS-to-NATS-mirror"`.
+When `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` is set, `QUEUED` **UI/async** actions older than that threshold become `EXPIRED` on the cleanup tick (not on queue). **Excluded:** `subscribe`, and mirror deploy/edit with `"name": "UNS-to-NATS-mirror"`.
 
 **Subscribe** still expires via its own **120s** `expires_at` (`error_message`: `Per-action TTL exceeded`) — test with `POST .../status-subscription` and SQL, not GetConfig result polling.
 
 Bruno flow to observe **UI** auto-expire:
 
 1. Queue GetConfig (`06-QueueActionForCancel.bru` or `01-GetDeviceConfig.bru`) — do **not** cancel or pull.
-2. Set `DM_ACTION_AUTO_EXPIRE_MINUTES=2` and restart DM.
+2. Set `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES=2` and restart DM.
 3. Wait ~2–3 minutes.
 4. Poll config result — expect `EXPIRED` with **auto-expired** message (not per-action TTL for GetConfig until 5 min).
 

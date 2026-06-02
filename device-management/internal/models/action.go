@@ -68,7 +68,7 @@ func IsNATSMirrorDeployOrEditPayload(payloadJSON []byte) bool {
 	return name == NATSMirrorPayloadMarker
 }
 
-// ExcludedFromAutoExpire reports whether DM_ACTION_AUTO_EXPIRE_MINUTES must not apply.
+// ExcludedFromAutoExpire reports whether TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES must not apply.
 // Infrastructure keepalive actions use per-action TTL and their own re-queue logic instead.
 func (a *Action) ExcludedFromAutoExpire() bool {
 	if a == nil {

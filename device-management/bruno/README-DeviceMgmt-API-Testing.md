@@ -92,7 +92,7 @@ Run in order:
 Details: [01-DeviceActions/README-DeviceActions-API-Testing.md](./01-DeviceActions/README-DeviceActions-API-Testing.md)
 
 #### Background cleanup (no HTTP endpoint)
-Terminal actions are deleted by DM using `DM_ACTION_RETENTION_MINUTES` and `DM_ACTION_CLEANUP_INTERVAL_MINUTES`. Optional `DM_ACTION_AUTO_EXPIRE_MINUTES` marks stale `QUEUED` actions as `EXPIRED`. See [docs/ACTION_MANAGEMENT.md](../docs/ACTION_MANAGEMENT.md).
+Terminal actions are deleted by DM using `TAKSA_DM_ACTION_RETENTION_MINUTES` and `TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES`. Optional `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` marks stale `QUEUED` actions as `EXPIRED`. See [docs/ACTION_MANAGEMENT.md](../docs/ACTION_MANAGEMENT.md).
 
 ## Key Features
 
@@ -138,7 +138,7 @@ QUEUED → DELIVERED → PROCESSING → COMPLETED
          │              │
          │              └── FAILED / FAILED_PARSING_RESPONSE
          │
-         ├── EXPIRED (per-action TTL or DM_ACTION_AUTO_EXPIRE_MINUTES)
+         ├── EXPIRED (per-action TTL or TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES)
          └── CANCELLED (POST .../actions/{id}/cancel — QUEUED only)
 ```
 
@@ -255,7 +255,7 @@ Tests will auto-fail with new fields in responses, indicating proto changes.
 
 ### Action expired
 **Error**: Status=EXPIRED after TTL or auto-expire
-**Fix**: Device may be offline, or `DM_ACTION_AUTO_EXPIRE_MINUTES` / per-action `expires_at` fired. See [ACTION_MANAGEMENT.md](../docs/ACTION_MANAGEMENT.md). Check GetDeviceHealth; cancel or re-queue as needed.
+**Fix**: Device may be offline, or `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` / per-action `expires_at` fired. See [ACTION_MANAGEMENT.md](../docs/ACTION_MANAGEMENT.md). Check GetDeviceHealth; cancel or re-queue as needed.
 
 ### Cancel rejected (400)
 **Error**: `FailedPrecondition` on cancel

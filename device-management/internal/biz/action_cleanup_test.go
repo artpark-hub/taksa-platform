@@ -7,24 +7,24 @@ import (
 )
 
 func TestEnvIntPositive(t *testing.T) {
-	t.Setenv("DM_ACTION_AUTO_EXPIRE_MINUTES", "")
-	if _, ok := envIntPositive("DM_ACTION_AUTO_EXPIRE_MINUTES"); ok {
+	t.Setenv("TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES", "")
+	if _, ok := envIntPositive(actionAutoExpireEnvVar); ok {
 		t.Fatal("expected unset env to be disabled")
 	}
 
-	t.Setenv("DM_ACTION_AUTO_EXPIRE_MINUTES", "30")
-	v, ok := envIntPositive("DM_ACTION_AUTO_EXPIRE_MINUTES")
+	t.Setenv("TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES", "30")
+	v, ok := envIntPositive(actionAutoExpireEnvVar)
 	if !ok || v != 30 {
 		t.Fatalf("expected (30, true), got (%d, %v)", v, ok)
 	}
 
-	t.Setenv("DM_ACTION_AUTO_EXPIRE_MINUTES", "0")
-	if _, ok := envIntPositive("DM_ACTION_AUTO_EXPIRE_MINUTES"); ok {
+	t.Setenv("TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES", "0")
+	if _, ok := envIntPositive(actionAutoExpireEnvVar); ok {
 		t.Fatal("expected zero to be disabled")
 	}
 
-	t.Setenv("DM_ACTION_AUTO_EXPIRE_MINUTES", "bad")
-	if _, ok := envIntPositive("DM_ACTION_AUTO_EXPIRE_MINUTES"); ok {
+	t.Setenv("TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES", "bad")
+	if _, ok := envIntPositive(actionAutoExpireEnvVar); ok {
 		t.Fatal("expected invalid value to be disabled")
 	}
 }
