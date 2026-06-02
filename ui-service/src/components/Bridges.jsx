@@ -124,21 +124,7 @@ const Bridges = () => {
                 return;
             }
 
-            const storedData = localStorage.getItem('taksa_user');
-            const parsedUser = storedData ? JSON.parse(storedData) : null;
-            const createdBy = parsedUser?.email || '';
-
-            if (!createdBy) {
-                setFetchError('User email not found. Please log in again.');
-                setBridges([]);
-                setIsLoading(false);
-                return;
-            }
-
-            const params = new URLSearchParams();
-            params.set('created_by', createdBy);
-
-            const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(deviceId)}/protocol-converters?${params.toString()}`, {
+            const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(deviceId)}/protocol-converters`, {
                 method: 'GET',
                 headers: {
                     Accept: 'application/json'
