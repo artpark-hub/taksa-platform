@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Copy, Info, Maximize2, Trash2, X } from 'lucide-react';
 import './Edit-readflow.css';
+import EditOpcuaReadflow from './EditOpcuaReadflow';
 
 const defaultModbusYaml = `modbus:
   addresses:
@@ -43,7 +44,7 @@ msg.meta.virtual_path = "";
 msg.meta.timestamp_ms = Date.now();
 return msg;`;
 
-const EditReadflow = ({ bridgeConfig, setBridgeConfig }) => {
+const EditModbusReadflow = ({ bridgeConfig, setBridgeConfig }) => {
     const [inputYaml, setInputYaml] = useState(() => bridgeConfig?.readInputYaml || getDefaultInputYaml(bridgeConfig?.protocol));
     const [injectYamlValue, setInjectYamlValue] = useState(bridgeConfig?.readRawYamlInject || injectYaml);
     const [isEditingInputYaml, setIsEditingInputYaml] = useState(false);
@@ -866,6 +867,32 @@ ${defaultsCode.split('\n').map((line) => `  ${line}`).join('\n')}`;
                 </div>
             )}
         </div>
+    );
+};
+
+const normalizeEditProtocol = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]/g, '');
+
+const EditReadflow = ({ bridgeConfig, setBridgeConfig }) => {
+    const normalizedProtocol = normalizeEditProtocol(bridgeConfig?.protocol || bridgeConfig?.metaProtocol || bridgeConfig?.readInputType);
+    const isOpcuaProtocol = normalizedProtocol === 'opcua' || normalizedProtocol === 'benthosopcua';
+
+    if (isOpcuaProtocol) {
+        return (
+            <EditOpcuaReadflow
+                bridgeConfig={bridgeConfig}
+                setBridgeConfig={setBridgeConfig}
+            />
+        );
+    }
+
+    return (
+        <EditModbusReadflow
+            bridgeConfig={bridgeConfig}
+            setBridgeConfig={setBridgeConfig}
+        />
     );
 };
 
