@@ -26,6 +26,19 @@ func envInt(name string, defaultValue int) int {
 	return n
 }
 
+func envIntWarn(name string, defaultValue int) (int, bool) {
+	v := os.Getenv(name)
+	if v == "" {
+		return defaultValue, false
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		fmt.Printf("WARNING: %s=%q is not an integer; using default %d\n", name, v, defaultValue)
+		return defaultValue, true
+	}
+	return n, true
+}
+
 // envIntPositive returns (value, true) when name is set to a positive integer; otherwise (0, false).
 func envIntPositive(name string) (int, bool) {
 	v := os.Getenv(name)
@@ -43,7 +56,7 @@ func envIntPositive(name string) (int, bool) {
 //
 // Configuration:
 // - DM_ACTION_RETENTION_MINUTES: how long terminal actions/messages are retained (default: 60)
-// - DM_ACTION_CLEANUP_INTERVAL_MINUTES: how often cleanup runs (default: 10)
+// - DM_ACTION_CLEANUP_INTERVAL_MINUTES: how often cleanup runs (default: 10). <= 0 disables loop.
 // - DM_ACTION_AUTO_EXPIRE_MINUTES: optional; when set, QUEUED UI/async actions older than this are marked EXPIRED
 //   (excludes subscribe and UNS→NATS mirror deploy/edit — see models.Action.ExcludedFromAutoExpire)
 //
@@ -54,15 +67,16 @@ func (uc *InstanceUsecase) StartActionCleanupLoop() {
 		return
 	}
 
-	retentionMinutes := envInt("DM_ACTION_RETENTION_MINUTES", defaultActionRetentionMinutes)
-	intervalMinutes := envInt("DM_ACTION_CLEANUP_INTERVAL_MINUTES", defaultActionCleanupIntervalMinutes)
+	retentionMinutes, _ := envIntWarn("DM_ACTION_RETENTION_MINUTES", defaultActionRetentionMinutes)
+	intervalMinutes, _ := envIntWarn("DM_ACTION_CLEANUP_INTERVAL_MINUTES", defaultActionCleanupIntervalMinutes)
 
 	if retentionMinutes <= 0 {
-		fmt.Printf("WARNING: DM_ACTION_RETENTION_MINUTES=%d is invalid; cleanup disabled\n", retentionMinutes)
-		return
+		fmt.Printf("WARNING: DM_ACTION_RETENTION_MINUTES=%d is invalid; clamping to default %d\n", retentionMinutes, defaultActionRetentionMinutes)
+		retentionMinutes = defaultActionRetentionMinutes
 	}
 	if intervalMinutes <= 0 {
-		intervalMinutes = defaultActionCleanupIntervalMinutes
+		fmt.Printf("WARNING: DM_ACTION_CLEANUP_INTERVAL_MINUTES=%d disables cleanup loop\n", intervalMinutes)
+		return
 	}
 
 	retention := time.Duration(retentionMinutes) * time.Minute

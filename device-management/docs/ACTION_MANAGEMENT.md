@@ -179,7 +179,7 @@ Terminal rows and old messages are **deleted** periodically. There is **no HTTP 
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `DM_ACTION_RETENTION_MINUTES` | 60 | Delete terminal actions + messages older than this |
-| `DM_ACTION_CLEANUP_INTERVAL_MINUTES` | 10 | Ticker interval between sweeps |
+| `DM_ACTION_CLEANUP_INTERVAL_MINUTES` | 10 | Ticker interval between sweeps (<= 0 disables the loop) |
 
 **Terminal statuses deleted:** `COMPLETED`, `FAILED`, `FAILED_PARSING_RESPONSE`, `CANCELLED`, `EXPIRED`.
 
@@ -198,7 +198,7 @@ Implementation: `StartActionCleanupLoop` in `internal/biz/action_cleanup.go`.
 ```bash
 # Retention / deletion
 DM_ACTION_RETENTION_MINUTES=60
-DM_ACTION_CLEANUP_INTERVAL_MINUTES=10
+DM_ACTION_CLEANUP_INTERVAL_MINUTES=10   # <= 0 disables cleanup loop
 
 # Optional: auto-expire stale QUEUED (unset = off)
 # DM_ACTION_AUTO_EXPIRE_MINUTES=30
