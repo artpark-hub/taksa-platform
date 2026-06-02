@@ -45,6 +45,27 @@ type DeviceStore interface {
 
 	// UpdateAuthTokenExpiresAt updates only the auth_token_expires_at timestamp
 	UpdateAuthTokenExpiresAt(ctx context.Context, id string, timestamp time.Time) error
+
+	// NATSMirrorDeployed returns true if UNS-to-NATS-mirror was successfully deployed on this device.
+	NATSMirrorDeployed(ctx context.Context, deviceID string) (bool, error)
+
+	// GetNATSMirrorConfigFingerprint returns the fingerprint of NATS URLs last applied (empty if never set).
+	GetNATSMirrorConfigFingerprint(ctx context.Context, deviceID string) (string, error)
+
+	// SetNATSMirrorApplied records successful deploy or edit of UNS-to-NATS-mirror on the device row.
+	SetNATSMirrorApplied(ctx context.Context, deviceID string, deployedAt time.Time, configFingerprint string) error
+
+	// ClearNATSMirrorApplied clears mirror deploy state (e.g. after edit fails because DFC missing on edge).
+	ClearNATSMirrorApplied(ctx context.Context, deviceID string) error
+
+	// ListNATSMirrorDevicesNeedingUpdate returns devices needing mirror deploy or edit (never applied or stale fingerprint).
+	ListNATSMirrorDevicesNeedingUpdate(ctx context.Context, currentFingerprint string) ([]NATSMirrorDeviceRef, error)
+}
+
+// NATSMirrorDeviceRef identifies a device for fleet NATS mirror reconciliation.
+type NATSMirrorDeviceRef struct {
+	ID       string
+	TenantID string
 }
 
 // DeviceListFilter defines filtering and pagination for device listing

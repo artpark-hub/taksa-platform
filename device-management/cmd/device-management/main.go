@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -82,18 +83,28 @@ func newZapLogger(logLevel, logFile string) (*zap.Logger, error) {
 	return cfg.Build()
 }
 
-func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server) *kratos.App {
-	return kratos.New(
+func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server, instanceUc *biz.InstanceUsecase) *kratos.App {
+	opts := []kratos.Option{
 		kratos.ID(id),
 		kratos.Name(Name),
 		kratos.Version(Version),
 		kratos.Metadata(map[string]string{}),
 		kratos.Logger(logger),
-		kratos.Server(
-			gs,
-			hs,
-		),
-	)
+		kratos.Server(gs, hs),
+	}
+	if instanceUc != nil {
+		opts = append(opts,
+			kratos.BeforeStart(func(ctx context.Context) error {
+				instanceUc.StartNATSMirrorFleetReconcile(ctx)
+				return nil
+			}),
+			kratos.AfterStop(func(ctx context.Context) error {
+				instanceUc.StopNATSMirrorFleetReconcile()
+				return nil
+			}),
+		)
+	}
+	return kratos.New(opts...)
 }
 
 func main() {
@@ -141,6 +152,9 @@ func main() {
 	}
 	if dockerImage := os.Getenv("TAKSA_DM_UMH_CORE_DOCKER_IMAGE"); dockerImage != "" {
 		bc.Deployment.UmhCoreDockerImage = dockerImage
+	}
+	if natsURLs := os.Getenv("TAKSA_DM_NATS_MIRROR_URLS"); natsURLs != "" {
+		bc.Deployment.NatsMirrorUrls = natsURLs
 	}
 	if jwtSecret := os.Getenv("TAKSA_DM_JWT_SECRET"); jwtSecret != "" {
 		bc.Server.JwtSecret = jwtSecret
