@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
@@ -571,16 +572,18 @@ func (s *DeviceMgmtService) CancelAction(ctx context.Context, req *v1.CancelActi
 		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
 	}
 
-	action, err := s.actionUc.CancelAction(ctx, tenantID, req.ActionId)
+	action, err := s.actionUc.CancelAction(ctx, tenantID, req.DeviceId, req.ActionId)
 	if err != nil {
 		if errors.Is(err, storage.ErrActionNotCancellable) {
 			return nil, status.Error(codes.FailedPrecondition, err.Error())
 		}
-		return nil, status.Error(codes.NotFound, fmt.Sprintf("action not found or not cancellable: %v", err))
-	}
-
-	if action.DeviceId != req.DeviceId {
-		return nil, status.Error(codes.PermissionDenied, "action does not belong to device")
+		if strings.Contains(err.Error(), "action does not belong to device") {
+			return nil, status.Error(codes.PermissionDenied, "action does not belong to device")
+		}
+		if strings.Contains(err.Error(), "action not found") {
+			return nil, status.Error(codes.NotFound, "action not found")
+		}
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to cancel action: %v", err))
 	}
 
 	return &v1.CancelActionResponse{

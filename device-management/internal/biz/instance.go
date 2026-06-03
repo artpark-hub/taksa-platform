@@ -206,6 +206,9 @@ type InstanceUsecase struct {
 
 	natsMirrorReconcileCancel context.CancelFunc
 	natsMirrorReconcileWG     sync.WaitGroup
+
+	actionCleanupCancel context.CancelFunc
+	actionCleanupWG     sync.WaitGroup
 }
 
 // NewInstanceUsecase creates a new InstanceUsecase with the given storage and authentication backends.
@@ -383,12 +386,8 @@ func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (i
 	// Get tenant_id from context (set by middleware from JWT)
 	tenantID := middleware.GetTenantID(ctx)
 
-	// Expire per-action TTL before claiming; never deliver past-deadline actions.
-	if err := uc.store.Actions().ExpireQueuedPastDeadline(ctx); err != nil {
-		return nil, fmt.Errorf("failed to expire past-deadline actions: %w", err)
-	}
-
 	// Atomically claim QUEUED → DELIVERED (race-safe vs cancel/auto-expire).
+	// Past-deadline rows are skipped by ClaimQueuedForDevice; global expiry runs on the cleanup loop.
 	actions, err := uc.store.Actions().ClaimQueuedForDevice(ctx, tenantID, deviceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to claim queued actions: %w", err)

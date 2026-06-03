@@ -72,8 +72,8 @@ stateDiagram-v2
 
 Previous pattern (`ListPending` then `MarkDelivered`) allowed a cancel to land between list and deliver. Pull now:
 
-1. **`ExpireQueuedPastDeadline`** — any `QUEUED` row with `expires_at < now` → `EXPIRED`.
-2. **`ClaimQueuedForDevice`** — single SQL `UPDATE … SET status = DELIVERED WHERE status = QUEUED … RETURNING`.
+1. **`ClaimQueuedForDevice`** — single SQL `UPDATE … SET status = DELIVERED WHERE status = QUEUED … RETURNING`, ordered by `created_at ASC`.
+   Rows with `expires_at < now` are **not claimed** (left `QUEUED` until the cleanup loop marks them `EXPIRED`).
 
 If cancel or auto-expire wins the race, the row is no longer `QUEUED` and is **not** returned to the device.
 
@@ -123,7 +123,7 @@ Two mechanisms:
 
 ### 1. Per-action TTL (`expires_at`)
 
-When queueing, `TTLSeconds > 0` sets `expires_at` on the row. Before pull (and on each cleanup tick), overdue `QUEUED` rows → `EXPIRED` with message `"Per-action TTL exceeded"`.
+When queueing, `TTLSeconds > 0` sets `expires_at` on the row. On each cleanup tick, overdue `QUEUED` rows → `EXPIRED` with message `"Per-action TTL exceeded"`. Pull skips past-deadline rows without delivering them.
 
 ### 2. Auto-expire queued actions (optional)
 

@@ -364,18 +364,28 @@ func (s *ActionStore) ClaimQueuedForDevice(ctx context.Context, tenantID, device
 	}
 
 	query := `
-UPDATE actions
-SET status = $1, delivered_at = CURRENT_TIMESTAMP
-WHERE id IN (
+WITH to_claim AS (
   SELECT id FROM actions
   WHERE tenant_id = $2 AND device_id = $3 AND status = $4
     AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
   ORDER BY created_at ASC
+),
+updated AS (
+  UPDATE actions AS a
+  SET status = $1, delivered_at = CURRENT_TIMESTAMP
+  FROM to_claim
+  WHERE a.id = to_claim.id
+  RETURNING a.id, a.device_id, a.action_type, a.payload_type, a.payload_data,
+            a.max_retries, a.retry_count, a.status,
+            a.created_at, a.expires_at, a.delivered_at, a.completed_at,
+            a.error_message
 )
-RETURNING id, device_id, action_type, payload_type, payload_data,
-          max_retries, retry_count, status,
-          created_at, expires_at, delivered_at, completed_at,
-          error_message`
+SELECT id, device_id, action_type, payload_type, payload_data,
+       max_retries, retry_count, status,
+       created_at, expires_at, delivered_at, completed_at,
+       error_message
+FROM updated
+ORDER BY created_at ASC`
 
 	rows, err := s.db.QueryContext(ctx, query,
 		int32(models.ActionStatusDelivered), tenantID, deviceID, int32(models.ActionStatusQueued))
@@ -387,9 +397,9 @@ RETURNING id, device_id, action_type, payload_type, payload_data,
 	return scanActionRows(rows)
 }
 
-// CancelQueued atomically cancels a QUEUED action.
-func (s *ActionStore) CancelQueued(ctx context.Context, tenantID, id, errorMessage string) error {
-	if id == "" || tenantID == "" {
+// CancelQueued atomically cancels a QUEUED action for the given device.
+func (s *ActionStore) CancelQueued(ctx context.Context, tenantID, deviceID, id, errorMessage string) error {
+	if id == "" || tenantID == "" || deviceID == "" {
 		return ErrInvalidInput
 	}
 	if errorMessage == "" {
@@ -399,8 +409,8 @@ func (s *ActionStore) CancelQueued(ctx context.Context, tenantID, id, errorMessa
 	result, err := s.db.ExecContext(ctx, `
 UPDATE actions
 SET status = $1, completed_at = CURRENT_TIMESTAMP, error_message = $2
-WHERE tenant_id = $3 AND id = $4 AND status = $5`,
-		int32(models.ActionStatusCancelled), errorMessage, tenantID, id, int32(models.ActionStatusQueued))
+WHERE tenant_id = $3 AND device_id = $4 AND id = $5 AND status = $6`,
+		int32(models.ActionStatusCancelled), errorMessage, tenantID, deviceID, id, int32(models.ActionStatusQueued))
 	if err != nil {
 		return fmt.Errorf("failed to cancel action: %w", err)
 	}

@@ -28,8 +28,8 @@ type ActionStore interface {
 	// Skips actions whose per-action expires_at is in the past (see ExpireQueuedPastDeadline).
 	ClaimQueuedForDevice(ctx context.Context, tenantID, deviceID string) ([]*models.Action, error)
 
-	// CancelQueued atomically transitions a QUEUED action to CANCELLED.
-	CancelQueued(ctx context.Context, tenantID, id, errorMessage string) error
+	// CancelQueued atomically transitions a QUEUED action to CANCELLED for the given device.
+	CancelQueued(ctx context.Context, tenantID, deviceID, id, errorMessage string) error
 
 	// ExpireQueuedPastDeadline marks QUEUED actions past their per-action expires_at as EXPIRED.
 	ExpireQueuedPastDeadline(ctx context.Context) error

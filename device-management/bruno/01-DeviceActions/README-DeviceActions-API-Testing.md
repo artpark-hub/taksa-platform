@@ -88,5 +88,6 @@ action_id_cancel=    # from 06-QueueActionForCancel
 | 5 | FAILED | Device reported failure |
 | 6 | EXPIRED | TTL or auto-expire |
 | 7 | CANCELLED | UI/API cancel |
+| 8 | FAILED_PARSING_RESPONSE | Device response could not be parsed |
 
 JSON may return enum as integer or string depending on client/proto settings — tests accept both.

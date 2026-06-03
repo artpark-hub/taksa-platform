@@ -68,8 +68,8 @@ func envIntPositive(name string) (int, bool) {
 //
 // Retention uses message.created_at and a derived action "terminal timestamp"
 // (COALESCE(completed_at, delivered_at, created_at)).
-func (uc *InstanceUsecase) StartActionCleanupLoop() {
-	if uc == nil || uc.store == nil {
+func (uc *InstanceUsecase) StartActionCleanupLoop(ctx context.Context) {
+	if uc == nil || uc.store == nil || ctx == nil {
 		return
 	}
 
@@ -88,35 +88,55 @@ func (uc *InstanceUsecase) StartActionCleanupLoop() {
 	retention := time.Duration(retentionMinutes) * time.Minute
 	interval := time.Duration(intervalMinutes) * time.Minute
 
+	ctx, cancel := context.WithCancel(ctx)
+	uc.actionCleanupCancel = cancel
+	uc.actionCleanupWG.Add(1)
 	go func() {
+		defer uc.actionCleanupWG.Done()
+
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			before := time.Now().Add(-retention)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				before := time.Now().Add(-retention)
 
-			// Cleanup is cross-tenant by design. The SQL store methods will not apply tenant scoping
-			// when tenant_id is missing from context.
-			ctx := context.Background()
+				// Cleanup is cross-tenant by design. The SQL store methods will not apply tenant scoping
+				// when tenant_id is missing from context.
+				cleanupCtx := context.Background()
 
-			if err := uc.store.Actions().ExpireQueuedPastDeadline(ctx); err != nil {
-				fmt.Printf("WARNING: per-action TTL expiry failed: %v\n", err)
-			}
-
-			if autoExpireMinutes, ok := envIntPositive(actionAutoExpireEnvVar); ok {
-				expireBefore := time.Now().Add(-time.Duration(autoExpireMinutes) * time.Minute)
-				if err := uc.store.Actions().ExpireQueuedOlderThan(ctx, expireBefore, autoExpireQueuedMessage); err != nil {
-					fmt.Printf("WARNING: queued action auto-expire failed: %v\n", err)
+				if err := uc.store.Actions().ExpireQueuedPastDeadline(cleanupCtx); err != nil {
+					fmt.Printf("WARNING: per-action TTL expiry failed: %v\n", err)
 				}
-			}
 
-			if err := uc.store.Actions().CleanupTerminal(ctx, before); err != nil {
-				fmt.Printf("WARNING: action cleanup failed: %v\n", err)
-			}
-			if err := uc.store.Messages().CleanupOld(ctx, before); err != nil {
-				fmt.Printf("WARNING: message cleanup failed: %v\n", err)
+				if autoExpireMinutes, ok := envIntPositive(actionAutoExpireEnvVar); ok {
+					expireBefore := time.Now().Add(-time.Duration(autoExpireMinutes) * time.Minute)
+					if err := uc.store.Actions().ExpireQueuedOlderThan(cleanupCtx, expireBefore, autoExpireQueuedMessage); err != nil {
+						fmt.Printf("WARNING: queued action auto-expire failed: %v\n", err)
+					}
+				}
+
+				if err := uc.store.Actions().CleanupTerminal(cleanupCtx, before); err != nil {
+					fmt.Printf("WARNING: action cleanup failed: %v\n", err)
+				}
+				if err := uc.store.Messages().CleanupOld(cleanupCtx, before); err != nil {
+					fmt.Printf("WARNING: message cleanup failed: %v\n", err)
+				}
 			}
 		}
 	}()
+}
+
+// StopActionCleanupLoop cancels the background cleanup loop (call from app shutdown).
+func (uc *InstanceUsecase) StopActionCleanupLoop() {
+	if uc == nil || uc.actionCleanupCancel == nil {
+		return
+	}
+	uc.actionCleanupCancel()
+	uc.actionCleanupWG.Wait()
+	uc.actionCleanupCancel = nil
 }
 

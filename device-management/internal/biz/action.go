@@ -81,22 +81,29 @@ func (uc *ActionUsecase) QueueAction(ctx context.Context, req *QueueActionReques
 	return action, nil
 }
 
-// CancelAction cancels a QUEUED action. Only QUEUED actions may be cancelled.
-func (uc *ActionUsecase) CancelAction(ctx context.Context, tenantID, actionID string) (*models.Action, error) {
+// CancelAction cancels a QUEUED action for the given device. Only QUEUED actions may be cancelled.
+func (uc *ActionUsecase) CancelAction(ctx context.Context, tenantID, deviceID, actionID string) (*models.Action, error) {
 	if actionID == "" {
 		return nil, fmt.Errorf("action ID is empty")
+	}
+	if deviceID == "" {
+		return nil, fmt.Errorf("device ID is empty")
 	}
 	if tenantID == "" {
 		return nil, fmt.Errorf("tenant ID is empty")
 	}
 
-	if err := uc.store.Actions().CancelQueued(ctx, tenantID, actionID, cancelledByUserMessage); err != nil {
+	existing, err := uc.store.Actions().GetByID(ctx, tenantID, actionID)
+	if err != nil {
+		return nil, fmt.Errorf("action not found: %w", err)
+	}
+	if existing.DeviceId != deviceID {
+		return nil, fmt.Errorf("action does not belong to device")
+	}
+
+	if err := uc.store.Actions().CancelQueued(ctx, tenantID, deviceID, actionID, cancelledByUserMessage); err != nil {
 		if errors.Is(err, storage.ErrActionNotCancellable) {
-			action, getErr := uc.store.Actions().GetByID(ctx, tenantID, actionID)
-			if getErr != nil {
-				return nil, fmt.Errorf("action not found: %w", getErr)
-			}
-			return nil, fmt.Errorf("cannot cancel action in %s status: %w", action.Status, storage.ErrActionNotCancellable)
+			return nil, fmt.Errorf("cannot cancel action in %s status: %w", existing.Status, storage.ErrActionNotCancellable)
 		}
 		return nil, fmt.Errorf("failed to cancel action: %w", err)
 	}
