@@ -96,7 +96,7 @@ New bridges and tags on the DCD are picked up automatically because the mirror r
 | Source | Key | Notes |
 |--------|-----|--------|
 | `configs/config.yaml` | `deployment.nats_mirror_urls` | Comma-separated NATS URLs, e.g. `nats://nats1:4222,nats://nats2:4222` |
-| Environment | `TAKSA_DM_NATS_MIRROR_URLS` | Overrides YAML when **non-empty** (`cmd/device-management/main.go`) |
+| Environment | `TAKSA_DM_NATS_MIRROR_URLS` | Overrides `deployment.nats_mirror_urls` when **non-empty** (`applyConfigEnvOverrides` in `main.go`) |
 | Proto | `conf.Deployment.nats_mirror_urls` | `internal/conf/conf.proto` |
 
 **Empty URLs** → mirror logic is a no-op (no deploy, no edit, no fleet reconcile).
@@ -219,7 +219,7 @@ Devices deployed **before** migration `003` have `NULL` fingerprint and are trea
 
 Setting URLs to empty stops **new** deploys and edits. It does **not** remove `UNS-to-NATS-mirror` from devices that already have it. To tear down on the edge, use umh-core / DM delete-data-flow-component flows separately (not automated by this feature today).
 
-**Note:** `TAKSA_DM_NATS_MIRROR_URLS` only overrides when non-empty; to clear URLs when YAML still has values, remove or empty the YAML entry as well.
+**Note:** `TAKSA_DM_NATS_MIRROR_URLS` only overrides when non-empty; YAML `deployment.nats_mirror_urls` applies when the env var is unset or empty.
 
 ---
 

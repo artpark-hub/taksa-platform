@@ -12,6 +12,17 @@ message Bootstrap {
   string log_file = 4;   // Log file path (optional, e.g., /tmp/taksa-platform-dm.log)
   Deployment deployment = 5; // Deployment configuration (docker image, base URLs)
   DeviceStatusSubscription device_status_subscription = 6;
+  ActionCleanup action_cleanup = 7;
+}
+
+// Background action retention, expiry sweep, and optional QUEUED auto-expire.
+message ActionCleanup {
+  // Minutes to retain terminal actions/messages before deletion (default 60).
+  int32 retention_minutes = 1;
+  // Cleanup ticker interval in minutes (default 10). <= 0 disables the loop.
+  int32 cleanup_interval_minutes = 2;
+  // Optional: mark stale QUEUED UI actions EXPIRED after N minutes; 0 = disabled.
+  int32 auto_expire_minutes = 3;
 }
 
 // Controls automatic edge status subscribe actions (pull-time catalog/heartbeat staleness).
@@ -47,7 +58,7 @@ message Server {
   }
   HTTP http = 1;
   GRPC grpc = 2;
-  string jwt_secret = 3;  // JWT signing secret for device auth tokens (optional; may be provided via TAKSA_DM_JWT_SECRET, or auto-generated and persisted at startup if empty)
+  string jwt_secret = 3;  // JWT signing secret (server.jwt_secret in config.yaml; empty => auto-generated and persisted at startup)
 }
 
 message Data {

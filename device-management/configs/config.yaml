@@ -1,29 +1,31 @@
+# Device-management runtime config. Values here are defaults; TAKSA_DM_* env vars override when set.
 server:
   http:
-    addr: 0.0.0.0:8000
+    addr: 0.0.0.0:8000   # override port via TAKSA_DM_HTTP_PORT
     timeout: 1s
   grpc:
-    addr: 0.0.0.0:9000
+    addr: 0.0.0.0:9000   # override port via TAKSA_DM_GRPC_PORT
     timeout: 1s
-  jwt_secret: ""   # OPTIONAL: Leave empty to autogenerate. Can override via TAKSA_DM_JWT_SECRET env var
-log_level: debug  # Options: debug, info, warn, error, production
-log_file: /data/taksa-device-management.log  # Log file path (logs to both console and file)
+  jwt_secret: ""         # empty => auto-generate and persist under /data; override via TAKSA_DM_JWT_SECRET
+log_level: debug        # debug | info | warn | error | production; override via TAKSA_DM_LOG_LEVEL
+log_file: /data/taksa-device-management.log  # override via TAKSA_DM_LOG_FILE
 data:
   database:
-    driver: postgres
-    source: postgres://user:password@localhost/taksa_platform_dm?sslmode=disable
+    driver: postgres    # override via TAKSA_DM_DATABASE_DRIVER
+    source: postgres://user:password@localhost/taksa_platform_dm?sslmode=disable  # override via TAKSA_DM_DATABASE_SOURCE
     max_open_conns: 25
     max_idle_conns: 5
     conn_max_lifetime: 300
     conn_max_idle_time: 10
 deployment:
-  base_url: http://localhost:8000
-  umh_core_docker_image: management.umh.app/oci/united-manufacturing-hub/umh-core:v0.43.17
-  # Comma-separated NATS URLs for the UNS→NATS mirror data flow (auto-queued on DCD login). Leave empty to disable.
-  nats_mirror_urls: ""
-# Edge status subscribe keepalive (topic catalog + health via push).
-# Set auto_resubscribe_status_messages: false for large fleets; use EnsureDeviceStatusSubscription per device.
+  base_url: http://localhost:8000  # override via TAKSA_DM_BASE_URL
+  umh_core_docker_image: management.umh.app/oci/united-manufacturing-hub/umh-core:v0.43.17  # override via TAKSA_DM_UMH_CORE_DOCKER_IMAGE
+  nats_mirror_urls: ""  # comma-separated; override via TAKSA_DM_NATS_MIRROR_URLS (non-empty only)
 device_status_subscription:
-  auto_resubscribe_status_messages: true
+  auto_resubscribe_status_messages: true  # override via TAKSA_DM_AUTO_RESUBSCRIBE_STATUS_MESSAGES (true/false/1/0)
   catalog_stale_threshold: 120s
   status_heartbeat_stale_threshold: 120s
+action_cleanup:
+  retention_minutes: 60       # override via TAKSA_DM_ACTION_RETENTION_MINUTES
+  cleanup_interval_minutes: 10  # override via TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES; <= 0 disables loop
+  auto_expire_minutes: 0      # optional QUEUED auto-expire; 0 = off; override via TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES
