@@ -206,6 +206,9 @@ type InstanceUsecase struct {
 
 	natsMirrorReconcileCancel context.CancelFunc
 	natsMirrorReconcileWG     sync.WaitGroup
+
+	actionCleanupCancel context.CancelFunc
+	actionCleanupWG     sync.WaitGroup
 }
 
 // NewInstanceUsecase creates a new InstanceUsecase with the given storage and authentication backends.
@@ -383,9 +386,11 @@ func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (i
 	// Get tenant_id from context (set by middleware from JWT)
 	tenantID := middleware.GetTenantID(ctx)
 
-	actions, err := uc.store.Actions().ListPending(ctx, tenantID, deviceID)
+	// Atomically claim QUEUED → DELIVERED (race-safe vs cancel/auto-expire).
+	// Past-deadline rows are skipped by ClaimQueuedForDevice; global expiry runs on the cleanup loop.
+	actions, err := uc.store.Actions().ClaimQueuedForDevice(ctx, tenantID, deviceID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pending actions: %w", err)
+		return nil, fmt.Errorf("failed to claim queued actions: %w", err)
 	}
 
 	_ = uc.store.Devices().UpdateLastSeen(ctx, deviceID, time.Now())
@@ -429,14 +434,6 @@ func (uc *InstanceUsecase) PullMessages(ctx context.Context, deviceID string) (i
 			},
 		})
 
-		// Mark action as DELIVERED now that we're returning it to the device
-		// This prevents ListPending from returning the same action repeatedly
-		// State progression: QUEUED → DELIVERED (on Pull) → COMPLETED (on Push)
-		if err := uc.store.Actions().MarkDelivered(ctx, tenantID, action.Id); err != nil {
-			fmt.Printf("Warning: Failed to mark action %s as delivered: %v\n", action.Id, err)
-			// Continue even if marking fails - action still needs to be sent
-			// Error will be logged for troubleshooting but won't block Pull response
-		}
 		// Subscribe is handled on the edge without an action-reply; complete immediately so
 		// DM can re-queue subscribe to refresh the edge subscriber TTL (~5 minutes).
 		if action.Type == subscribeActionType {
@@ -587,6 +584,46 @@ func isTerminalActionState(state string) bool {
 // Intermediate states mean the action is still processing
 func isIntermediateActionState(state string) bool {
 	return state == "action-confirmed" || state == "action-executing"
+}
+
+// isActionTerminalForPushIgnore reports whether push replies should be ignored for this action status.
+func isActionTerminalForPushIgnore(status models.ActionStatus) bool {
+	switch status {
+	case models.ActionStatusCancelled, models.ActionStatusExpired:
+		return true
+	default:
+		return false
+	}
+}
+
+// markActionProcessingBestEffort transitions an action to PROCESSING based on an intermediate action reply
+// ("action-confirmed" / "action-executing"). It never overwrites terminal statuses.
+func (uc *InstanceUsecase) markActionProcessingBestEffort(ctx context.Context, tenantID string, actionID string) {
+	if uc == nil || uc.store == nil {
+		return
+	}
+	if tenantID == "" || actionID == "" {
+		return
+	}
+
+	action, err := uc.store.Actions().GetByID(ctx, tenantID, actionID)
+	if err != nil || action == nil {
+		return
+	}
+
+	// Never overwrite terminal / admin states.
+	switch action.Status {
+	case models.ActionStatusCompleted,
+		models.ActionStatusFailed,
+		models.ActionStatusFailedParsingResponse,
+		models.ActionStatusCancelled,
+		models.ActionStatusExpired:
+		return
+	case models.ActionStatusProcessing:
+		return
+	}
+
+	_ = uc.store.Actions().UpdateStatus(ctx, tenantID, actionID, models.ActionStatusProcessing)
 }
 
 // actionToJSONContent converts an Action to JSON string in umh-core format.
@@ -762,9 +799,15 @@ func (uc *InstanceUsecase) PushMessages(ctx context.Context, messages interface{
 						}
 					}
 				} else if isIntermediateActionState(actionReplyState) {
-					// For intermediate states, just log for debugging (don't finalize)
+					// For intermediate states, mark action as PROCESSING (don't finalize).
 					actionUUID := extractActionUUID(msg.Content)
-					fmt.Printf("DEBUG: Received intermediate action state '%s' for action %s - not finalizing yet\n", actionReplyState, actionUUID)
+					if actionUUID == "" && msg.Metadata != nil && msg.Metadata.TraceId != "" {
+						if track, err := uc.store.ActionMessageTracking().GetByTraceID(ctx, msg.Metadata.TraceId); err == nil && track != nil {
+							actionUUID = track.ActionID
+						}
+					}
+					uc.markActionProcessingBestEffort(ctx, tenantID, actionUUID)
+					fmt.Printf("DEBUG: Received intermediate action state '%s' for action %s - marked PROCESSING\n", actionReplyState, actionUUID)
 				}
 			}
 
@@ -1005,6 +1048,8 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 	if err != nil || action == nil {
 		fmt.Printf("Warning: Could not retrieve action %s for protocol converter sync: %v\n", track.ActionID, err)
 		// Continue anyway - action can still be marked complete
+	} else if isActionTerminalForPushIgnore(action.Status) {
+		return nil
 	}
 
 	// 4. Update tracking with response info (store message_id for O(1) lookup)
@@ -1106,6 +1151,9 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 	}
 	if action == nil {
 		return fmt.Errorf("action with UUID %s not found", actionUUID)
+	}
+	if isActionTerminalForPushIgnore(action.Status) {
+		return nil
 	}
 
 	// TRACEABILITY: Update tracking record to reflect response correlation

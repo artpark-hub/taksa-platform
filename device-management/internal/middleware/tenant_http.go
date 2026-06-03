@@ -24,10 +24,10 @@ const (
 	reasonDeviceJWTSignatureRequired = "device_jwt_signature_required"
 )
 
-// isPublicPath returns true for endpoints that don't require JWT authentication.
+// IsPublicPath returns true for endpoints that don't require JWT authentication.
 // - /health: service health check
-// - /instance/login: device login (authenticates via auth token, not JWT)
-func isPublicPath(urlPath string) bool {
+// - /api/v2/instance/login: device login (authenticates via auth token, not JWT)
+func IsPublicPath(urlPath string) bool {
 	// IMPORTANT:
 	// - Only match against the parsed URL path (no query string).
 	// - Do NOT use substring matching (strings.Contains), as that can accidentally
@@ -91,7 +91,7 @@ func HTTPTenantMiddleware(logger *zap.Logger, jwtSecret string) middleware.Middl
 			request := httpTr.Request()
 
 			// Public paths don't require JWT
-			if isPublicPath(request.URL.Path) {
+			if IsPublicPath(request.URL.Path) {
 				return handler(ctx, req)
 			}
 

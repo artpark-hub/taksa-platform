@@ -1,0 +1,39 @@
+meta {
+  name: Queue Action For Cancel Test
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/config
+}
+
+docs {
+  Step 1 of cancel flow: queue an action while the device is NOT pulling.
+  
+  Run this before 06-CancelQueuedAction.bru. Do NOT run Instance-Pull between queue and cancel.
+  
+  Sets action_id_cancel for the cancel tests.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  
+  if (resp && resp.actionId) {
+    bru.setEnvVar('action_id_cancel', resp.actionId);
+    console.log("✓ Action queued for cancel test: " + resp.actionId);
+    console.log("  Next: run 06-CancelQueuedAction.bru (before Instance-Pull)");
+  }
+}
+
+tests {
+  test("Action queued successfully", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+  });
+}

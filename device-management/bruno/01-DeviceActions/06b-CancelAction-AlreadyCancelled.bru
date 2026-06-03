@@ -1,0 +1,42 @@
+meta {
+  name: Cancel Action Already Terminal
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/actions/{{action_id_cancel}}/cancel
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}",
+    "actionId": "{{action_id_cancel}}"
+  }
+}
+
+docs {
+  Negative test: cancel the same action again after it is already CANCELLED.
+  
+  Expect HTTP 400 (gRPC FailedPrecondition) — only QUEUED actions are cancellable.
+  
+  Prerequisites: run 06-CancelQueuedAction.bru first on the same action_id_cancel.
+}
+
+script:post-response {
+  console.log("Cancel retry status: " + res.getStatus());
+  if (res.getStatus() !== 200) {
+    console.log("✓ Expected failure for non-QUEUED action");
+  }
+}
+
+tests {
+  test("Second cancel is rejected", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+}

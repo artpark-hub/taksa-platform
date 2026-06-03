@@ -15,6 +15,11 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
+const (
+	perActionTTLExpiredMessage = "Per-action TTL exceeded"
+	autoExpireQueuedMessage    = "Queued action auto-expired (device did not pull in time)"
+)
+
 // ActionStore implements storage.ActionStore for PostgreSQL
 type ActionStore struct {
 	db *sql.DB
@@ -313,6 +318,113 @@ func (s *ActionStore) ListPending(ctx context.Context, tenantID, deviceID string
 		tenantID, deviceID, int32(models.ActionStatusQueued))
 }
 
+// ExpireQueuedPastDeadline marks QUEUED actions whose per-action expires_at has passed as EXPIRED.
+func (s *ActionStore) ExpireQueuedPastDeadline(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `
+UPDATE actions
+SET status = $1, completed_at = CURRENT_TIMESTAMP, error_message = $2
+WHERE status = $3
+  AND expires_at IS NOT NULL
+  AND expires_at < CURRENT_TIMESTAMP`,
+		int32(models.ActionStatusExpired), perActionTTLExpiredMessage, int32(models.ActionStatusQueued))
+	if err != nil {
+		return fmt.Errorf("failed to expire queued actions past deadline: %w", err)
+	}
+	return nil
+}
+
+// ExpireQueuedOlderThan marks stale QUEUED actions as EXPIRED (cross-tenant auto-expire sweep).
+// Infrastructure actions (subscribe, UNS→NATS mirror deploy/edit) are excluded; they use per-action TTL
+// and dedicated re-queue paths (pull staleness, login, fleet reconcile).
+func (s *ActionStore) ExpireQueuedOlderThan(ctx context.Context, before time.Time, errorMessage string) error {
+	if errorMessage == "" {
+		errorMessage = autoExpireQueuedMessage
+	}
+	_, err := s.db.ExecContext(ctx, `
+UPDATE actions
+SET status = $1, completed_at = CURRENT_TIMESTAMP, error_message = $2
+WHERE status = $3 AND created_at < $4
+  AND action_type <> $5
+  AND NOT (
+    action_type IN ('deploy-data-flow-component', 'edit-data-flow-component')
+    AND payload_data::jsonb ->> 'name' = $6
+  )`,
+		int32(models.ActionStatusExpired), errorMessage, int32(models.ActionStatusQueued), before.Format(time.RFC3339),
+		models.ActionTypeSubscribe, models.NATSMirrorPayloadMarker)
+	if err != nil {
+		return fmt.Errorf("failed to auto-expire queued actions: %w", err)
+	}
+	return nil
+}
+
+// ClaimQueuedForDevice atomically claims QUEUED actions for delivery (QUEUED → DELIVERED).
+func (s *ActionStore) ClaimQueuedForDevice(ctx context.Context, tenantID, deviceID string) ([]*models.Action, error) {
+	if deviceID == "" || tenantID == "" {
+		return nil, ErrInvalidInput
+	}
+
+	query := `
+WITH to_claim AS (
+  SELECT id FROM actions
+  WHERE tenant_id = $2 AND device_id = $3 AND status = $4
+    AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+  ORDER BY created_at ASC
+),
+updated AS (
+  UPDATE actions AS a
+  SET status = $1, delivered_at = CURRENT_TIMESTAMP
+  FROM to_claim
+  WHERE a.id = to_claim.id
+  RETURNING a.id, a.device_id, a.action_type, a.payload_type, a.payload_data,
+            a.max_retries, a.retry_count, a.status,
+            a.created_at, a.expires_at, a.delivered_at, a.completed_at,
+            a.error_message
+)
+SELECT id, device_id, action_type, payload_type, payload_data,
+       max_retries, retry_count, status,
+       created_at, expires_at, delivered_at, completed_at,
+       error_message
+FROM updated
+ORDER BY created_at ASC`
+
+	rows, err := s.db.QueryContext(ctx, query,
+		int32(models.ActionStatusDelivered), tenantID, deviceID, int32(models.ActionStatusQueued))
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim queued actions: %w", err)
+	}
+	defer rows.Close()
+
+	return scanActionRows(rows)
+}
+
+// CancelQueued atomically cancels a QUEUED action for the given device.
+func (s *ActionStore) CancelQueued(ctx context.Context, tenantID, deviceID, id, errorMessage string) error {
+	if id == "" || tenantID == "" || deviceID == "" {
+		return ErrInvalidInput
+	}
+	if errorMessage == "" {
+		errorMessage = "Cancelled by user"
+	}
+
+	result, err := s.db.ExecContext(ctx, `
+UPDATE actions
+SET status = $1, completed_at = CURRENT_TIMESTAMP, error_message = $2
+WHERE tenant_id = $3 AND device_id = $4 AND id = $5 AND status = $6`,
+		int32(models.ActionStatusCancelled), errorMessage, tenantID, deviceID, id, int32(models.ActionStatusQueued))
+	if err != nil {
+		return fmt.Errorf("failed to cancel action: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to cancel action: %w", err)
+	}
+	if rows == 0 {
+		return storage.ErrActionNotCancellable
+	}
+	return nil
+}
+
 // UpdateStatus updates an action's status
 func (s *ActionStore) UpdateStatus(ctx context.Context, tenantID, id string, status models.ActionStatus) error {
 	if id == "" || tenantID == "" {
@@ -362,8 +474,8 @@ func (s *ActionStore) MarkDelivered(ctx context.Context, tenantID, id string) er
 	result, err := s.db.ExecContext(ctx,
 		`UPDATE actions 
 		 SET status = $1, delivered_at = CURRENT_TIMESTAMP 
-		 WHERE tenant_id = $2 AND id = $3`,
-		int32(models.ActionStatusDelivered), tenantID, id)
+		 WHERE tenant_id = $2 AND id = $3 AND status = $4`,
+		int32(models.ActionStatusDelivered), tenantID, id, int32(models.ActionStatusQueued))
 	if err != nil {
 		return fmt.Errorf("failed to mark action delivered: %w", err)
 	}
@@ -522,6 +634,26 @@ func (s *ActionStore) CleanupExpired(ctx context.Context) error {
 	return nil
 }
 
+// CleanupTerminal removes terminal actions older than before.
+// NOTE: This does not currently attempt to preserve actions for audit/history.
+// It is intended for aggressive cleanup after the async UI loop completes.
+func (s *ActionStore) CleanupTerminal(ctx context.Context, before time.Time) error {
+	// Terminal statuses:
+	// 4=COMPLETED, 5=FAILED, 6=EXPIRED, 7=CANCELLED, 8=FAILED_PARSING_RESPONSE
+	//
+	// Use a stable "terminal timestamp" so we can clean up even when completed_at is missing:
+	// completed_at (when present) > delivered_at > created_at.
+	_, err := s.db.ExecContext(ctx, `
+DELETE FROM actions
+WHERE status IN (4, 5, 6, 7, 8)
+  AND COALESCE(completed_at, delivered_at, created_at) < $1
+`, before.Format(time.RFC3339))
+	if err != nil {
+		return fmt.Errorf("failed to cleanup terminal actions: %w", err)
+	}
+	return nil
+}
+
 // listActions is a helper to retrieve actions with a where clause
 func (s *ActionStore) listActions(ctx context.Context, whereClause string, args ...interface{}) ([]*models.Action, error) {
 	query := `
@@ -537,69 +669,77 @@ func (s *ActionStore) listActions(ctx context.Context, whereClause string, args 
 	}
 	defer rows.Close()
 
+	return scanActionRows(rows)
+}
+
+func scanActionRows(rows *sql.Rows) ([]*models.Action, error) {
 	var actions []*models.Action
 	for rows.Next() {
-		action := &models.Action{}
-		var payloadType, payloadData string
-		var status int32
-		var createdAt, expiresAt, deliveredAt, completedAt sql.NullString
-		var errorMessage sql.NullString
-
-		err := rows.Scan(
-			&action.Id, &action.DeviceId, &action.Type,
-			&payloadType, &payloadData,
-			&action.MaxRetries, &action.RetryCount, &status,
-			&createdAt, &expiresAt, &deliveredAt, &completedAt,
-			&errorMessage,
-		)
+		action, err := scanActionRow(rows)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan action: %w", err)
+			return nil, err
 		}
-
-		// Unmarshal payload
-		if payloadType != "" && payloadData != "" {
-			action.Payload = &anypb.Any{
-				TypeUrl: payloadType,
-				Value:   []byte(payloadData),
-			}
-		}
-
-		action.Status = models.ActionStatus(status)
-
-		// Parse timestamps
-		if createdAt.Valid {
-			t, _ := time.Parse(time.RFC3339, createdAt.String)
-			action.CreatedAt = t
-		}
-		if expiresAt.Valid {
-			t, _ := time.Parse(time.RFC3339, expiresAt.String)
-			action.ExpiresAt = t
-		}
-		if deliveredAt.Valid {
-			t, _ := time.Parse(time.RFC3339, deliveredAt.String)
-			action.DeliveredAt = t
-		}
-		if completedAt.Valid {
-			t, _ := time.Parse(time.RFC3339, completedAt.String)
-			action.CompletedAt = t
-		}
-		if errorMessage.Valid {
-			action.ErrorMessage = errorMessage.String
-		}
-
 		actions = append(actions, action)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
-
 	return actions, nil
 }
 
-const natsMirrorNameMarker = "%UNS-to-NATS-mirror%"
+func scanActionRow(scanner interface {
+	Scan(dest ...interface{}) error
+}) (*models.Action, error) {
+	action := &models.Action{}
+	var payloadType, payloadData string
+	var status int32
+	var createdAt, expiresAt, deliveredAt, completedAt sql.NullString
+	var errorMessage sql.NullString
 
-// NATSMirrorDeployInflight reports whether a UNS-to-NATS mirror deploy is queued, delivered, or processing.
+	err := scanner.Scan(
+		&action.Id, &action.DeviceId, &action.Type,
+		&payloadType, &payloadData,
+		&action.MaxRetries, &action.RetryCount, &status,
+		&createdAt, &expiresAt, &deliveredAt, &completedAt,
+		&errorMessage,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan action: %w", err)
+	}
+
+	if payloadType != "" && payloadData != "" {
+		action.Payload = &anypb.Any{
+			TypeUrl: payloadType,
+			Value:   []byte(payloadData),
+		}
+	}
+
+	action.Status = models.ActionStatus(status)
+
+	if createdAt.Valid {
+		t, _ := time.Parse(time.RFC3339, createdAt.String)
+		action.CreatedAt = t
+	}
+	if expiresAt.Valid {
+		t, _ := time.Parse(time.RFC3339, expiresAt.String)
+		action.ExpiresAt = t
+	}
+	if deliveredAt.Valid {
+		t, _ := time.Parse(time.RFC3339, deliveredAt.String)
+		action.DeliveredAt = t
+	}
+	if completedAt.Valid {
+		t, _ := time.Parse(time.RFC3339, completedAt.String)
+		action.CompletedAt = t
+	}
+	if errorMessage.Valid {
+		action.ErrorMessage = errorMessage.String
+	}
+
+	return action, nil
+}
+
+// NATSMirrorDeployInflight reports whether a UNS-to-NATS mirror deploy is queued or delivered.
 func (s *ActionStore) NATSMirrorDeployInflight(ctx context.Context, tenantID, deviceID string) (bool, error) {
 	return s.natsMirrorInflight(ctx, tenantID, deviceID, "deploy-data-flow-component")
 }
@@ -619,9 +759,9 @@ SELECT EXISTS (
   SELECT 1 FROM actions
   WHERE tenant_id = $1 AND device_id = $2
     AND action_type IN ($3, $4)
-    AND payload_data LIKE $5
+    AND payload_data::jsonb ->> 'name' = $5
     AND status IN ($6, $7, $8)
-)`, tenantID, deviceID, deployType, editType, natsMirrorNameMarker,
+)`, tenantID, deviceID, deployType, editType, models.NATSMirrorPayloadMarker,
 		int(models.ActionStatusQueued),
 		int(models.ActionStatusDelivered),
 		int(models.ActionStatusProcessing),
@@ -642,9 +782,9 @@ SELECT EXISTS (
   SELECT 1 FROM actions
   WHERE tenant_id = $1 AND device_id = $2
     AND action_type = $3
-    AND payload_data LIKE $4
+    AND payload_data::jsonb ->> 'name' = $4
     AND status IN ($5, $6, $7)
-)`, tenantID, deviceID, actionType, natsMirrorNameMarker,
+)`, tenantID, deviceID, actionType, models.NATSMirrorPayloadMarker,
 		int(models.ActionStatusQueued),
 		int(models.ActionStatusDelivered),
 		int(models.ActionStatusProcessing),

@@ -20,6 +20,9 @@ Actions that return action_id for polling:
 - **GetLogs**: Queue log retrieval
 - **GetMetrics**: Queue metrics retrieval
 - **GetActionResult**: Poll for action status/result
+- **CancelAction**: Cancel a QUEUED action before device pull
+
+See [Action Management](../docs/ACTION_MANAGEMENT.md) for the full lifecycle (states, expiry, cancellation, background cleanup).
 
 ## Test Organization
 
@@ -38,6 +41,11 @@ Actions that return action_id for polling:
   03-GetLogs.bru
   04-GetMetrics.bru
   05-GetActionResult.bru
+  06-QueueActionForCancel.bru
+  06-CancelQueuedAction.bru
+  06a-GetActionResult-AfterCancel.bru
+  06b-CancelAction-AlreadyCancelled.bru
+  README-DeviceActions-API-Testing.md
 ```
 
 ## Setup
@@ -52,6 +60,7 @@ device_id=          # Set by RegisterDevice
 action_id_config=   # Set by GetDeviceConfig
 action_id_logs=     # Set by GetLogs
 action_id_metrics=  # Set by GetMetrics
+action_id_cancel=   # Set by 06-QueueActionForCancel (cancel tests)
 start_time_ms=      # Auto-set to 1 hour ago
 timestamp=          # Auto-set for unique naming
 ```
@@ -73,6 +82,17 @@ Run in order:
 3. **GetLogs** → Queues log retrieval, sets `action_id_logs`
 4. **GetMetrics** → Queues metrics retrieval
 5. **GetActionResult** → Poll for any action result
+
+#### Cancel flow (QUEUED only — do not run Instance-Pull between queue and cancel)
+1. **06-QueueActionForCancel** → Sets `action_id_cancel`
+2. **06-CancelQueuedAction** → `POST .../actions/{action_id}/cancel`
+3. **06a-GetActionResult-AfterCancel** → Expect `CANCELLED`
+4. **06b-CancelAction-AlreadyCancelled** → Expect HTTP 400
+
+Details: [01-DeviceActions/README-DeviceActions-API-Testing.md](./01-DeviceActions/README-DeviceActions-API-Testing.md)
+
+#### Background cleanup (no HTTP endpoint)
+Terminal actions are deleted by DM using `TAKSA_DM_ACTION_RETENTION_MINUTES` and `TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES`. Optional `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` marks stale `QUEUED` actions as `EXPIRED`. See [docs/ACTION_MANAGEMENT.md](../docs/ACTION_MANAGEMENT.md).
 
 ## Key Features
 
@@ -115,11 +135,16 @@ Asynchronous actions return immediately with `action_id`:
 ```
 Action Status Flow:
 QUEUED → DELIVERED → PROCESSING → COMPLETED
-                                ↓
-                                FAILED
-                                EXPIRED
-                                CANCELLED
+         │              │
+         │              └── FAILED / FAILED_PARSING_RESPONSE
+         │
+         ├── EXPIRED (per-action TTL or TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES)
+         └── CANCELLED (POST .../actions/{id}/cancel — QUEUED only)
 ```
+
+Only **QUEUED** actions can be cancelled or auto-expired. Pull uses atomic claim-on-deliver so cancel vs pull races are safe.
+
+Full reference: [docs/ACTION_MANAGEMENT.md](../docs/ACTION_MANAGEMENT.md)
 
 Poll strategy:
 - First poll: 100-200ms delay
@@ -229,8 +254,12 @@ Tests will auto-fail with new fields in responses, indicating proto changes.
 **Fix**: Run RegisterDevice first, or set `device_id` in environment
 
 ### Action expired
-**Error**: Status=EXPIRED after ~5 minutes
-**Fix**: Device may be offline. Check GetDeviceHealth
+**Error**: Status=EXPIRED after TTL or auto-expire
+**Fix**: Device may be offline, or `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` / per-action `expires_at` fired. See [ACTION_MANAGEMENT.md](../docs/ACTION_MANAGEMENT.md). Check GetDeviceHealth; cancel or re-queue as needed.
+
+### Cancel rejected (400)
+**Error**: `FailedPrecondition` on cancel
+**Fix**: Action is no longer QUEUED (device pulled it, or already terminal). Poll GetActionResult for current status.
 
 ### Compressed payload decoding
 **Error**: JSON parse error on result_payload
