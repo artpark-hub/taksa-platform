@@ -171,7 +171,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
                     matchPaths: ['/dashboard/copilot']
                 },
                 {
-                    name: 'Topic Browser',
+                    name: 'Data-Flows',
                     href: '/dashboard/data-flows',
                     icon: BookOpen,
                     matchPaths: ['/dashboard/data-flows']
