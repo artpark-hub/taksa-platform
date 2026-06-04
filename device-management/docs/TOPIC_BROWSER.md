@@ -2,6 +2,8 @@
 
 This document describes how Device Management (DM) exposes UNS topic browser data through APIs and persistence. The design **does not require changes to umh-core or the edge**: DM reads whatever device **status** messages already include under `core.topicBrowser`, materializes rows in PostgreSQL, and serves list/detail RPCs aligned with umh-core GraphQL semantics.
 
+**FAQ (capabilities, limitations, tag discovery vs Topic Browser):** [FAQ_UNS_TOPIC_BROWSER_AND_TAG_DISCOVERY.md](./FAQ_UNS_TOPIC_BROWSER_AND_TAG_DISCOVERY.md)
+
 ---
 
 ## Goals

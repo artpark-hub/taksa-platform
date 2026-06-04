@@ -1,6 +1,6 @@
 FROM alpine:3.23
 
-RUN apk add --no-cache ca-certificates wget gettext
+RUN apk add --no-cache ca-certificates wget
 
 # Create app user
 RUN addgroup -S taksa && adduser -S taksa -G taksa

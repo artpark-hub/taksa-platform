@@ -2,7 +2,7 @@
 
 Guide for building a **management console** topic browser against Device Management (DM). Data is **materialized in PostgreSQL** from edge status (`core.topicBrowser`); the UI does not talk to the DCD directly for reads.
 
-**Related:** [TOPIC_BROWSER.md](./TOPIC_BROWSER.md) (architecture, merge semantics, ops).
+**Related:** [TOPIC_BROWSER.md](./TOPIC_BROWSER.md) (architecture, merge semantics, ops). **FAQ:** [FAQ_UNS_TOPIC_BROWSER_AND_TAG_DISCOVERY.md](./FAQ_UNS_TOPIC_BROWSER_AND_TAG_DISCOVERY.md) (UNS vs tags vs discovery assumptions).
 
 ---
 

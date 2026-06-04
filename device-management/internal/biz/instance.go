@@ -201,6 +201,7 @@ type InstanceUsecase struct {
 	streamProcessorRepo   *data.StreamProcessorRepo
 	deviceTopicRepo       *data.DeviceTopicRepo
 	statusSub             StatusSubscriptionSettings
+	actionCleanup         ActionCleanupSettings
 	deployment            *conf.Deployment
 	actionUc              *ActionUsecase
 
@@ -220,6 +221,7 @@ func NewInstanceUsecase(
 	streamProcessorRepo *data.StreamProcessorRepo,
 	deviceTopicRepo *data.DeviceTopicRepo,
 	statusSub StatusSubscriptionSettings,
+	actionCleanup ActionCleanupSettings,
 	deployment *conf.Deployment,
 	actionUc *ActionUsecase,
 ) *InstanceUsecase {
@@ -231,6 +233,7 @@ func NewInstanceUsecase(
 		streamProcessorRepo:   streamProcessorRepo,
 		deviceTopicRepo:       deviceTopicRepo,
 		statusSub:             statusSub,
+		actionCleanup:         actionCleanup,
 		deployment:            deployment,
 		actionUc:              actionUc,
 	}

@@ -112,7 +112,6 @@ func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server, instanceUc *biz
 func main() {
 	flag.Parse()
 
-	// Load config first to get log level
 	c := config.New(
 		config.WithSource(
 			file.NewSource(flagconf),
@@ -129,48 +128,8 @@ func main() {
 		panic(err)
 	}
 
-	// Override with environment variables (Docker containerized service pattern)
-	// Pattern: TAKSA_DM_* (aligned with taksa-deployments)
-	if logLevel := os.Getenv("TAKSA_DM_LOG_LEVEL"); logLevel != "" {
-		bc.LogLevel = logLevel
-	}
-	if logFile := os.Getenv("TAKSA_DM_LOG_FILE"); logFile != "" {
-		bc.LogFile = logFile
-	}
-	if httpPort := os.Getenv("TAKSA_DM_HTTP_PORT"); httpPort != "" {
-		bc.Server.Http.Addr = "0.0.0.0:" + httpPort
-	}
-	if grpcPort := os.Getenv("TAKSA_DM_GRPC_PORT"); grpcPort != "" {
-		bc.Server.Grpc.Addr = "0.0.0.0:" + grpcPort
-	}
-	if dbDriver := os.Getenv("TAKSA_DM_DATABASE_DRIVER"); dbDriver != "" {
-		bc.Data.Database.Driver = dbDriver
-	}
-	if dbSource := os.Getenv("TAKSA_DM_DATABASE_SOURCE"); dbSource != "" {
-		bc.Data.Database.Source = dbSource
-	}
-	if baseURL := os.Getenv("TAKSA_DM_BASE_URL"); baseURL != "" {
-		bc.Deployment.BaseUrl = baseURL
-	}
-	if dockerImage := os.Getenv("TAKSA_DM_UMH_CORE_DOCKER_IMAGE"); dockerImage != "" {
-		bc.Deployment.UmhCoreDockerImage = dockerImage
-	}
-	if natsURLs := os.Getenv("TAKSA_DM_NATS_MIRROR_URLS"); natsURLs != "" {
-		bc.Deployment.NatsMirrorUrls = natsURLs
-	}
-	if jwtSecret := os.Getenv("TAKSA_DM_JWT_SECRET"); jwtSecret != "" {
-		bc.Server.JwtSecret = jwtSecret
-	}
-	if v := os.Getenv("TAKSA_DM_AUTO_RESUBSCRIBE_STATUS_MESSAGES"); v != "" {
-		if bc.DeviceStatusSubscription == nil {
-			bc.DeviceStatusSubscription = &conf.DeviceStatusSubscription{}
-		}
-		enabled := v == "true" || v == "1"
-		bc.DeviceStatusSubscription.AutoResubscribeStatusMessages = &enabled
-	}
+	applyConfigEnvOverrides(&bc)
 
-	// Get or generate JWT secret (generate-once, persist-under-/data strategy)
-	// Treat quoted empty strings ("" or \"\" from YAML) as needing generation
 	if strings.TrimSpace(bc.Server.JwtSecret) == "" || bc.Server.JwtSecret == `""` {
 		bc.Server.JwtSecret = ""
 	}
@@ -180,14 +139,12 @@ func main() {
 	}
 	bc.Server.JwtSecret = jwtSecret
 
-	// Initialize Zap logger based on config log_level and log_file
 	zapLogger, err := newZapLogger(bc.LogLevel, bc.LogFile)
 	if err != nil {
 		panic(err)
 	}
 	defer zapLogger.Sync()
 
-	// Wrap Zap logger to be compatible with Kratos logger interface
 	logger := log.With(log.NewStdLogger(os.Stdout),
 		"ts", log.DefaultTimestamp,
 		"caller", log.DefaultCaller,
@@ -213,7 +170,8 @@ func main() {
 	)
 
 	statusSub := biz.ResolveStatusSubscriptionSettings(bc.DeviceStatusSubscription)
-	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Deployment, statusSub, logger, zapLogger)
+	actionCleanup := biz.ResolveActionCleanupSettings(bc.ActionCleanup)
+	app, cleanup, err := wireApp(bc.Server, bc.Data, bc.Deployment, statusSub, actionCleanup, logger, zapLogger)
 	if err != nil {
 		zapLogger.Fatal("Failed to wire app", zap.Error(err))
 	}
@@ -221,7 +179,6 @@ func main() {
 
 	zapLogger.Info("Application initialized, starting server...")
 
-	// start and wait for stop signal
 	if err := app.Run(); err != nil {
 		zapLogger.Fatal("Application error", zap.Error(err))
 	}

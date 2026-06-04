@@ -3,29 +3,29 @@ package biz
 import (
 	"testing"
 
+	"github.com/artpark-hub/taksa-platform/device-management/internal/conf"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
 )
 
-func TestEnvIntPositive(t *testing.T) {
-	t.Setenv("TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES", "")
-	if _, ok := envIntPositive(actionAutoExpireEnvVar); ok {
-		t.Fatal("expected unset env to be disabled")
+func TestResolveActionCleanupSettings(t *testing.T) {
+	def := ResolveActionCleanupSettings(nil)
+	if def.RetentionMinutes != 60 || def.CleanupIntervalMinutes != 10 || def.AutoExpireMinutes != 0 {
+		t.Fatalf("unexpected defaults: %+v", def)
 	}
 
-	t.Setenv("TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES", "30")
-	v, ok := envIntPositive(actionAutoExpireEnvVar)
-	if !ok || v != 30 {
-		t.Fatalf("expected (30, true), got (%d, %v)", v, ok)
+	cfg := &conf.ActionCleanup{
+		RetentionMinutes:       2,
+		CleanupIntervalMinutes: 1,
+		AutoExpireMinutes:      30,
+	}
+	got := ResolveActionCleanupSettings(cfg)
+	if got.RetentionMinutes != 2 || got.CleanupIntervalMinutes != 1 || got.AutoExpireMinutes != 30 {
+		t.Fatalf("unexpected resolved: %+v", got)
 	}
 
-	t.Setenv("TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES", "0")
-	if _, ok := envIntPositive(actionAutoExpireEnvVar); ok {
-		t.Fatal("expected zero to be disabled")
-	}
-
-	t.Setenv("TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES", "bad")
-	if _, ok := envIntPositive(actionAutoExpireEnvVar); ok {
-		t.Fatal("expected invalid value to be disabled")
+	off := ResolveActionCleanupSettings(&conf.ActionCleanup{AutoExpireMinutes: 0})
+	if off.AutoExpireMinutes != 0 {
+		t.Fatal("expected auto-expire disabled when zero")
 	}
 }
 

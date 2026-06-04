@@ -127,9 +127,9 @@ When queueing, `TTLSeconds > 0` sets `expires_at` on the row. On each cleanup ti
 
 ### 2. Auto-expire queued actions (optional)
 
-| Variable | Default | Effect |
-|----------|---------|--------|
-| `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` | **unset (disabled)** | When set, `QUEUED` **UI/async** actions with `created_at` older than N minutes → `EXPIRED` |
+| Config path | Env override | Default | Effect |
+|-------------|--------------|---------|--------|
+| `action_cleanup.auto_expire_minutes` | `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` | 0 (disabled) | When > 0, `QUEUED` **UI/async** actions with `created_at` older than N minutes → `EXPIRED` |
 
 Use when devices may be offline for long periods and the UI does not cancel explicitly. **Not** the same as per-action `TTLSeconds`.
 
@@ -176,10 +176,11 @@ These are **not** console async actions. They use the same `actions` table but d
 
 Terminal rows and old messages are **deleted** periodically. There is **no HTTP cleanup endpoint**.
 
-| Variable | Default | Effect |
-|----------|---------|--------|
-| `TAKSA_DM_ACTION_RETENTION_MINUTES` | 60 | Delete terminal actions + messages older than this |
-| `TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES` | 10 | Ticker interval between sweeps (<= 0 disables the loop) |
+| Config path | Env override | Default | Effect |
+|-------------|--------------|---------|--------|
+| `action_cleanup.retention_minutes` | `TAKSA_DM_ACTION_RETENTION_MINUTES` | 60 | Delete terminal actions + messages older than this |
+| `action_cleanup.cleanup_interval_minutes` | `TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES` | 10 | Ticker interval between sweeps (<= 0 disables the loop) |
+| `action_cleanup.auto_expire_minutes` | `TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES` | 0 (off) | Optional QUEUED auto-expire threshold |
 
 **Terminal statuses deleted:** `COMPLETED`, `FAILED`, `FAILED_PARSING_RESPONSE`, `CANCELLED`, `EXPIRED`.
 
@@ -195,8 +196,10 @@ Implementation: `StartActionCleanupLoop` in `internal/biz/action_cleanup.go`.
 
 ## Environment variables (summary)
 
+Defaults live in `configs/config.yaml` under `action_cleanup`; `TAKSA_DM_*` env vars override when set.
+
 ```bash
-# Retention / deletion
+# Retention / deletion (action_cleanup.* in config.yaml)
 TAKSA_DM_ACTION_RETENTION_MINUTES=60
 TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES=10   # <= 0 disables cleanup loop
 
