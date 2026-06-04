@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/artpark-hub/taksa-platform/device-management/internal/biz"
@@ -82,74 +81,6 @@ func newZapLogger(logLevel, logFile string) (*zap.Logger, error) {
 	}
 
 	return cfg.Build()
-}
-
-// applyConfigEnvOverrides applies TAKSA_DM_* env vars over config.yaml (env wins when set).
-func applyConfigEnvOverrides(bc *conf.Bootstrap) {
-	if bc == nil {
-		return
-	}
-	if v := os.Getenv("TAKSA_DM_LOG_LEVEL"); v != "" {
-		bc.LogLevel = v
-	}
-	if v := os.Getenv("TAKSA_DM_LOG_FILE"); v != "" {
-		bc.LogFile = v
-	}
-	if v := os.Getenv("TAKSA_DM_HTTP_PORT"); v != "" {
-		bc.Server.Http.Addr = "0.0.0.0:" + v
-	}
-	if v := os.Getenv("TAKSA_DM_GRPC_PORT"); v != "" {
-		bc.Server.Grpc.Addr = "0.0.0.0:" + v
-	}
-	if v := os.Getenv("TAKSA_DM_DATABASE_DRIVER"); v != "" {
-		bc.Data.Database.Driver = v
-	}
-	if v := os.Getenv("TAKSA_DM_DATABASE_SOURCE"); v != "" {
-		bc.Data.Database.Source = v
-	}
-	if v := os.Getenv("TAKSA_DM_BASE_URL"); v != "" {
-		bc.Deployment.BaseUrl = v
-	}
-	if v := os.Getenv("TAKSA_DM_UMH_CORE_DOCKER_IMAGE"); v != "" {
-		bc.Deployment.UmhCoreDockerImage = v
-	}
-	if v := os.Getenv("TAKSA_DM_NATS_MIRROR_URLS"); v != "" {
-		bc.Deployment.NatsMirrorUrls = v
-	}
-	if v := os.Getenv("TAKSA_DM_JWT_SECRET"); v != "" {
-		bc.Server.JwtSecret = v
-	}
-	if v := os.Getenv("TAKSA_DM_AUTO_RESUBSCRIBE_STATUS_MESSAGES"); v != "" {
-		if bc.DeviceStatusSubscription == nil {
-			bc.DeviceStatusSubscription = &conf.DeviceStatusSubscription{}
-		}
-		enabled := v == "true" || v == "1"
-		bc.DeviceStatusSubscription.AutoResubscribeStatusMessages = &enabled
-	}
-	if v := os.Getenv("TAKSA_DM_ACTION_RETENTION_MINUTES"); v != "" {
-		if bc.ActionCleanup == nil {
-			bc.ActionCleanup = &conf.ActionCleanup{}
-		}
-		if n, err := strconv.Atoi(v); err == nil {
-			bc.ActionCleanup.RetentionMinutes = int32(n)
-		}
-	}
-	if v := os.Getenv("TAKSA_DM_ACTION_CLEANUP_INTERVAL_MINUTES"); v != "" {
-		if bc.ActionCleanup == nil {
-			bc.ActionCleanup = &conf.ActionCleanup{}
-		}
-		if n, err := strconv.Atoi(v); err == nil {
-			bc.ActionCleanup.CleanupIntervalMinutes = int32(n)
-		}
-	}
-	if v := os.Getenv("TAKSA_DM_ACTION_AUTO_EXPIRE_MINUTES"); v != "" {
-		if bc.ActionCleanup == nil {
-			bc.ActionCleanup = &conf.ActionCleanup{}
-		}
-		if n, err := strconv.Atoi(v); err == nil {
-			bc.ActionCleanup.AutoExpireMinutes = int32(n)
-		}
-	}
 }
 
 func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server, instanceUc *biz.InstanceUsecase) *kratos.App {
