@@ -116,34 +116,13 @@ const getTopicDataContract = (detail, fallbackTopic) => {
     return topicSegments.find((segment) => segment.startsWith('_')) || '-';
 };
 
-const getPayloadValue = (timeSeries = {}) => {
-    const valueKeys = [
-        'stringValue',
-        'numberValue',
-        'integerValue',
-        'booleanValue',
-        'jsonValue',
-        'bytesValue',
-        'value'
-    ];
-    const valueKey = valueKeys.find((key) => Object.prototype.hasOwnProperty.call(timeSeries, key));
-
-    if (!valueKey) {
-        return '-';
-    }
-
-    const value = timeSeries[valueKey];
-    return typeof value === 'object' ? JSON.stringify(value) : String(value);
-};
-
 const getLastMessageSummary = (detail) => {
     if (detail?.timeSeries) {
         return {
             payloadType: 'Time-Series',
             producedAt: formatIstDateTime(detail.timeSeries.producedAt),
             type: detail.timeSeries.scalarType ? String(detail.timeSeries.scalarType).toLowerCase() : '-',
-            updatedAt: formatIstDateTime(detail.updatedAt),
-            value: getPayloadValue(detail.timeSeries)
+            updatedAt: formatIstDateTime(detail.updatedAt)
         };
     }
 
@@ -152,8 +131,7 @@ const getLastMessageSummary = (detail) => {
             payloadType: 'Relational',
             producedAt: formatIstDateTime(detail.relational.producedAt),
             type: detail.relational.type || '-',
-            updatedAt: formatIstDateTime(detail.updatedAt),
-            value: detail.relational.value ? JSON.stringify(detail.relational.value) : '-'
+            updatedAt: formatIstDateTime(detail.updatedAt)
         };
     }
 
@@ -161,8 +139,7 @@ const getLastMessageSummary = (detail) => {
         payloadType: '-',
         producedAt: '-',
         type: '-',
-        updatedAt: '-',
-        value: '-'
+        updatedAt: '-'
     };
 };
 
@@ -616,6 +593,11 @@ const TopicBrowser = () => {
         });
     };
 
+    const detailMetadataJson = useMemo(
+        () => JSON.stringify(topicDetailRaw || topicDetail || selectedTopic?.topicRow || {}, null, 2),
+        [topicDetailRaw, topicDetail, selectedTopic?.topicRow]
+    );
+
     if (!deviceId) {
         return (
             <SelectDCD
@@ -629,7 +611,6 @@ const TopicBrowser = () => {
     const showSearchResults = Boolean(searchTerm.trim());
     const detailSource = topicDetail || selectedTopic?.topicRow || {};
     const lastMessage = getLastMessageSummary(topicDetail);
-    const detailMetadataJson = JSON.stringify(topicDetailRaw || topicDetail || selectedTopic?.topicRow || {}, null, 2);
 
     return (
         <div className="topic-browser-container">

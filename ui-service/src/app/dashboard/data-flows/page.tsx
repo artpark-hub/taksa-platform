@@ -3,7 +3,7 @@ import TopicBrowser from '../../../components/TopicBrowser';
 
 export default function DataFlowsPage() {
     return (
-        <Suspense>
+        <Suspense fallback={null}>
             <TopicBrowser />
         </Suspense>
     );
