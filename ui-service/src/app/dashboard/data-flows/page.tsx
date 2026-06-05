@@ -1,6 +1,10 @@
-import React from 'react';
-import AccessDeniedPage from '../../../components/AccessDeniedPage';
+import { Suspense } from 'react';
+import TopicBrowser from '../../../components/TopicBrowser';
 
 export default function DataFlowsPage() {
-    return <AccessDeniedPage />;
+    return (
+        <Suspense fallback={null}>
+            <TopicBrowser />
+        </Suspense>
+    );
 }
