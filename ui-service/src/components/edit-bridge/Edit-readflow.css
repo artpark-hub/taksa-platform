@@ -310,6 +310,19 @@
     box-shadow: var(--shadow-soft);
 }
 
+.toggle-btn:disabled,
+.toggle-btn.disabled {
+    cursor: not-allowed;
+    color: #9ca3af;
+    opacity: 0.65;
+}
+
+.toggle-btn:disabled:hover,
+.toggle-btn.disabled:hover {
+    background-color: transparent;
+    box-shadow: none;
+}
+
 .bridge-processing-visual {
     display: flex;
     flex-direction: column;

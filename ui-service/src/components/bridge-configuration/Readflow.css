@@ -23,6 +23,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-xl);
+    margin-bottom: var(--space-2xl);
 }
 
 .bridge-readflow-config-card,
@@ -45,7 +46,7 @@
 .bridge-readflow-card-header h2,
 .bridge-readflow-section-card h2 {
     color: #111827;
-    font-size: var(--text-xl);
+    font-size: clamp(1.1875rem, 1rem + 1vw, 1.625rem);
     font-weight: 700;
     margin: 0 0 var(--space-sm) 0;
     letter-spacing: -0.03em;
@@ -57,7 +58,7 @@
 .bridge-readflow-card-header p,
 .bridge-readflow-section-card p {
     color: #6b7280;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 500;
     margin: 0;
     line-height: 1.5;
@@ -95,7 +96,7 @@
 
 .bridge-readflow-form-row label {
     color: #111827;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 600;
 }
 
@@ -117,7 +118,7 @@
     border-radius: var(--radius-md);
     background-color: #fff;
     color: #111827;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 500;
     font-family: inherit;
     outline: none;
@@ -186,7 +187,7 @@
     margin: 0;
     padding: var(--space-md);
     color: #d1d5db;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     line-height: 1.6;
     overflow: auto;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -245,7 +246,7 @@
     padding: var(--space-md);
     color: #d1d5db;
     background-color: #1b1b1e;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 600;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     outline: none;
@@ -296,7 +297,7 @@
     background-color: transparent;
     text-decoration: none;
     color: #6b7280;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 600;
     border-radius: calc(var(--radius-md) - 0.125rem);
     cursor: pointer;
@@ -380,7 +381,7 @@
     align-items: center;
     gap: var(--space-md);
     cursor: pointer;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 600;
     color: #111827;
     transition: background-color 0.2s ease;
@@ -426,7 +427,7 @@
     color: #d1d5db;
     padding: var(--space-md);
     border-radius: var(--radius-md);
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     line-height: 1.6;
     overflow-x: auto;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -447,7 +448,7 @@
 
 .bridge-condition-field label {
     color: #374151;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 600;
 }
 
@@ -456,7 +457,7 @@
     border: 1px solid #e5e7eb;
     border-radius: var(--radius-md);
     padding: var(--space-md);
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     color: #111827;
     background-color: #fff;
@@ -491,7 +492,7 @@
     color: #dc2626;
     border-radius: var(--radius-md);
     text-decoration: none;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -597,7 +598,7 @@
     background-color: #111217;
     border-right: 1px solid #2f3035;
     color: #60a5fa;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     line-height: 1.75;
     text-align: right;
     overflow: hidden;
@@ -611,7 +612,7 @@
     resize: none;
     padding: var(--space-md);
     color: #d1d5db;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     line-height: 1.75;
     background-color: #202020;
     overflow: auto;
@@ -634,14 +635,14 @@
 .bridge-delete-modal h3 {
     margin: 0 0 var(--space-sm) 0;
     color: #111827;
-    font-size: var(--text-xl);
+    font-size: clamp(1.1875rem, 1rem + 1vw, 1.625rem);
     font-weight: 700;
 }
 
 .bridge-delete-modal p {
     margin: 0 0 var(--space-xl) 0;
     color: #6b7280;
-    font-size: var(--text-base);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     line-height: 1.5;
 }
 
@@ -711,6 +712,6 @@
     .bridge-modal-cancel-btn,
     .bridge-modal-delete-btn {
         flex: 1;
-        font-size: var(--text-base);
+        font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     }
 }

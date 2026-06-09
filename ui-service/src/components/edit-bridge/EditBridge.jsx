@@ -17,6 +17,7 @@ const EditBridge = () => {
     const selectedDeviceName = searchParams.get('deviceName') || '';
 
     const [activeTab, setActiveTab] = useState('general');
+    const [visitedTabs, setVisitedTabs] = useState({ general: true });
     const [isDeploying, setIsDeploying] = useState(false);
     const [deployMessage, setDeployMessage] = useState('');
     const [deployError, setDeployError] = useState('');
@@ -41,7 +42,8 @@ const EditBridge = () => {
         readProcessorYaml: '',
         readRawYamlInject: 'buffer:\n  none: {}',
         metaProtocol: 'modbus_tcp',
-        templateVariables: []
+        templateVariables: [],
+        readTemplateVariables: []
     });
     const initialBridgeConfigRef = useRef(null);
     const loadedProtocolConverterRef = useRef(null);
@@ -62,6 +64,12 @@ const EditBridge = () => {
                   value: String(item?.value ?? '').trim()
               }))
             : [];
+        const readTemplateVariables = Array.isArray(config?.readTemplateVariables)
+            ? config.readTemplateVariables.map((item) => ({
+                  label: String(item?.label ?? '').trim(),
+                  value: String(item?.value ?? '').trim()
+              }))
+            : [];
 
         return {
             name: String(config?.name ?? '').trim(),
@@ -75,7 +83,8 @@ const EditBridge = () => {
             readProcessorYaml: String(config?.readProcessorYaml ?? ''),
             readRawYamlInject: String(config?.readRawYamlInject ?? ''),
             metaProtocol: String(config?.metaProtocol ?? '').trim().toLowerCase(),
-            templateVariables
+            templateVariables,
+            readTemplateVariables
         };
     };
 
@@ -91,10 +100,17 @@ const EditBridge = () => {
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const sanitizeProtocolMeta = (protocol) => {
-        const normalized = String(protocol || '').trim().toLowerCase();
+        const normalized = String(protocol || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[\s_-]/g, '');
 
-        if (normalized === 'modbus') {
+        if (normalized === 'modbus' || normalized === 'modbustcp') {
             return 'modbus_tcp';
+        }
+
+        if (normalized === 'opcua' || normalized === 'benthosopcua') {
+            return 'opcua';
         }
 
         return normalized || 'modbus_tcp';
@@ -349,7 +365,8 @@ const EditBridge = () => {
                     readProcessorYaml: processorData,
                     readRawYamlInject: rawYamlData,
                     metaProtocol: rawMetaProtocol,
-                    templateVariables: updatedVars
+                    templateVariables: updatedVars,
+                    readTemplateVariables: []
                 };
 
                 setBridgeConfig(nextConfig);
@@ -422,6 +439,11 @@ const EditBridge = () => {
         router.back();
     };
 
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        setVisitedTabs((prev) => (prev[tab] ? prev : { ...prev, [tab]: true }));
+    };
+
     const handleSaveDeploy = () => {
         if (!isSaveDeployEnabled || isDeploying) {
             return;
@@ -447,14 +469,18 @@ const EditBridge = () => {
                 const portNum = Number.isFinite(parsedPort) ? parsedPort : 0;
                 const location = getDeployLocationFromBridgeConfig();
 
-                // Sync templateInfo variables with latest ip/port from connection tab
                 const currentIp = bridgeConfig?.ipAddress || '';
                 const currentPort = String(portNum);
-                const syncedVars = (bridgeConfig?.templateVariables || []).map((v) => {
-                    if (String(v.label).toUpperCase() === 'IP') return { ...v, value: currentIp };
-                    if (String(v.label).toUpperCase() === 'PORT') return { ...v, value: currentPort };
-                    return v;
-                });
+                const protocolMeta = sanitizeProtocolMeta(bridgeConfig?.metaProtocol || bridgeConfig?.protocol);
+                const normalizedReadInputType = String(bridgeConfig?.readInputType || protocolMeta || 'modbus')
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[\s_-]/g, '');
+                const isOpcuaPatch = protocolMeta === 'opcua' || normalizedReadInputType === 'opcua' || normalizedReadInputType === 'benthosopcua';
+                const readInputType = isOpcuaPatch ? 'benthos_opcua' : normalizedReadInputType;
+                const readTemplateVariables = Array.isArray(bridgeConfig?.readTemplateVariables)
+                    ? bridgeConfig.readTemplateVariables
+                    : [];
 
                 const loadedConverter = loadedProtocolConverterRef.current && typeof loadedProtocolConverterRef.current === 'object'
                     ? loadedProtocolConverterRef.current
@@ -479,10 +505,10 @@ const EditBridge = () => {
                     location,
                     readDFC: {
                         ...loadedReadDFC,
-                        ignoreErrors: true,
+                        ignoreErrors: !isOpcuaPatch,
                         inputs: {
                             ...(loadedReadDFC?.inputs || {}),
-                            type: String(bridgeConfig?.readInputType || bridgeConfig?.metaProtocol || 'modbus').toLowerCase(),
+                            type: readInputType,
                             data: toMultilineString(bridgeConfig?.readInputYaml)
                         },
                         pipeline: {
@@ -499,18 +525,37 @@ const EditBridge = () => {
                         },
                         rawYAML: {
                             ...(loadedReadDFC?.rawYAML || {}),
-                            data: toMultilineString(bridgeConfig?.readRawYamlInject)
+                            data: toMultilineString(bridgeConfig?.readRawYamlInject, 'buffer:\n  none: {}')
                         }
-                    },
-                    templateInfo: {
-                        ...loadedTemplateInfo,
-                        variables: syncedVars
                     },
                     meta: {
                         ...loadedMeta,
-                        protocol: bridgeConfig?.metaProtocol || 'modbus_tcp'
+                        protocol: protocolMeta,
+                        ...(isOpcuaPatch ? { processingMode: 'streaming' } : {})
                     }
                 };
+
+                if (isOpcuaPatch) {
+                    if (readTemplateVariables.length > 0) {
+                        editPayload.templateInfo = {
+                            ...loadedTemplateInfo,
+                            variables: readTemplateVariables
+                        };
+                    } else {
+                        delete editPayload.templateInfo;
+                    }
+                } else {
+                    const syncedVars = (bridgeConfig?.templateVariables || []).map((v) => {
+                        if (String(v.label).toUpperCase() === 'IP') return { ...v, value: currentIp };
+                        if (String(v.label).toUpperCase() === 'PORT') return { ...v, value: currentPort };
+                        return v;
+                    });
+
+                    editPayload.templateInfo = {
+                        ...loadedTemplateInfo,
+                        variables: syncedVars
+                    };
+                }
 
                 const actionId = await queueProtocolConverterUpdate(bridgeId, editPayload);
                 setDeployMessage('Applying changes, please wait.');
@@ -609,7 +654,7 @@ const EditBridge = () => {
             <div className="bridge-config-tabs">
                 <button
                     className={`bridge-config-tab ${activeTab === 'general' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('general')}
+                    onClick={() => handleTabChange('general')}
                 >
                     <FileText size={20} />
                     General
@@ -617,7 +662,7 @@ const EditBridge = () => {
 
                 <button
                     className={`bridge-config-tab ${activeTab === 'connection' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('connection')}
+                    onClick={() => handleTabChange('connection')}
                 >
                     <Link size={20} />
                     Connection
@@ -625,7 +670,7 @@ const EditBridge = () => {
 
                 <button
                     className={`bridge-config-tab ${activeTab === 'readflow' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('readflow')}
+                    onClick={() => handleTabChange('readflow')}
                 >
                     <Network size={20} />
                     Read Flow
@@ -633,25 +678,31 @@ const EditBridge = () => {
             </div>
 
             <div className="bridge-config-body">
-                {activeTab === 'general' && (
-                    <EditGeneral
-                        bridgeConfig={bridgeConfig}
-                        setBridgeConfig={setBridgeConfig}
-                    />
+                {!isLoadingConfig && visitedTabs.general && (
+                    <div style={{ display: activeTab === 'general' ? 'block' : 'none' }}>
+                        <EditGeneral
+                            bridgeConfig={bridgeConfig}
+                            setBridgeConfig={setBridgeConfig}
+                        />
+                    </div>
                 )}
 
-                {activeTab === 'connection' && (
-                    <EditConnection
-                        bridgeConfig={bridgeConfig}
-                        setBridgeConfig={setBridgeConfig}
-                    />
+                {!isLoadingConfig && visitedTabs.connection && (
+                    <div style={{ display: activeTab === 'connection' ? 'block' : 'none' }}>
+                        <EditConnection
+                            bridgeConfig={bridgeConfig}
+                            setBridgeConfig={setBridgeConfig}
+                        />
+                    </div>
                 )}
 
-                {activeTab === 'readflow' && (
-                    <EditReadflow
-                        bridgeConfig={bridgeConfig}
-                        setBridgeConfig={setBridgeConfig}
-                    />
+                {!isLoadingConfig && visitedTabs.readflow && (
+                    <div style={{ display: activeTab === 'readflow' ? 'block' : 'none' }}>
+                        <EditReadflow
+                            bridgeConfig={bridgeConfig}
+                            setBridgeConfig={setBridgeConfig}
+                        />
+                    </div>
                 )}
             </div>
 

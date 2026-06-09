@@ -1,0 +1,15 @@
+.edit-opcua-readflow {
+    gap: 1.5rem;
+}
+
+.edit-opcua-readflow .opcua-readflow-scope {
+    gap: 1.5rem;
+}
+
+.edit-opcua-readflow .bridge-readflow-section-card {
+    margin-bottom: 1.5rem;
+}
+
+.edit-opcua-readflow .bridge-readflow-section-card:last-of-type {
+    margin-bottom: 2rem;
+}

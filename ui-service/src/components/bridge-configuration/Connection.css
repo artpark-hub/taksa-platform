@@ -25,15 +25,16 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-soft);
     padding: var(--space-xl);
+    margin-bottom: var(--space-2xl);
 }
 
 .bridge-connection-header {
-    margin-bottom: var(--space-xl);
+    margin-bottom: var(--space-2xl);
 }
 
 .bridge-connection-header h2 {
     color: #111827;
-    font-size: var(--text-xl);
+    font-size: clamp(1.1875rem, 1rem + 1vw, 1.625rem);
     font-weight: 700;
     margin: 0 0 var(--space-sm) 0;
     letter-spacing: -0.03em;
@@ -41,7 +42,7 @@
 
 .bridge-connection-header p {
     color: #6b7280;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 500;
     margin: 0;
     line-height: 1.5;
@@ -62,7 +63,7 @@
 
 .bridge-connection-form-row label {
     color: #111827;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 600;
 }
 
@@ -78,7 +79,7 @@
     border-radius: var(--radius-md);
     background-color: #fff;
     color: #111827;
-    font-size: var(--text-sm);
+    font-size: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
     font-weight: 500;
     font-family: inherit;
     outline: none;
