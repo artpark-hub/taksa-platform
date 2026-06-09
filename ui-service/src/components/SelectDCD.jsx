@@ -5,7 +5,11 @@ import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import './SelectDCD.css';
 
-const SelectDCD = () => {
+const SelectDCD = ({
+    title = 'Select DCD',
+    subtitle = 'Select the DCD whose bridges you want to see or configure.',
+    destinationPath = '/dashboard/bridges/list'
+}) => {
     const router = useRouter();
     const [devices, setDevices] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +57,7 @@ const SelectDCD = () => {
             deviceName: getDeviceName(device)
         });
 
-        router.push(`/dashboard/bridges/list?${query.toString()}`);
+        router.push(`${destinationPath}?${query.toString()}`);
     };
 
     useEffect(() => {
@@ -107,9 +111,9 @@ const SelectDCD = () => {
     return (
         <div className="select-dcd-container">
             <div className="select-dcd-header">
-                <h1 className="select-dcd-title">Select DCD</h1>
+                <h1 className="select-dcd-title">{title}</h1>
                 <p className="select-dcd-subtitle">
-                    Select the DCD whose bridges you want to see or configure.
+                    {subtitle}
                 </p>
             </div>
 
