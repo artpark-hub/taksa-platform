@@ -16,6 +16,7 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/biz"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	pcconv "github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter/opcua"
 )
 
@@ -248,16 +249,13 @@ func (s *DeviceMgmtService) assertOpcUaConverterKind(ctx context.Context, tenant
 	if err != nil || row == nil {
 		return nil
 	}
-	if !isOpcUaDBType(row.Type) {
+	// Catalog type is often the DFC kind ("protocol-converter") from heartbeat sync, not the wire
+	// protocol (opcua/modbus). Only reject when the catalog already records a different protocol.
+	if pcconv.IsKnownNonOpcUaCatalogType(row.Type) {
 		return status.Error(codes.FailedPrecondition,
 			fmt.Sprintf("protocol converter %s is kind %q, not opc-ua", uuid, row.Type))
 	}
 	return nil
-}
-
-func isOpcUaDBType(t string) bool {
-	n := strings.ToLower(strings.TrimSpace(t))
-	return n == "opcua" || n == "opc-ua" || strings.Contains(n, "opcua")
 }
 
 func workflowStageToProto(stage string) v1.ProtocolConverterWorkflowStage {

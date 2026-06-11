@@ -23,6 +23,7 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
@@ -1531,17 +1532,13 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 		case "deploy":
 			// For deploy: UPSERT to create new record
 			name, _ := protocolConverter["name"].(string)
-			converterType := "protocol-converter"
-
-			// Try to extract protocol type from response meta first
-			if meta, ok := protocolConverter["meta"].(map[string]interface{}); ok {
-				if protocol, ok := meta["protocol"].(string); ok && protocol != "" {
-					converterType = protocol
-				}
+			converterType := protocolconverter.WireTypeFromMap(protocolConverter)
+			if protocolconverter.IsGenericCatalogType(converterType) {
+				converterType = "protocol-converter"
 			}
 
 			// If not in response, extract from request payload
-			if converterType == "protocol-converter" && action.Payload != nil {
+			if protocolconverter.IsGenericCatalogType(converterType) && action.Payload != nil {
 				var requestPayload map[string]interface{}
 				if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
 					if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
@@ -1585,18 +1582,14 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				_ = uc.protocolConverterRepo.Delete(ctx, tenantID, action.DeviceId, oldUUID)
 
 				// Create new record with new UUID and updated details
-				converterType := "protocol-converter"
+				converterType := protocolconverter.WireTypeFromMap(protocolConverter)
+				if protocolconverter.IsGenericCatalogType(converterType) {
+					converterType = "protocol-converter"
+				}
 				connectionUUID := ""
 
-				// Try to extract protocol type from response meta first
-				if meta, ok := protocolConverter["meta"].(map[string]interface{}); ok {
-					if protocol, ok := meta["protocol"].(string); ok && protocol != "" {
-						converterType = protocol
-					}
-				}
-
 				// If not in response, extract from request payload
-				if converterType == "protocol-converter" && action.Payload != nil {
+				if protocolconverter.IsGenericCatalogType(converterType) && action.Payload != nil {
 					var requestPayload map[string]interface{}
 					if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
 						if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
@@ -1640,6 +1633,17 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 			err := uc.protocolConverterRepo.Delete(ctx, tenantID, action.DeviceId, uuid)
 			if err != nil {
 				fmt.Printf("Warning: Failed to delete protocol converter: %v\n", err)
+			}
+
+		case "get":
+			// Backfill wire protocol in catalog from device payload (listing otherwise shows DFC kind only).
+			converterType := protocolconverter.WireTypeFromMap(protocolConverter)
+			if !protocolconverter.IsGenericCatalogType(converterType) {
+				if err := uc.protocolConverterRepo.Update(ctx, tenantID, action.DeviceId, uuid, map[string]interface{}{
+					"type": converterType,
+				}); err != nil {
+					fmt.Printf("Warning: Failed to update protocol converter type from get: %v\n", err)
+				}
 			}
 		}
 	} else if action.Status == models.ActionStatusFailed {
@@ -2215,6 +2219,16 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 			continue // Skip if no UUID
 		}
 
+		catalogType := converter.Type
+		// Heartbeat only reports dfcType; do not overwrite opcua/modbus learned from deploy/get.
+		if protocolconverter.IsGenericCatalogType(catalogType) {
+			if existing, err := uc.protocolConverterRepo.GetByUUID(ctx, tenantID, deviceID, converter.UUID); err == nil && existing != nil {
+				if !protocolconverter.IsGenericCatalogType(existing.Type) {
+					catalogType = existing.Type
+				}
+			}
+		}
+
 		// Use Upsert to create or update
 		// This handles both new converters and converters transitioning from PENDING to ACTIVE
 		err := uc.protocolConverterRepo.Upsert(ctx,
@@ -2222,7 +2236,7 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 			deviceID,
 			converter.UUID,
 			converter.Name,
-			converter.Type,
+			catalogType,
 			converter.ConnectionUUID,
 		)
 		if err != nil {

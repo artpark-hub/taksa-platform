@@ -1,0 +1,87 @@
+meta {
+  name: Poll OPC-UA facade action result (get / edit)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/opc-ua/actions/{{opcua_action_id}}/result
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Poll typed OPC-UA facade results for GET and EDIT child actions.
+  
+  Uses `opcua_action_id` from:
+  - 03-GetOpcUaProtocolConverter
+  - 05-EditOpcUaProtocolConverter
+  
+  For deploy workflow polling use 02-GetOpcUaWorkflowResult instead
+  (`opcua_workflow_action_id`).
+  
+  When status=COMPLETED, `result` is an OpcUaProtocolConverter with:
+  - raw_input_yaml, raw_processor_yaml, raw_buffer_yaml
+  - input.structured, read_flow.processor
+  - input_parse, processor_parse
+  - processing_mode, protocol, state
+  
+  Poll every 1–2s until COMPLETED or FAILED.
+}
+
+script:post-response {
+  const resp = res.getBody();
+
+  if (resp && resp.status) {
+    console.log('✓ Action status: ' + resp.status);
+
+    if (resp.errorMessage) {
+      console.log('  error: ' + resp.errorMessage);
+    }
+
+    if (resp.result) {
+      console.log('  uuid: ' + (resp.result.uuid || ''));
+      console.log('  name: ' + (resp.result.name || ''));
+      console.log('  input_parse: ' + (resp.result.inputParse || resp.result.input_parse || ''));
+      console.log('  processor_parse: ' + (resp.result.processorParse || resp.result.processor_parse || ''));
+
+      if (resp.result.uuid) {
+        bru.setEnvVar('opcua_converter_uuid', resp.result.uuid);
+        bru.setEnvVar('converter_uuid', resp.result.uuid);
+      }
+    } else if (['QUEUED', 'DELIVERED', 'PROCESSING'].includes(resp.status)) {
+      console.log('  ⏳ Still processing — poll again');
+    }
+  }
+}
+
+tests {
+  test("Action result retrieved", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has status", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+  });
+
+  test("COMPLETED has typed facade result", function() {
+    const resp = res.getBody();
+    if (resp.status !== 'COMPLETED' || !resp.result) {
+      return;
+    }
+    expect(resp.result).to.have.property('uuid');
+    const rawInput = resp.result.rawInputYaml || resp.result.raw_input_yaml;
+    expect(rawInput).to.be.a('string');
+  });
+
+  test("FAILED has errorMessage", function() {
+    const resp = res.getBody();
+    if (resp.status === 'FAILED') {
+      expect(resp.errorMessage).to.be.a('string');
+      expect(resp.errorMessage).to.not.be.empty;
+    }
+  });
+}
