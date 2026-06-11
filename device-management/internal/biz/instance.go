@@ -204,6 +204,7 @@ type InstanceUsecase struct {
 	actionCleanup         ActionCleanupSettings
 	deployment            *conf.Deployment
 	actionUc              *ActionUsecase
+	pcWorkflowUc          *ProtocolConverterWorkflowUsecase
 
 	natsMirrorReconcileCancel context.CancelFunc
 	natsMirrorReconcileWG     sync.WaitGroup
@@ -224,6 +225,7 @@ func NewInstanceUsecase(
 	actionCleanup ActionCleanupSettings,
 	deployment *conf.Deployment,
 	actionUc *ActionUsecase,
+	pcWorkflowUc *ProtocolConverterWorkflowUsecase,
 ) *InstanceUsecase {
 	return &InstanceUsecase{
 		store:                 store,
@@ -236,6 +238,7 @@ func NewInstanceUsecase(
 		actionCleanup:         actionCleanup,
 		deployment:            deployment,
 		actionUc:              actionUc,
+		pcWorkflowUc:          pcWorkflowUc,
 	}
 }
 
@@ -1129,8 +1132,14 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(resultPayload))
 		}
 		uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
+		if uc.pcWorkflowUc != nil {
+			uc.pcWorkflowUc.HandleActionTerminal(ctx, &actionWithStatus, finalStatus, errorMessage, []byte(decodedPayload))
+		}
 	} else if action != nil {
 		uc.HandleNATSMirrorActionFailure(ctx, action, finalStatus, errorMessage)
+		if uc.pcWorkflowUc != nil {
+			uc.pcWorkflowUc.HandleActionTerminal(ctx, action, finalStatus, errorMessage, []byte(decodedPayload))
+		}
 	}
 
 	// 7. Mark tracking as completed
@@ -1220,27 +1229,35 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 
 	uc.persistActionErrorMessageIfFailed(ctx, tenantID, action.Id, finalStatus, errorMessage)
 
+	syncMsg := deviceMsg
+	if syncMsg == nil {
+		syncMsg, _ = uc.store.Messages().GetByID(ctx, messageID)
+	}
+	var syncPayload []byte
+	if syncMsg != nil {
+		syncPayload = []byte(syncMsg.Content)
+	}
+
 	// 6. Sync state if this is a protocol converter or data model action
 	// This mirrors the logic in correlateResponseByTraceId to ensure DB persistence
 	// regardless of which correlation method (trace_id vs actionUUID) is used
 	if finalStatus == models.ActionStatusCompleted && action != nil {
 		actionWithStatus := *action
 		actionWithStatus.Status = finalStatus
-		syncMsg := deviceMsg
-		if syncMsg == nil {
-			syncMsg, err = uc.store.Messages().GetByID(ctx, messageID)
-			if err != nil {
-				syncMsg = nil
-			}
-		}
 		if syncMsg != nil {
-			_ = uc.syncProtocolConverterActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
-			_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
-			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
+			_ = uc.syncProtocolConverterActionResult(ctx, &actionWithStatus, syncPayload)
+			_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, syncPayload)
+			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, syncPayload)
 		}
 		uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
+		if uc.pcWorkflowUc != nil {
+			uc.pcWorkflowUc.HandleActionTerminal(ctx, &actionWithStatus, finalStatus, errorMessage, syncPayload)
+		}
 	} else if action != nil {
 		uc.HandleNATSMirrorActionFailure(ctx, action, finalStatus, errorMessage)
+		if uc.pcWorkflowUc != nil {
+			uc.pcWorkflowUc.HandleActionTerminal(ctx, action, finalStatus, errorMessage, syncPayload)
+		}
 	}
 
 	return nil

@@ -784,6 +784,108 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/protocol-converters/opc-ua:
+        post:
+            tags:
+                - DeviceMgmtService
+            description: 'Deploy OPC-UA bridge (workflow: deploy shell + configure read flow).'
+            operationId: DeviceMgmtService_DeployOpcUaProtocolConverter
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.DeployOpcUaProtocolConverterRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/protocol-converters/opc-ua/actions/{actionId}/result:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Poll typed result (workflow id for deploy, child action id for get/edit).
+            operationId: DeviceMgmtService_GetOpcUaProtocolConverterActionResponse
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: actionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaProtocolConverterActionResponse'
+    /api/v1/devicemgmt/devices/{deviceId}/protocol-converters/opc-ua/{uuid}:
+        get:
+            tags:
+                - DeviceMgmtService
+            description: Queue async get; returns child action_id to poll.
+            operationId: DeviceMgmtService_GetOpcUaProtocolConverter
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
+        patch:
+            tags:
+                - DeviceMgmtService
+            description: Edit OPC-UA bridge (single edit action).
+            operationId: DeviceMgmtService_EditOpcUaProtocolConverter
+            parameters:
+                - name: deviceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: uuid
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/api.devicemgmt.v1.EditOpcUaProtocolConverterRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/api.devicemgmt.v1.ActionQueuedResponse'
     /api/v1/devicemgmt/devices/{deviceId}/protocol-converters/{actionId}/result:
         get:
             tags:
@@ -1431,6 +1533,30 @@ components:
                     type: string
                 payload:
                     $ref: '#/components/schemas/api.umh_core.v2.DeployDataFlowComponentPayload'
+        api.devicemgmt.v1.DeployOpcUaProtocolConverterRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                name:
+                    type: string
+                connection:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterConnection'
+                location:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterLocation'
+                input:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaInputSection'
+                read_flow:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaReadFlowSection'
+                template_variables:
+                    type: object
+                    additionalProperties:
+                        type: string
+                apply_read_config:
+                    type: boolean
+                state:
+                    type: string
+                    description: 'umh-core desired FSM state: "active" (default) or "stopped".'
         api.devicemgmt.v1.DeployProtocolConverterRequest:
             type: object
             properties:
@@ -1755,6 +1881,29 @@ components:
                     type: string
                 structure:
                     type: object
+        api.devicemgmt.v1.EditOpcUaProtocolConverterRequest:
+            type: object
+            properties:
+                deviceId:
+                    type: string
+                uuid:
+                    type: string
+                name:
+                    type: string
+                connection:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterConnection'
+                location:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterLocation'
+                input:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaInputSection'
+                read_flow:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaReadFlowSection'
+                template_variables:
+                    type: object
+                    additionalProperties:
+                        type: string
+                state:
+                    type: string
         api.devicemgmt.v1.EditProtocolConverterRequest:
             type: object
             properties:
@@ -2001,6 +2150,276 @@ components:
                          Each metric: {"name": "...", "value": "...", "componentType": "...", ...}
                          Server automatically decompresses gzip/zstd payloads before returning
                          Client can directly parse as JSON without decoding base64
+        api.devicemgmt.v1.OpcUaAdditionalSetting:
+            type: object
+            properties:
+                key:
+                    type: string
+                value:
+                    type: string
+        api.devicemgmt.v1.OpcUaAdvancedInputConfig:
+            type: object
+            properties:
+                profile:
+                    type: string
+                    description: 'benthos-umh YAML key: profile (auto, ignition, kepware, siemens-s7-1200, …)'
+                username:
+                    type: string
+                password:
+                    type: string
+                security_mode:
+                    type: string
+                security_policy:
+                    type: string
+                client_certificate_base64:
+                    type: string
+                server_certificate_fingerprint:
+                    type: string
+                user_certificate_base64:
+                    type: string
+                user_private_key_base64:
+                    type: string
+                session_timeout_ms:
+                    type: integer
+                    format: int32
+                insecure:
+                    type: boolean
+                direct_connect:
+                    type: boolean
+                auto_reconnect:
+                    type: boolean
+                reconnect_interval_seconds:
+                    type: integer
+                    format: int32
+                queue_size:
+                    type: integer
+                    format: int32
+                sampling_interval:
+                    type: number
+                    format: double
+        api.devicemgmt.v1.OpcUaConditionClause:
+            type: object
+            properties:
+                field:
+                    type: string
+                operator:
+                    type: string
+                value:
+                    type: string
+        api.devicemgmt.v1.OpcUaInputSection:
+            type: object
+            properties:
+                structured:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaInputStructuredConfig'
+                raw_yaml:
+                    type: string
+                mode:
+                    type: integer
+                    format: enum
+        api.devicemgmt.v1.OpcUaInputStructuredConfig:
+            type: object
+            properties:
+                standard:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaStandardInputConfig'
+                advanced:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaAdvancedInputConfig'
+                additional_settings:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaAdditionalSetting'
+        api.devicemgmt.v1.OpcUaNodeSubscription:
+            type: object
+            properties:
+                node_id:
+                    type: string
+                    description: OPC-UA node identifier, e.g. "ns=2;s=MyVariable", "i=84".
+                display_name:
+                    type: string
+                    description: UI-only label from browse; not written to YAML.
+        api.devicemgmt.v1.OpcUaOutputInfo:
+            type: object
+            properties:
+                autogenerated:
+                    type: boolean
+                description:
+                    type: string
+        api.devicemgmt.v1.OpcUaProcessorCondition:
+            type: object
+            properties:
+                clauses:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaConditionClause'
+                joiner:
+                    type: string
+                action:
+                    type: string
+                if_expression:
+                    type: string
+        api.devicemgmt.v1.OpcUaProcessorDefaults:
+            type: object
+            properties:
+                location_path:
+                    type: string
+                data_contract:
+                    type: string
+                virtual_path:
+                    type: string
+        api.devicemgmt.v1.OpcUaProcessorStructuredConfig:
+            type: object
+            properties:
+                defaults:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaProcessorDefaults'
+                tag_mappings:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaTagMapping'
+                conditions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaProcessorCondition'
+                defaults_code:
+                    type: string
+                conditions_yaml:
+                    type: string
+                advanced_processing:
+                    type: string
+                    description: tag_processor.advancedProcessing — default "return msg;"
+        api.devicemgmt.v1.OpcUaProtocolConverter:
+            type: object
+            properties:
+                uuid:
+                    type: string
+                name:
+                    type: string
+                connection:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterConnection'
+                location:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterLocation'
+                data_type:
+                    type: integer
+                    format: enum
+                input:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaInputSection'
+                read_flow:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaReadFlowSection'
+                output:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaOutputInfo'
+                raw_input_yaml:
+                    type: string
+                raw_processor_yaml:
+                    type: string
+                raw_buffer_yaml:
+                    type: string
+                template_variables:
+                    type: object
+                    additionalProperties:
+                        type: string
+                input_parse:
+                    type: integer
+                    format: enum
+                processor_parse:
+                    type: integer
+                    format: enum
+                deployment_status:
+                    type: string
+                health_status:
+                    type: string
+                error_message:
+                    type: string
+                processing_mode:
+                    type: string
+                    description: From umh-core meta / GET payload.
+                protocol:
+                    type: string
+                state:
+                    type: string
+        api.devicemgmt.v1.OpcUaProtocolConverterActionResponse:
+            type: object
+            properties:
+                action_id:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+                completed_at:
+                    type: string
+                    format: date-time
+                error_message:
+                    type: string
+                stage:
+                    type: integer
+                    format: enum
+                steps:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterWorkflowSteps'
+                rollback_status:
+                    type: integer
+                    format: enum
+                result:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaProtocolConverter'
+        api.devicemgmt.v1.OpcUaReadFlowSection:
+            type: object
+            properties:
+                data_type:
+                    type: integer
+                    format: enum
+                processor:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaProcessorStructuredConfig'
+                yaml_inject:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaYamlInjectConfig'
+                raw_processor_yaml:
+                    type: string
+                raw_buffer_yaml:
+                    type: string
+                processor_mode:
+                    type: integer
+                    format: enum
+                buffer_mode:
+                    type: integer
+                    format: enum
+        api.devicemgmt.v1.OpcUaStandardInputConfig:
+            type: object
+            properties:
+                subscribe_node_ids:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaNodeSubscription'
+                node_ids_text:
+                    type: string
+                    description: Multiline or comma-separated node IDs (alternative to subscribe_node_ids).
+                endpoint:
+                    type: string
+                poll_rate:
+                    type: integer
+                    description: Poll interval in milliseconds when subscribe_enabled is false (benthos-umh pollRate).
+                    format: int32
+                subscribe_enabled:
+                    type: boolean
+                use_heartbeat:
+                    type: boolean
+        api.devicemgmt.v1.OpcUaTagMapping:
+            type: object
+            properties:
+                node_id:
+                    type: string
+                tag_name:
+                    type: string
+                data_contract:
+                    type: string
+                virtual_path:
+                    type: string
+                location_path_suffix:
+                    type: string
+                metadata:
+                    type: object
+                    additionalProperties:
+                        type: string
+        api.devicemgmt.v1.OpcUaYamlInjectConfig:
+            type: object
+            properties:
+                raw_yaml:
+                    type: string
+            description: 'Inject block: buffer, cache_resources, rate_limit_resources (readDFC.rawYAML).'
         api.devicemgmt.v1.ProtocolConverterActionResponse:
             type: object
             properties:
@@ -2021,6 +2440,22 @@ components:
                         result field contents:
                          - Deploy/Edit/Get: populated with the ProtocolConverter object
                          - Delete: empty (when status=COMPLETED, no object is returned)
+        api.devicemgmt.v1.ProtocolConverterConnection:
+            type: object
+            properties:
+                ip:
+                    type: string
+                port:
+                    type: integer
+                    format: uint32
+        api.devicemgmt.v1.ProtocolConverterLocation:
+            type: object
+            properties:
+                levels:
+                    type: object
+                    additionalProperties:
+                        type: string
+            description: UNS location hierarchy (same semantics as umh-core ProtocolConverter.location).
         api.devicemgmt.v1.ProtocolConverterSummary:
             type: object
             properties:
@@ -2040,6 +2475,23 @@ components:
                     type: string
                 errorMessage:
                     type: string
+        api.devicemgmt.v1.ProtocolConverterWorkflowStep:
+            type: object
+            properties:
+                action_id:
+                    type: string
+                status:
+                    type: integer
+                    format: enum
+        api.devicemgmt.v1.ProtocolConverterWorkflowSteps:
+            type: object
+            properties:
+                deploy:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterWorkflowStep'
+                configure:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterWorkflowStep'
+                rollback:
+                    $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterWorkflowStep'
         api.devicemgmt.v1.RegisterDeviceRequest:
             type: object
             properties:
@@ -2474,6 +2926,8 @@ components:
                     $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterTemplateInfo'
                 meta:
                     $ref: '#/components/schemas/api.umh_core.v2.ProtocolConverterMeta'
+                state:
+                    type: string
             description: |-
                 ProtocolConverter: Full protocol converter model (action payload for Deploy/Edit)
                  MUST match umh-core's models.ProtocolConverter exactly

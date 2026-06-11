@@ -353,6 +353,7 @@ message ProtocolConverter {
   ProtocolConverterDFC writeDFC = 6; // Write data flow component (optional)
   ProtocolConverterTemplateInfo templateInfo = 7; // Template variables (optional)
   ProtocolConverterMeta meta = 8; // Metadata (optional)
+  string state = 9; // Desired FSM state: "active" or "stopped" (optional, default active)
 }
 
 // ============================================================================

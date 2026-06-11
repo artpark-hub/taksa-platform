@@ -1,0 +1,19 @@
+meta {
+  name: Poll OPC-UA facade workflow result
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/opc-ua/actions/{{opcua_workflow_action_id}}/result
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("HTTP 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

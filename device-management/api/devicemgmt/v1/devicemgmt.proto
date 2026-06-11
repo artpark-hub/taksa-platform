@@ -8,6 +8,8 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "devicemgmt/v1/models.proto";
 import "devicemgmt/v1/device_topics.proto";
+import "devicemgmt/v1/protocol_converter_common.proto";
+import "devicemgmt/v1/protocol_converter_opcua.proto";
 import "umh-core/v2/models.proto";
 
 option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1;v1";
@@ -223,6 +225,40 @@ service DeviceMgmtService {
   rpc GetProtocolConverterActionResponse(ActionResultRequest) returns (ProtocolConverterActionResponse) {
     option (google.api.http) = {
       get: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/{action_id}/result"
+    };
+  }
+
+  // ============================================================================
+  // OPC-UA Protocol Converter facade RPCs
+  // ============================================================================
+
+  // Deploy OPC-UA bridge (workflow: deploy shell + configure read flow).
+  rpc DeployOpcUaProtocolConverter(DeployOpcUaProtocolConverterRequest) returns (ActionQueuedResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/opc-ua"
+      body: "*"
+    };
+  }
+
+  // Edit OPC-UA bridge (single edit action).
+  rpc EditOpcUaProtocolConverter(EditOpcUaProtocolConverterRequest) returns (ActionQueuedResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/opc-ua/{uuid}"
+      body: "*"
+    };
+  }
+
+  // Queue async get; returns child action_id to poll.
+  rpc GetOpcUaProtocolConverter(GetOpcUaProtocolConverterRequest) returns (ActionQueuedResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/opc-ua/{uuid}"
+    };
+  }
+
+  // Poll typed result (workflow id for deploy, child action id for get/edit).
+  rpc GetOpcUaProtocolConverterActionResponse(ActionResultRequest) returns (OpcUaProtocolConverterActionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/opc-ua/actions/{action_id}/result"
     };
   }
 

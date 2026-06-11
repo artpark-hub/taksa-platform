@@ -1,0 +1,73 @@
+meta {
+  name: Deploy OPC-UA Protocol Converter (facade)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/opc-ua
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}",
+    "name": "facade-opcua-{{timestamp}}",
+    "connection": {
+      "ip": "192.168.1.50",
+      "port": 4840
+    },
+    "location": {
+      "levels": {
+        "0": "AcmeCorp",
+        "1": "PlantA"
+      }
+    },
+    "state": "active",
+    "input": {
+      "mode": "STRUCTURED",
+      "structured": {
+        "standard": {
+          "subscribeEnabled": true,
+          "useHeartbeat": true,
+          "subscribeNodeIds": [
+            { "nodeId": "ns=2;s=MyVariable" }
+          ]
+        },
+        "advanced": {
+          "profile": "auto"
+        }
+      }
+    },
+    "readFlow": {
+      "dataType": "TIME_SERIES",
+      "processorMode": "STRUCTURED",
+      "processor": {
+        "defaults": {
+          "locationPath": "{{ .location_path }}",
+          "dataContract": "_historian"
+        }
+      },
+      "bufferMode": "STRUCTURED",
+      "yamlInject": {
+        "rawYaml": "buffer:\n  none: {}\n"
+      }
+    },
+    "applyReadConfig": true
+  }
+}
+
+script:pre-request {
+  bru.setEnvVar('timestamp', Date.now().toString());
+}
+
+script:post-response {
+  const resp = res.getBody();
+  if (resp && resp.actionId) {
+    bru.setEnvVar('opcua_workflow_action_id', resp.actionId);
+  }
+}

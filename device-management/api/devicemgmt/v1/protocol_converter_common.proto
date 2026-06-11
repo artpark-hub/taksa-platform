@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package api.devicemgmt.v1;
+
+import "devicemgmt/v1/models.proto";
+
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.devicemgmt.v1";
+
+// UNS location hierarchy (same semantics as umh-core ProtocolConverter.location).
+message ProtocolConverterLocation {
+  map<int32, string> levels = 1;
+}
+
+message ProtocolConverterConnection {
+  string ip   = 1;
+  uint32 port = 2;
+}
+
+// Per-section edit mode for dual visual/YAML UI.
+enum EditSectionMode {
+  EDIT_SECTION_MODE_UNSPECIFIED = 0;
+  STRUCTURED = 1;
+  RAW        = 2;
+}
+
+// Result of parsing device YAML into structured fields.
+enum SectionParseStatus {
+  SECTION_PARSE_STATUS_UNSPECIFIED = 0;
+  PARSE_OK      = 1;
+  PARSE_PARTIAL = 2;
+  PARSE_FAILED  = 3;
+}
+
+message TagProcessorCondition {
+  string condition = 1;
+  string action    = 2;
+}
+
+message TagProcessorConfig {
+  string defaults = 1;
+  repeated TagProcessorCondition conditions = 2;
+  string advanced_processing = 3 [json_name = "advanced_processing"];
+  // When mode=RAW, this is sent verbatim (after validation).
+  string raw_yaml = 4 [json_name = "raw_yaml"];
+}
+
+message ReadFlowBufferConfig {
+  string raw_yaml = 1 [json_name = "raw_yaml"];
+}
+
+message ReadFlowConfig {
+  TagProcessorConfig tag_processor = 1 [json_name = "tag_processor"];
+  ReadFlowBufferConfig buffer       = 2;
+  // Input-section raw override (opcua:/modbus: block).
+  string raw_input_yaml = 3 [json_name = "raw_input_yaml"];
+}
+
+// Workflow stage — only meaningful when workflow status is PROCESSING.
+// Orthogonal to child action states (QUEUED, DELIVERED, etc.).
+enum ProtocolConverterWorkflowStage {
+  PROTOCOL_CONVERTER_WORKFLOW_STAGE_UNSPECIFIED = 0;
+  DEPLOYING     = 1;
+  CONFIGURING   = 2;
+  ROLLING_BACK  = 3;
+}
+
+enum ProtocolConverterRollbackStatus {
+  PROTOCOL_CONVERTER_ROLLBACK_STATUS_UNSPECIFIED = 0;
+  ROLLBACK_CLEAN        = 1;
+  ROLLBACK_ORPHAN_SHELL = 2;
+}
+
+message ProtocolConverterWorkflowStep {
+  string action_id = 1 [json_name = "action_id"];
+  ActionStatus status = 2;
+}
+
+message ProtocolConverterWorkflowSteps {
+  ProtocolConverterWorkflowStep deploy     = 1;
+  ProtocolConverterWorkflowStep configure  = 2;
+  ProtocolConverterWorkflowStep rollback   = 3;
+}

@@ -1,0 +1,209 @@
+syntax = "proto3";
+
+package api.devicemgmt.v1;
+
+import "google/protobuf/timestamp.proto";
+import "devicemgmt/v1/models.proto";
+import "devicemgmt/v1/protocol_converter_common.proto";
+
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.devicemgmt.v1";
+
+// Bridge data type (UMH Configuration card). v1 supports time-series read bridges only.
+enum OpcUaBridgeDataType {
+  OPC_UA_BRIDGE_DATA_TYPE_UNSPECIFIED = 0;
+  TIME_SERIES = 1;
+}
+
+// ============================================================================
+// Input (OPC UA) — Standard / Advanced / Additional settings
+// YAML schema: taksa-benthos-umh opcua_plugin (core_connection.go, read.go)
+// ============================================================================
+
+message OpcUaNodeSubscription {
+  // OPC-UA node identifier, e.g. "ns=2;s=MyVariable", "i=84".
+  string node_id = 1 [json_name = "node_id"];
+  // UI-only label from browse; not written to YAML.
+  string display_name = 2 [json_name = "display_name"];
+}
+
+message OpcUaStandardInputConfig {
+  repeated OpcUaNodeSubscription subscribe_node_ids = 1 [json_name = "subscribe_node_ids"];
+  // Multiline or comma-separated node IDs (alternative to subscribe_node_ids).
+  string node_ids_text = 2 [json_name = "node_ids_text"];
+  string endpoint = 3;
+  // Poll interval in milliseconds when subscribe_enabled is false (benthos-umh pollRate).
+  int32 poll_rate = 4 [json_name = "poll_rate"];
+  bool subscribe_enabled = 5 [json_name = "subscribe_enabled"];
+  bool use_heartbeat = 6 [json_name = "use_heartbeat"];
+}
+
+message OpcUaAdvancedInputConfig {
+  // benthos-umh YAML key: profile (auto, ignition, kepware, siemens-s7-1200, …)
+  string profile = 1;
+  string username = 2;
+  string password = 3;
+  string security_mode = 4 [json_name = "security_mode"];
+  string security_policy = 5 [json_name = "security_policy"];
+  string client_certificate_base64 = 6 [json_name = "client_certificate_base64"];
+  string server_certificate_fingerprint = 7 [json_name = "server_certificate_fingerprint"];
+  string user_certificate_base64 = 8 [json_name = "user_certificate_base64"];
+  string user_private_key_base64 = 9 [json_name = "user_private_key_base64"];
+  int32 session_timeout_ms = 10 [json_name = "session_timeout_ms"];
+  bool insecure = 11;
+  bool direct_connect = 12 [json_name = "direct_connect"];
+  bool auto_reconnect = 13 [json_name = "auto_reconnect"];
+  int32 reconnect_interval_seconds = 14 [json_name = "reconnect_interval_seconds"];
+  int32 queue_size = 15 [json_name = "queue_size"];
+  double sampling_interval = 16 [json_name = "sampling_interval"];
+}
+
+message OpcUaAdditionalSetting {
+  string key = 1;
+  string value = 2;
+}
+
+message OpcUaInputStructuredConfig {
+  OpcUaStandardInputConfig standard = 1;
+  OpcUaAdvancedInputConfig advanced = 2;
+  repeated OpcUaAdditionalSetting additional_settings = 3 [json_name = "additional_settings"];
+}
+
+message OpcUaInputSection {
+  OpcUaInputStructuredConfig structured = 1;
+  string raw_yaml = 2 [json_name = "raw_yaml"];
+  EditSectionMode mode = 3;
+}
+
+// ============================================================================
+// Processing (Tag Processor) — benthos-umh tag_processor_plugin
+// Downsampler is injected at runtime by umh-core (separate pipeline processor).
+// ============================================================================
+
+message OpcUaProcessorDefaults {
+  string location_path = 1 [json_name = "location_path"];
+  string data_contract = 2 [json_name = "data_contract"];
+  string virtual_path = 3 [json_name = "virtual_path"];
+}
+
+message OpcUaTagMapping {
+  string node_id = 1 [json_name = "node_id"];
+  string tag_name = 2 [json_name = "tag_name"];
+  string data_contract = 3 [json_name = "data_contract"];
+  string virtual_path = 4 [json_name = "virtual_path"];
+  string location_path_suffix = 5 [json_name = "location_path_suffix"];
+  map<string, string> metadata = 6;
+}
+
+message OpcUaConditionClause {
+  string field = 1;
+  string operator = 2;
+  string value = 3;
+}
+
+message OpcUaProcessorCondition {
+  repeated OpcUaConditionClause clauses = 1;
+  string joiner = 2;
+  string action = 3;
+  string if_expression = 4 [json_name = "if_expression"];
+}
+
+message OpcUaProcessorStructuredConfig {
+  OpcUaProcessorDefaults defaults = 1;
+  repeated OpcUaTagMapping tag_mappings = 2 [json_name = "tag_mappings"];
+  repeated OpcUaProcessorCondition conditions = 3;
+  string defaults_code = 4 [json_name = "defaults_code"];
+  string conditions_yaml = 5 [json_name = "conditions_yaml"];
+  // tag_processor.advancedProcessing — default "return msg;"
+  string advanced_processing = 6 [json_name = "advanced_processing"];
+}
+
+// Inject block: buffer, cache_resources, rate_limit_resources (readDFC.rawYAML).
+message OpcUaYamlInjectConfig {
+  string raw_yaml = 1 [json_name = "raw_yaml"];
+}
+
+message OpcUaReadFlowSection {
+  OpcUaBridgeDataType data_type = 1 [json_name = "data_type"];
+  OpcUaProcessorStructuredConfig processor = 2;
+  OpcUaYamlInjectConfig yaml_inject = 3 [json_name = "yaml_inject"];
+  string raw_processor_yaml = 4 [json_name = "raw_processor_yaml"];
+  string raw_buffer_yaml = 5 [json_name = "raw_buffer_yaml"];
+  EditSectionMode processor_mode = 6 [json_name = "processor_mode"];
+  EditSectionMode buffer_mode = 7 [json_name = "buffer_mode"];
+}
+
+message OpcUaOutputInfo {
+  bool autogenerated = 1;
+  string description = 2;
+}
+
+// ============================================================================
+// Deploy / Edit / Get
+// ============================================================================
+
+message DeployOpcUaProtocolConverterRequest {
+  string device_id = 1;
+  string name = 2;
+  ProtocolConverterConnection connection = 3;
+  ProtocolConverterLocation location = 4;
+  OpcUaInputSection input = 5;
+  OpcUaReadFlowSection read_flow = 6 [json_name = "read_flow"];
+  map<string, string> template_variables = 7 [json_name = "template_variables"];
+  bool apply_read_config = 8 [json_name = "apply_read_config"];
+  // umh-core desired FSM state: "active" (default) or "stopped".
+  string state = 9;
+}
+
+message EditOpcUaProtocolConverterRequest {
+  string device_id = 1;
+  string uuid = 2;
+  string name = 3;
+  ProtocolConverterConnection connection = 4;
+  ProtocolConverterLocation location = 5;
+  OpcUaInputSection input = 6;
+  OpcUaReadFlowSection read_flow = 7 [json_name = "read_flow"];
+  map<string, string> template_variables = 8 [json_name = "template_variables"];
+  string state = 9;
+}
+
+message GetOpcUaProtocolConverterRequest {
+  string device_id = 1;
+  string uuid = 2;
+}
+
+message OpcUaProtocolConverter {
+  string uuid = 1;
+  string name = 2;
+  ProtocolConverterConnection connection = 3;
+  ProtocolConverterLocation location = 4;
+  OpcUaBridgeDataType data_type = 5 [json_name = "data_type"];
+  OpcUaInputSection input = 6;
+  OpcUaReadFlowSection read_flow = 7 [json_name = "read_flow"];
+  OpcUaOutputInfo output = 8;
+  string raw_input_yaml = 9 [json_name = "raw_input_yaml"];
+  string raw_processor_yaml = 10 [json_name = "raw_processor_yaml"];
+  string raw_buffer_yaml = 11 [json_name = "raw_buffer_yaml"];
+  map<string, string> template_variables = 12 [json_name = "template_variables"];
+  SectionParseStatus input_parse = 13 [json_name = "input_parse"];
+  SectionParseStatus processor_parse = 14 [json_name = "processor_parse"];
+  string deployment_status = 15 [json_name = "deployment_status"];
+  string health_status = 16 [json_name = "health_status"];
+  string error_message = 17 [json_name = "error_message"];
+  // From umh-core meta / GET payload.
+  string processing_mode = 18 [json_name = "processing_mode"];
+  string protocol = 19;
+  string state = 20;
+}
+
+message OpcUaProtocolConverterActionResponse {
+  string action_id = 1 [json_name = "action_id"];
+  ActionStatus status = 2;
+  google.protobuf.Timestamp completed_at = 3 [json_name = "completed_at"];
+  string error_message = 4 [json_name = "error_message"];
+  ProtocolConverterWorkflowStage stage = 5;
+  ProtocolConverterWorkflowSteps steps = 6;
+  ProtocolConverterRollbackStatus rollback_status = 7 [json_name = "rollback_status"];
+  OpcUaProtocolConverter result = 8;
+}
