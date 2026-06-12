@@ -194,6 +194,10 @@ func (s *DeviceMgmtService) GetOpcUaProtocolConverterActionResponse(ctx context.
 		return resp, nil
 	}
 	if !opcua.IsOpcUaProtocolConverter(pc) {
+		// umh-core edit-protocol-converter replies with {uuid} only; run GET for full facade.
+		if action.Type == "edit-protocol-converter" && opcua.IsMinimalProtocolConverterReply(pc) {
+			return resp, nil
+		}
 		return nil, status.Error(codes.FailedPrecondition, "protocol converter is not OPC-UA kind")
 	}
 	resp.Result = opcua.ToFacade(pc)

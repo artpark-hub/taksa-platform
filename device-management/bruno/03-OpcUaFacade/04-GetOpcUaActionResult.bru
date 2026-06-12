@@ -22,11 +22,10 @@ docs {
   For deploy workflow polling use 02-GetOpcUaWorkflowResult instead
   (`opcua_workflow_action_id`).
   
-  When status=COMPLETED, `result` is an OpcUaProtocolConverter with:
-  - raw_input_yaml, raw_processor_yaml, raw_buffer_yaml
-  - input.structured, read_flow.processor
-  - input_parse, processor_parse
-  - processing_mode, protocol, state
+  When status=COMPLETED:
+  - GET actions: `result` is a full OpcUaProtocolConverter facade
+  - EDIT actions: umh-core returns `{uuid}` only — `result` may be absent even on success.
+    Run 03-GetOpcUaProtocolConverter to verify config after edit.
   
   Poll every 1–2s until COMPLETED or FAILED.
 }

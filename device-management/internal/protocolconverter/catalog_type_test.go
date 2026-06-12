@@ -34,6 +34,18 @@ func TestIsKnownNonOpcUaCatalogType(t *testing.T) {
 	}
 }
 
+func TestWireTypeFromJSON(t *testing.T) {
+	deployShell := []byte(`{"name":"bridge-1","meta":{"protocol":"opcua"}}`)
+	if got := WireTypeFromJSON(deployShell); got != "opcua" {
+		t.Fatalf("WireTypeFromJSON deploy shell = %q, want opcua", got)
+	}
+
+	configure := []byte(`{"uuid":"abc","readDFC":{"inputs":{"type":"opcua"}}}`)
+	if got := WireTypeFromJSON(configure); got != "opcua" {
+		t.Fatalf("WireTypeFromJSON configure = %q, want opcua", got)
+	}
+}
+
 func TestWireTypeFromMap(t *testing.T) {
 	pc := map[string]interface{}{
 		"meta": map[string]interface{}{"protocol": "opcua"},

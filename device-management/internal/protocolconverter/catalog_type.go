@@ -1,6 +1,9 @@
 package protocolconverter
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // IsGenericCatalogType reports whether the catalog type is the DFC kind, not a wire protocol.
 // Heartbeat sync only knows dfcType "protocol-converter"; deploy/get responses carry opcua/modbus.
@@ -24,14 +27,32 @@ func IsKnownNonOpcUaCatalogType(t string) bool {
 	return strings.Contains(n, "modbus") || strings.Contains(n, "sparkplug")
 }
 
+// WireTypeFromJSON extracts wire protocol from a queued action payload (protojson or JSON object).
+func WireTypeFromJSON(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return ""
+	}
+	return WireTypeFromMap(m)
+}
+
 // WireTypeFromMap extracts readDFC.inputs.type or meta.protocol from an umh-core payload map.
 func WireTypeFromMap(pc map[string]interface{}) string {
 	if pc == nil {
 		return ""
 	}
-	if meta, ok := pc["meta"].(map[string]interface{}); ok {
-		if protocol, ok := meta["protocol"].(string); ok && protocol != "" {
-			return protocol
+	for _, metaKey := range []string{"meta", "Meta"} {
+		meta, ok := pc[metaKey].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for _, protocolKey := range []string{"protocol", "Protocol"} {
+			if protocol, ok := meta[protocolKey].(string); ok && protocol != "" {
+				return protocol
+			}
 		}
 	}
 	for _, key := range []string{"readDFC", "read_dfc", "ReadDFC"} {

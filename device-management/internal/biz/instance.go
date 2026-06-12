@@ -1537,17 +1537,10 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				converterType = "protocol-converter"
 			}
 
-			// If not in response, extract from request payload
+			// Deploy replies are often shell-only; read meta/readDFC from the queued request.
 			if protocolconverter.IsGenericCatalogType(converterType) && action.Payload != nil {
-				var requestPayload map[string]interface{}
-				if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
-					if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
-						if inputs, ok := readDFC["inputs"].(map[string]interface{}); ok {
-							if inputType, ok := inputs["type"].(string); ok && inputType != "" {
-								converterType = inputType
-							}
-						}
-					}
+				if t := protocolconverter.WireTypeFromJSON(action.Payload.Value); !protocolconverter.IsGenericCatalogType(t) {
+					converterType = t
 				}
 			}
 
@@ -1588,17 +1581,9 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				}
 				connectionUUID := ""
 
-				// If not in response, extract from request payload
 				if protocolconverter.IsGenericCatalogType(converterType) && action.Payload != nil {
-					var requestPayload map[string]interface{}
-					if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
-						if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
-							if inputs, ok := readDFC["inputs"].(map[string]interface{}); ok {
-								if inputType, ok := inputs["type"].(string); ok && inputType != "" {
-									converterType = inputType
-								}
-							}
-						}
+					if t := protocolconverter.WireTypeFromJSON(action.Payload.Value); !protocolconverter.IsGenericCatalogType(t) {
+						converterType = t
 					}
 				}
 
@@ -1614,17 +1599,23 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 					fmt.Printf("Warning: Failed to upsert renamed protocol converter: %v\n", err)
 				}
 			} else {
-				// UUID unchanged (name unchanged) - just update status and details
-				err := uc.protocolConverterRepo.UpdateStatus(ctx,
-					tenantID,
-					action.DeviceId,
-					uuid,
-					"ACTIVE", // deployment_status
-					"ONLINE", // health_status
-					"",       // error_message (clear any previous errors)
-				)
-				if err != nil {
-					fmt.Printf("Warning: Failed to update protocol converter status: %v\n", err)
+				// UUID unchanged — edit replies are often {uuid} only; type lives in request payload.
+				converterType := protocolconverter.WireTypeFromMap(protocolConverter)
+				if protocolconverter.IsGenericCatalogType(converterType) && action.Payload != nil {
+					if t := protocolconverter.WireTypeFromJSON(action.Payload.Value); !protocolconverter.IsGenericCatalogType(t) {
+						converterType = t
+					}
+				}
+				updates := map[string]interface{}{
+					"deployment_status": "ACTIVE",
+					"health_status":     "ONLINE",
+					"error_message":     "",
+				}
+				if !protocolconverter.IsGenericCatalogType(converterType) {
+					updates["type"] = converterType
+				}
+				if err := uc.protocolConverterRepo.Update(ctx, tenantID, action.DeviceId, uuid, updates); err != nil {
+					fmt.Printf("Warning: Failed to update protocol converter after edit: %v\n", err)
 				}
 			}
 
