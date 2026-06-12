@@ -39,10 +39,14 @@ func ValidateEditRequest(req *v1.EditOpcUaProtocolConverterRequest) error {
 			return err
 		}
 	}
-	if req.GetInput() != nil {
-		if err := validateInputSection(req.GetInput()); err != nil {
-			return err
-		}
+	if req.GetInput() == nil {
+		return fmt.Errorf("input is required")
+	}
+	if req.GetReadFlow() == nil {
+		return fmt.Errorf("read_flow is required")
+	}
+	if err := validateInputSection(req.GetInput()); err != nil {
+		return err
 	}
 	return nil
 }

@@ -200,7 +200,9 @@ func (s *DeviceMgmtService) GetOpcUaProtocolConverterActionResponse(ctx context.
 		}
 		return nil, status.Error(codes.FailedPrecondition, "protocol converter is not OPC-UA kind")
 	}
-	resp.Result = opcua.ToFacade(pc)
+	facade := opcua.ToFacade(pc)
+	s.enrichOpcUaFacadeFromCatalog(ctx, tenantID, action.DeviceId, facade)
+	resp.Result = facade
 	return resp, nil
 }
 
@@ -231,18 +233,56 @@ func (s *DeviceMgmtService) buildOpcUaWorkflowPollResponse(ctx context.Context, 
 		}
 	}
 
-	if wf.Status == models.ActionStatusCompleted && wf.ConfigureActionID != "" {
+	if wf.Status == models.ActionStatusCompleted {
+		resp.Result = s.resolveOpcUaWorkflowFacade(ctx, tenantID, wf)
+	}
+
+	return resp, nil
+}
+
+func (s *DeviceMgmtService) resolveOpcUaWorkflowFacade(ctx context.Context, tenantID string, wf *models.ActionWorkflow) *v1.OpcUaProtocolConverter {
+	if wf.ConfigureActionID != "" {
 		resultPayload, err := s.instanceUc.GetActionResultPayload(ctx, tenantID, wf.ConfigureActionID)
 		if err == nil && len(resultPayload) > 0 {
 			if decompressed, err := decompressPayload(resultPayload); err == nil {
 				if pc, err := unmarshalProtocolConverterResult(decompressed); err == nil && pc != nil {
-					resp.Result = opcua.ToFacade(pc)
+					if !opcua.IsMinimalProtocolConverterReply(pc) && opcua.IsOpcUaProtocolConverter(pc) {
+						facade := opcua.ToFacade(pc)
+						s.enrichOpcUaFacadeFromCatalog(ctx, tenantID, wf.DeviceID, facade)
+						return facade
+					}
 				}
 			}
 		}
 	}
+	if wf.PendingConfigureJSON == "" {
+		return nil
+	}
+	var pc v2.ProtocolConverter
+	if err := protojson.Unmarshal([]byte(wf.PendingConfigureJSON), &pc); err != nil {
+		return nil
+	}
+	if pc.GetUuid() == "" {
+		pc.Uuid = wf.ConverterUUID
+	}
+	facade := opcua.ToFacade(&pc)
+	s.enrichOpcUaFacadeFromCatalog(ctx, tenantID, wf.DeviceID, facade)
+	return facade
+}
 
-	return resp, nil
+func (s *DeviceMgmtService) enrichOpcUaFacadeFromCatalog(ctx context.Context, tenantID, deviceID string, facade *v1.OpcUaProtocolConverter) {
+	if s.protocolConverterRepo == nil || facade == nil || facade.GetUuid() == "" {
+		return
+	}
+	row, err := s.protocolConverterRepo.GetByUUID(ctx, tenantID, deviceID, facade.GetUuid())
+	if err != nil || row == nil {
+		return
+	}
+	facade.DeploymentStatus = row.DeploymentStatus
+	facade.HealthStatus = row.HealthStatus
+	if row.ErrorMessage.Valid {
+		facade.ErrorMessage = row.ErrorMessage.String
+	}
 }
 
 func (s *DeviceMgmtService) assertOpcUaConverterKind(ctx context.Context, tenantID, deviceID, uuid string) error {

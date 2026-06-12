@@ -1,5 +1,7 @@
 # ADR: Protocol converter facade APIs
 
+> **UI integration:** [`OPC_UA_FACADE_UI_GUIDE.md`](./OPC_UA_FACADE_UI_GUIDE.md)
+
 ## Status
 
 Accepted — implementation in progress.

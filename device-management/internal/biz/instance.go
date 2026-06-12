@@ -1493,20 +1493,18 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 		// For deploy: UUID is generated from name (same as umh-core does)
 		// UUID generation is deterministic: GenerateUUIDFromName(name) == same UUID every time for same name
 		if actionType == "deploy" {
-			if name, ok := protocolConverter["name"].(string); ok && name != "" {
-				// Import would be needed: "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
-				// For now, try to get from request payload
-				if action.Payload != nil {
-					var origPayload map[string]interface{}
-					if err := json.Unmarshal(action.Payload.Value, &origPayload); err == nil {
-						if name, ok := origPayload["name"].(string); ok && name != "" {
-							// Use the name to look up the converter, or generate UUID from name
-							// For deterministic UUID generation: would need to implement same logic as umh-core
-							// Fallback: use name as temporary identifier
-							uuid = name // Temporary - ideally generate proper UUID from name
-						}
-					}
+			name := ""
+			if n, ok := protocolConverter["name"].(string); ok && n != "" {
+				name = n
+			}
+			if name == "" && action.Payload != nil {
+				var origPayload map[string]interface{}
+				if err := json.Unmarshal(action.Payload.Value, &origPayload); err == nil {
+					name, _ = origPayload["name"].(string)
 				}
+			}
+			if name != "" {
+				uuid = GenerateUUIDFromName(name)
 			}
 		}
 

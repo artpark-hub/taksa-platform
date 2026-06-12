@@ -233,7 +233,7 @@ func parseProcessorStructured(processorYAML, bufferYAML string, templateVars map
 	}
 
 	defaultCode := extractYAMLSection(processorYAML, "defaults", "conditions", "advancedProcessing")
-	conditionCode := extractYAMLSection(processorYAML, "conditions", "defaults", "advancedProcessing")
+	conditionCode := extractConditionsYAML(processorYAML)
 	advancedCode := extractYAMLSection(processorYAML, "advancedProcessing", "defaults", "conditions")
 	if defaultCode == "" {
 		defaultCode = buildDefaultProcessorCode(nil, nil)
@@ -247,11 +247,9 @@ func parseProcessorStructured(processorYAML, bufferYAML string, templateVars map
 	proc.ConditionsYaml = conditionCode
 	proc.Defaults = parseDefaultsFromCode(defaultCode)
 
-	mappings := parseAddressMappingsFromTemplate(templateVars)
-	if len(mappings) == 0 {
-		mappings = parseTagMappingsFromDefaultCode(defaultCode)
-	}
-	proc.TagMappings = mappings
+	fromTemplate := parseAddressMappingsFromTemplate(templateVars)
+	fromSwitch := parseTagMappingsFromDefaultCode(defaultCode)
+	proc.TagMappings = mergeTagMappings(fromTemplate, fromSwitch)
 	proc.Conditions = parseConditionsFromYAML(conditionCode)
 	if advancedCode == "" {
 		advancedCode = "return msg;"
@@ -259,10 +257,104 @@ func parseProcessorStructured(processorYAML, bufferYAML string, templateVars map
 	proc.AdvancedProcessing = advancedCode
 
 	status := v1.SectionParseStatus_PARSE_PARTIAL
-	if proc.Defaults != nil || len(proc.TagMappings) > 0 {
+	if proc.Defaults != nil && len(proc.TagMappings) > 0 {
 		status = v1.SectionParseStatus_PARSE_OK
 	}
+	if status == v1.SectionParseStatus_PARSE_OK && hasUnparsedConditions(processorYAML, conditionCode, proc.Conditions) {
+		status = v1.SectionParseStatus_PARSE_PARTIAL
+	}
 	return section, status
+}
+
+func mergeTagMappings(fromTemplate, fromSwitch []*v1.OpcUaTagMapping) []*v1.OpcUaTagMapping {
+	if len(fromSwitch) == 0 {
+		return fromTemplate
+	}
+	if len(fromTemplate) == 0 {
+		return fromSwitch
+	}
+	tmplByNode := make(map[string]*v1.OpcUaTagMapping, len(fromTemplate))
+	for _, m := range fromTemplate {
+		if id := strings.TrimSpace(m.GetNodeId()); id != "" {
+			tmplByNode[id] = m
+		}
+	}
+	out := make([]*v1.OpcUaTagMapping, 0, len(fromSwitch)+len(fromTemplate))
+	seen := make(map[string]struct{}, len(fromSwitch))
+	for _, sw := range fromSwitch {
+		id := strings.TrimSpace(sw.GetNodeId())
+		if id == "" {
+			continue
+		}
+		merged := cloneTagMapping(sw)
+		if tm, ok := tmplByNode[id]; ok {
+			mergeTagMappingExtras(merged, tm)
+		}
+		out = append(out, merged)
+		seen[id] = struct{}{}
+	}
+	for _, tm := range fromTemplate {
+		id := strings.TrimSpace(tm.GetNodeId())
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		out = append(out, cloneTagMapping(tm))
+	}
+	return out
+}
+
+func cloneTagMapping(m *v1.OpcUaTagMapping) *v1.OpcUaTagMapping {
+	if m == nil {
+		return &v1.OpcUaTagMapping{}
+	}
+	cp := *m
+	if m.Metadata != nil {
+		cp.Metadata = make(map[string]string, len(m.Metadata))
+		for k, v := range m.Metadata {
+			cp.Metadata[k] = v
+		}
+	}
+	return &cp
+}
+
+func mergeTagMappingExtras(dst, src *v1.OpcUaTagMapping) {
+	if dst == nil || src == nil {
+		return
+	}
+	if strings.TrimSpace(dst.GetVirtualPath()) == "" {
+		dst.VirtualPath = src.GetVirtualPath()
+	}
+	if strings.TrimSpace(dst.GetLocationPathSuffix()) == "" {
+		dst.LocationPathSuffix = src.GetLocationPathSuffix()
+	}
+	if strings.TrimSpace(dst.GetDataContract()) == "" || dst.GetDataContract() == "_historian" {
+		if v := strings.TrimSpace(src.GetDataContract()); v != "" {
+			dst.DataContract = v
+		}
+	}
+}
+
+func hasUnparsedConditions(processorYAML, conditionCode string, parsed []*v1.OpcUaProcessorCondition) bool {
+	if strings.TrimSpace(conditionCode) == "" || conditionCode == "[]" {
+		return false
+	}
+	if len(parsed) > 0 {
+		return false
+	}
+	return strings.Contains(processorYAML, "conditions:") && strings.Contains(processorYAML, "- if:")
+}
+
+func extractConditionsYAML(processorYAML string) string {
+	if block := extractYAMLSection(processorYAML, "conditions", "defaults", "advancedProcessing"); block != "" {
+		return block
+	}
+	if list := extractYAMLIndentedSection(processorYAML, "conditions", "defaults", "advancedProcessing"); list != "" {
+		return list
+	}
+	return "[]"
 }
 
 func parseDefaultsFromCode(code string) *v1.OpcUaProcessorDefaults {
@@ -338,11 +430,7 @@ func extractQuotedAssignment(line string) string {
 }
 
 func parseConditionsFromYAML(conditionYAML string) []*v1.OpcUaProcessorCondition {
-	text := strings.TrimSpace(conditionYAML)
-	if text == "" || text == "[]" {
-		return nil
-	}
-	entries := regexp.MustCompile(`(?m)\n(?=-\s+if:)`).Split(text, -1)
+	entries := splitConditionEntries(conditionYAML)
 	var out []*v1.OpcUaProcessorCondition
 	for _, entry := range entries {
 		entry = strings.TrimSpace(entry)
@@ -373,6 +461,32 @@ func parseConditionsFromYAML(conditionYAML string) []*v1.OpcUaProcessorCondition
 		})
 	}
 	return out
+}
+
+func splitConditionEntries(text string) []string {
+	text = strings.TrimSpace(text)
+	if text == "" || text == "[]" {
+		return nil
+	}
+	var entries []string
+	var current strings.Builder
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- if:") && current.Len() > 0 {
+			entries = append(entries, strings.TrimSpace(current.String()))
+			current.Reset()
+		}
+		if strings.HasPrefix(trimmed, "- if:") || current.Len() > 0 {
+			if current.Len() > 0 {
+				current.WriteByte('\n')
+			}
+			current.WriteString(line)
+		}
+	}
+	if current.Len() > 0 {
+		entries = append(entries, strings.TrimSpace(current.String()))
+	}
+	return entries
 }
 
 func parseClauseExpression(expression string) *v1.OpcUaConditionClause {
@@ -417,6 +531,50 @@ func stripBlockIndent(value string) string {
 		out = append(out, strings.TrimRight(line, " \t"))
 	}
 	return strings.TrimRight(strings.Join(out, "\n"), " \t")
+}
+
+func extractYAMLIndentedSection(yamlText, key string, nextKeys ...string) string {
+	text := stripTagProcessorRoot(yamlText)
+	lines := strings.Split(text, "\n")
+	keyPrefix := key + ":"
+	start := -1
+	keyIndent := 0
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, keyPrefix) {
+			continue
+		}
+		start = i
+		keyIndent = len(line) - len(strings.TrimLeft(line, " \t"))
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, keyPrefix))
+		if rest == "[]" {
+			return "[]"
+		}
+		if rest != "" && rest != "|" && rest != "|-" {
+			return rest
+		}
+		break
+	}
+	if start < 0 {
+		return ""
+	}
+	var body []string
+	for i := start + 1; i < len(lines); i++ {
+		line := lines[i]
+		if strings.TrimSpace(line) == "" {
+			body = append(body, line)
+			continue
+		}
+		if isTopLevelYAMLKey(line, nextKeys...) {
+			break
+		}
+		indent := len(line) - len(strings.TrimLeft(line, " \t"))
+		if indent <= keyIndent {
+			break
+		}
+		body = append(body, line)
+	}
+	return strings.TrimRight(strings.Join(body, "\n"), "\n")
 }
 
 func extractYAMLSection(yamlText, key string, nextKeys ...string) string {

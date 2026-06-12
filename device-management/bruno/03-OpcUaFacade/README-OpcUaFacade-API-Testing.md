@@ -2,6 +2,8 @@
 
 Typed protocol-converter facade for OPC-UA bridges (`/protocol-converters/opc-ua`).
 
+**UI developers:** see [`docs/OPC_UA_FACADE_UI_GUIDE.md`](../../docs/OPC_UA_FACADE_UI_GUIDE.md) for poll semantics, section modes, and GET-after-edit.
+
 ## Environment variables
 
 Set in `environments/default.bru` (Bruno desktop) or your active environment:

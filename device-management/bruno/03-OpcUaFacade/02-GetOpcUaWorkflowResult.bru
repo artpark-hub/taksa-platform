@@ -18,8 +18,11 @@ docs {
   Uses `opcua_workflow_action_id` (not `opcua_action_id`).
   For GET/EDIT polling use 04-GetOpcUaActionResult instead.
   
-  When COMPLETED, `result` contains the typed OpcUaProtocolConverter.
-  `steps` shows deploy / configure / rollback child action statuses.
+  When COMPLETED:
+  - `result` is the typed OpcUaProtocolConverter (from device reply or applied configure payload)
+  - `steps` shows deploy / configure / rollback child action statuses
+  
+  If `result` is missing, confirm `steps.configure.status=COMPLETED` then run GET.
 }
 
 script:post-response {
