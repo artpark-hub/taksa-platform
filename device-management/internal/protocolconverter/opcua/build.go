@@ -134,6 +134,21 @@ func resolveReadFlowYAML(section *v1.OpcUaReadFlowSection) (processorYAML, buffe
 	return processorYAML, bufferYAML, nil
 }
 
+// ResolveReadFlowYAML builds tag_processor and buffer YAML (shared by OPC-UA and Modbus facades).
+func ResolveReadFlowYAML(section *v1.OpcUaReadFlowSection) (string, string, error) {
+	return resolveReadFlowYAML(section)
+}
+
+// ParseReadFlowStructured parses tag_processor YAML into structured read_flow fields.
+func ParseReadFlowStructured(processorYAML, bufferYAML string, templateVars map[string]string) (*v1.OpcUaReadFlowSection, v1.SectionParseStatus) {
+	return parseProcessorStructured(processorYAML, bufferYAML, templateVars)
+}
+
+// BuildTemplateInfo assembles template variables for protocol converter deploy/edit.
+func BuildTemplateInfo(conn *v1.ProtocolConverterConnection, extra map[string]string, readFlow *v1.OpcUaReadFlowSection) *v2.ProtocolConverterTemplateInfo {
+	return buildTemplateInfo(conn, extra, readFlow)
+}
+
 func buildTemplateInfo(conn *v1.ProtocolConverterConnection, extra map[string]string, readFlow *v1.OpcUaReadFlowSection) *v2.ProtocolConverterTemplateInfo {
 	vars := []*v2.ProtocolConverterVariable{
 		{Label: "IP", Value: conn.GetIp()},

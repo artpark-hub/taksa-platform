@@ -10,6 +10,7 @@ import "devicemgmt/v1/models.proto";
 import "devicemgmt/v1/device_topics.proto";
 import "devicemgmt/v1/protocol_converter_common.proto";
 import "devicemgmt/v1/protocol_converter_opcua.proto";
+import "devicemgmt/v1/protocol_converter_modbus.proto";
 import "umh-core/v2/models.proto";
 
 option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1;v1";
@@ -259,6 +260,36 @@ service DeviceMgmtService {
   rpc GetOpcUaProtocolConverterActionResponse(ActionResultRequest) returns (OpcUaProtocolConverterActionResponse) {
     option (google.api.http) = {
       get: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/opc-ua/actions/{action_id}/result"
+    };
+  }
+
+  // ============================================================================
+  // Modbus Protocol Converter facade RPCs
+  // ============================================================================
+
+  rpc DeployModbusProtocolConverter(DeployModbusProtocolConverterRequest) returns (ActionQueuedResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/modbus"
+      body: "*"
+    };
+  }
+
+  rpc EditModbusProtocolConverter(EditModbusProtocolConverterRequest) returns (ActionQueuedResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/modbus/{uuid}"
+      body: "*"
+    };
+  }
+
+  rpc GetModbusProtocolConverter(GetModbusProtocolConverterRequest) returns (ActionQueuedResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/modbus/{uuid}"
+    };
+  }
+
+  rpc GetModbusProtocolConverterActionResponse(ActionResultRequest) returns (ModbusProtocolConverterActionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/devicemgmt/devices/{device_id}/protocol-converters/modbus/actions/{action_id}/result"
     };
   }
 

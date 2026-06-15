@@ -34,6 +34,23 @@ func TestIsKnownNonOpcUaCatalogType(t *testing.T) {
 	}
 }
 
+func TestIsKnownNonModbusCatalogType(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		want bool
+	}{
+		{"protocol-converter", false},
+		{"modbus", false},
+		{"modbus_tcp", false},
+		{"opcua", true},
+		{"opc-ua", true},
+	} {
+		if got := IsKnownNonModbusCatalogType(tc.in); got != tc.want {
+			t.Errorf("IsKnownNonModbusCatalogType(%q) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestWireTypeFromJSON(t *testing.T) {
 	deployShell := []byte(`{"name":"bridge-1","meta":{"protocol":"opcua"}}`)
 	if got := WireTypeFromJSON(deployShell); got != "opcua" {

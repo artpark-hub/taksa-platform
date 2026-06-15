@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package api.devicemgmt.v1;
+
+import "google/protobuf/timestamp.proto";
+import "devicemgmt/v1/models.proto";
+import "devicemgmt/v1/protocol_converter_common.proto";
+import "devicemgmt/v1/protocol_converter_opcua.proto";
+
+option go_package = "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.devicemgmt.v1";
+
+// Bridge data type (UMH Configuration card). v1 supports time-series read bridges only.
+enum ModbusBridgeDataType {
+  MODBUS_BRIDGE_DATA_TYPE_UNSPECIFIED = 0;
+  MODBUS_TIME_SERIES = 1;
+}
+
+// ============================================================================
+// Input (Modbus) — Standard / Advanced / Additional settings
+// YAML schema: taksa-benthos-umh modbus_plugin
+// ============================================================================
+
+message ModbusLegacyAddress {
+  string name = 1;
+  string register = 2;
+  uint32 address = 3;
+  string type = 4;
+  uint32 length = 5 [json_name = "length"];
+  uint32 bit = 6;
+  double scale = 7;
+  string output = 8;
+  uint32 slave_id = 9 [json_name = "slave_id"];
+}
+
+message ModbusStandardInputConfig {
+  // e.g. tcp://{{ .IP }}:{{ .PORT }}
+  string controller = 1;
+  repeated uint32 slave_ids = 2 [json_name = "slave_ids"];
+  // Preferred address format: name.register.address.type[:key=value]*
+  repeated string unified_addresses = 3 [json_name = "unified_addresses"];
+  // Deprecated on device when unified_addresses is set.
+  repeated ModbusLegacyAddress addresses = 4;
+  string time_between_reads = 5 [json_name = "time_between_reads"];
+  string timeout = 6;
+}
+
+message ModbusWorkaroundsConfig {
+  string pause_after_connect = 1 [json_name = "pause_after_connect"];
+  bool one_request_per_field = 2 [json_name = "one_request_per_field"];
+  bool read_coils_starting_at_zero = 3 [json_name = "read_coils_starting_at_zero"];
+  string time_between_requests = 4 [json_name = "time_between_requests"];
+  string string_register_location = 5 [json_name = "string_register_location"];
+}
+
+message ModbusAdvancedInputConfig {
+  string transmission_mode = 1 [json_name = "transmission_mode"];
+  string optimization = 2;
+  int32 optimization_max_register_fill = 3 [json_name = "optimization_max_register_fill"];
+  string byte_order = 4 [json_name = "byte_order"];
+  int32 busy_retries = 5 [json_name = "busy_retries"];
+  string busy_retries_wait = 6 [json_name = "busy_retries_wait"];
+  ModbusWorkaroundsConfig workarounds = 7;
+}
+
+message ModbusAdditionalSetting {
+  string key = 1;
+  string value = 2;
+}
+
+message ModbusInputStructuredConfig {
+  ModbusStandardInputConfig standard = 1;
+  ModbusAdvancedInputConfig advanced = 2;
+  repeated ModbusAdditionalSetting additional_settings = 3 [json_name = "additional_settings"];
+}
+
+message ModbusInputSection {
+  ModbusInputStructuredConfig structured = 1;
+  string raw_yaml = 2 [json_name = "raw_yaml"];
+  EditSectionMode mode = 3;
+}
+
+// ============================================================================
+// Deploy / Edit / Get — read_flow reuses OpcUaReadFlowSection (tag_processor)
+// ============================================================================
+
+message DeployModbusProtocolConverterRequest {
+  string device_id = 1;
+  string name = 2;
+  ProtocolConverterConnection connection = 3;
+  ProtocolConverterLocation location = 4;
+  ModbusInputSection input = 5;
+  OpcUaReadFlowSection read_flow = 6 [json_name = "read_flow"];
+  map<string, string> template_variables = 7 [json_name = "template_variables"];
+  bool apply_read_config = 8 [json_name = "apply_read_config"];
+  string state = 9;
+}
+
+message EditModbusProtocolConverterRequest {
+  string device_id = 1;
+  string uuid = 2;
+  string name = 3;
+  ProtocolConverterConnection connection = 4;
+  ProtocolConverterLocation location = 5;
+  ModbusInputSection input = 6;
+  OpcUaReadFlowSection read_flow = 7 [json_name = "read_flow"];
+  map<string, string> template_variables = 8 [json_name = "template_variables"];
+  string state = 9;
+}
+
+message GetModbusProtocolConverterRequest {
+  string device_id = 1;
+  string uuid = 2;
+}
+
+message ModbusProtocolConverter {
+  string uuid = 1;
+  string name = 2;
+  ProtocolConverterConnection connection = 3;
+  ProtocolConverterLocation location = 4;
+  ModbusBridgeDataType data_type = 5 [json_name = "data_type"];
+  ModbusInputSection input = 6;
+  OpcUaReadFlowSection read_flow = 7 [json_name = "read_flow"];
+  OpcUaOutputInfo output = 8;
+  string raw_input_yaml = 9 [json_name = "raw_input_yaml"];
+  string raw_processor_yaml = 10 [json_name = "raw_processor_yaml"];
+  string raw_buffer_yaml = 11 [json_name = "raw_buffer_yaml"];
+  map<string, string> template_variables = 12 [json_name = "template_variables"];
+  SectionParseStatus input_parse = 13 [json_name = "input_parse"];
+  SectionParseStatus processor_parse = 14 [json_name = "processor_parse"];
+  string deployment_status = 15 [json_name = "deployment_status"];
+  string health_status = 16 [json_name = "health_status"];
+  string error_message = 17 [json_name = "error_message"];
+  string processing_mode = 18 [json_name = "processing_mode"];
+  string protocol = 19;
+  string state = 20;
+}
+
+message ModbusProtocolConverterActionResponse {
+  string action_id = 1 [json_name = "action_id"];
+  ActionStatus status = 2;
+  google.protobuf.Timestamp completed_at = 3 [json_name = "completed_at"];
+  string error_message = 4 [json_name = "error_message"];
+  ProtocolConverterWorkflowStage stage = 5;
+  ProtocolConverterWorkflowSteps steps = 6;
+  ProtocolConverterRollbackStatus rollback_status = 7 [json_name = "rollback_status"];
+  ModbusProtocolConverter result = 8;
+}

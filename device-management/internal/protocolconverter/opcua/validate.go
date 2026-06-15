@@ -112,6 +112,21 @@ func hasStructuredProcessor(section *v1.OpcUaReadFlowSection) bool {
 		strings.TrimSpace(p.GetAdvancedProcessing()) != ""
 }
 
+// ValidateReadFlowSectionModes validates dual-mode read_flow sections (shared with Modbus facade).
+func ValidateReadFlowSectionModes(readFlow *v1.OpcUaReadFlowSection) error {
+	if readFlow == nil {
+		return nil
+	}
+	hasP := hasStructuredProcessor(readFlow) || readFlow.GetYamlInject() != nil
+	hasR := strings.TrimSpace(readFlow.GetRawProcessorYaml()) != "" ||
+		strings.TrimSpace(readFlow.GetRawBufferYaml()) != ""
+	if hasP && hasR && (readFlow.GetProcessorMode() == v1.EditSectionMode_EDIT_SECTION_MODE_UNSPECIFIED ||
+		readFlow.GetBufferMode() == v1.EditSectionMode_EDIT_SECTION_MODE_UNSPECIFIED) {
+		return fmt.Errorf("read_flow: both structured and raw yaml set; set processor_mode and buffer_mode explicitly")
+	}
+	return nil
+}
+
 // ValidateSectionModes rejects ambiguous dual structured+raw without explicit mode.
 func ValidateSectionModes(input *v1.OpcUaInputSection, readFlow *v1.OpcUaReadFlowSection) error {
 	if input != nil {
@@ -121,14 +136,5 @@ func ValidateSectionModes(input *v1.OpcUaInputSection, readFlow *v1.OpcUaReadFlo
 			return fmt.Errorf("input: both structured and raw_yaml set; set mode explicitly")
 		}
 	}
-	if readFlow != nil {
-		hasP := hasStructuredProcessor(readFlow) || readFlow.GetYamlInject() != nil
-		hasR := strings.TrimSpace(readFlow.GetRawProcessorYaml()) != "" ||
-			strings.TrimSpace(readFlow.GetRawBufferYaml()) != ""
-		if hasP && hasR && (readFlow.GetProcessorMode() == v1.EditSectionMode_EDIT_SECTION_MODE_UNSPECIFIED ||
-			readFlow.GetBufferMode() == v1.EditSectionMode_EDIT_SECTION_MODE_UNSPECIFIED) {
-			return fmt.Errorf("read_flow: both structured and raw yaml set; set processor_mode and buffer_mode explicitly")
-		}
-	}
-	return nil
+	return ValidateReadFlowSectionModes(readFlow)
 }

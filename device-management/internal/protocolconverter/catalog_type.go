@@ -23,8 +23,21 @@ func IsKnownNonOpcUaCatalogType(t string) bool {
 	if IsGenericCatalogType(t) || IsOpcUaCatalogType(t) {
 		return false
 	}
+	return IsModbusCatalogType(t) || strings.Contains(strings.ToLower(strings.TrimSpace(t)), "sparkplug")
+}
+
+// IsModbusCatalogType reports whether the catalog records a Modbus wire protocol.
+func IsModbusCatalogType(t string) bool {
 	n := strings.ToLower(strings.TrimSpace(t))
-	return strings.Contains(n, "modbus") || strings.Contains(n, "sparkplug")
+	return n == "modbus" || n == "modbus_tcp" || n == "modbus-tcp" || strings.Contains(n, "modbus")
+}
+
+// IsKnownNonModbusCatalogType reports a catalog type that is definitely not Modbus.
+func IsKnownNonModbusCatalogType(t string) bool {
+	if IsGenericCatalogType(t) || IsModbusCatalogType(t) {
+		return false
+	}
+	return IsOpcUaCatalogType(t) || strings.Contains(strings.ToLower(strings.TrimSpace(t)), "sparkplug")
 }
 
 // WireTypeFromJSON extracts wire protocol from a queued action payload (protojson or JSON object).

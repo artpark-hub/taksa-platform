@@ -1,0 +1,45 @@
+meta {
+  name: Poll Modbus facade workflow result (deploy)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/modbus/actions/{{modbus_workflow_action_id}}/result
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Poll deploy+configure workflow from 01-DeployModbusProtocolConverter.
+  Uses `modbus_workflow_action_id` (not `modbus_action_id`).
+}
+
+script:post-response {
+  const resp = res.getBody();
+
+  if (resp && resp.status) {
+    console.log('✓ Workflow status: ' + resp.status);
+    if (resp.stage) {
+      console.log('  stage: ' + resp.stage);
+    }
+    if (resp.result && resp.result.uuid) {
+      bru.setEnvVar('modbus_converter_uuid', resp.result.uuid);
+      bru.setEnvVar('converter_uuid', resp.result.uuid);
+      console.log('  modbus_converter_uuid: ' + resp.result.uuid);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has status", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+  });
+}

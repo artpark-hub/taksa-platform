@@ -15,6 +15,7 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter/modbus"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter/opcua"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
@@ -84,6 +85,76 @@ func (uc *ProtocolConverterWorkflowUsecase) StartOpcUaDeploy(ctx context.Context
 		DeviceID:             req.GetDeviceId(),
 		WorkflowType:         models.WorkflowTypeDeployOpcUa,
 		ProtocolKind:         models.ProtocolKindOpcUa,
+		ConverterUUID:        converterUUID,
+		ConverterName:        name,
+		Status:               models.ActionStatusProcessing,
+		Stage:                models.WorkflowStageDeploying,
+		PendingConfigureJSON: configureJSON,
+		CreatedAt:            now,
+		UpdatedAt:            now,
+		ExpiresAt:            now.Add(workflowTTLSeconds * time.Second),
+	}
+
+	deployAction, err := uc.queueProtocolConverterAction(ctx, req.GetDeviceId(), "deploy-protocol-converter", shell)
+	if err != nil {
+		return nil, err
+	}
+	wf.DeployActionID = deployAction.Id
+
+	if err := uc.store.ActionWorkflows().Save(ctx, wf); err != nil {
+		return nil, fmt.Errorf("save workflow: %w", err)
+	}
+	return wf, nil
+}
+
+// StartModbusDeploy creates a workflow and queues the deploy child action for Modbus bridges.
+func (uc *ProtocolConverterWorkflowUsecase) StartModbusDeploy(ctx context.Context, req *v1.DeployModbusProtocolConverterRequest) (*models.ActionWorkflow, error) {
+	if err := modbus.ValidateDeployRequest(req); err != nil {
+		return nil, err
+	}
+	if err := modbus.ValidateSectionModes(req.GetInput(), req.GetReadFlow()); err != nil {
+		return nil, err
+	}
+
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, fmt.Errorf("tenant_id not found in context")
+	}
+
+	name := req.GetName()
+	converterUUID := GenerateUUIDFromName(name)
+
+	if uc.protocolConverterRepo != nil {
+		if existing, _ := uc.protocolConverterRepo.GetByUUID(ctx, tenantID, req.GetDeviceId(), converterUUID); existing != nil {
+			return nil, fmt.Errorf("protocol converter already exists for name %q", name)
+		}
+	}
+	if active, _ := uc.store.ActionWorkflows().HasActiveForDeviceName(ctx, tenantID, req.GetDeviceId(), name); active {
+		return nil, fmt.Errorf("deploy workflow already in progress for name %q", name)
+	}
+
+	shell := modbus.BuildDeployShell(name, req.GetConnection(), req.GetLocation(), req.GetState())
+	var configureJSON string
+	if req.GetApplyReadConfig() {
+		cfg, err := modbus.BuildConfigurePayload(converterUUID, name, req.GetConnection(), req.GetLocation(),
+			req.GetInput(), req.GetReadFlow(), req.GetTemplateVariables(), req.GetState())
+		if err != nil {
+			return nil, err
+		}
+		b, err := protojson.Marshal(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("marshal configure payload: %w", err)
+		}
+		configureJSON = string(b)
+	}
+
+	now := time.Now()
+	wf := &models.ActionWorkflow{
+		ID:                   generateUUID(),
+		TenantID:             tenantID,
+		DeviceID:             req.GetDeviceId(),
+		WorkflowType:         models.WorkflowTypeDeployModbus,
+		ProtocolKind:         models.ProtocolKindModbusTCP,
 		ConverterUUID:        converterUUID,
 		ConverterName:        name,
 		Status:               models.ActionStatusProcessing,

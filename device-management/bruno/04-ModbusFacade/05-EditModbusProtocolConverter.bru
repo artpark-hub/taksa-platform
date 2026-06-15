@@ -1,0 +1,113 @@
+meta {
+  name: Edit Modbus protocol converter (facade)
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/modbus/{{modbus_converter_uuid}}
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}",
+    "uuid": "{{modbus_converter_uuid}}",
+    "name": "facade-modbus-edited-{{timestamp}}",
+    "state": "active",
+    "connection": {
+      "ip": "192.168.1.10",
+      "port": 502
+    },
+    "location": {
+      "levels": {
+        "0": "AcmeCorp",
+        "1": "PlantA",
+        "2": "Line1"
+      }
+    },
+    "input": {
+      "mode": "STRUCTURED",
+      "structured": {
+        "standard": {
+          "controller": "tcp://{{ .IP }}:{{ .PORT }}",
+          "slave_ids": [1],
+          "unified_addresses": [
+            "FirstFlagOfDiscreteInput.holding.1025.UINT16",
+            "ZeroElementOfInputRegister.holding.1024.UINT16"
+          ],
+          "time_between_reads": "1s",
+          "timeout": "1s"
+        },
+        "advanced": {
+          "byte_order": "ABCD",
+          "optimization": "max_read"
+        }
+      }
+    },
+    "readFlow": {
+      "dataType": "TIME_SERIES",
+      "processorMode": "STRUCTURED",
+      "bufferMode": "STRUCTURED",
+      "processor": {
+        "defaults": {
+          "locationPath": "{{ .location_path }}",
+          "dataContract": "_historian"
+        },
+        "conditions": [
+          {
+            "joiner": "AND",
+            "clauses": [
+              {
+                "field": "modbus_tag_name",
+                "operator": "equals (===)",
+                "value": "ZeroElementOfInputRegister"
+              }
+            ],
+            "action": "msg.payload = Number(msg.payload);\nreturn msg;"
+          }
+        ],
+        "advancedProcessing": "return msg;"
+      },
+      "yamlInject": {
+        "rawYaml": "buffer:\n  none: {}\n"
+      }
+    }
+  }
+}
+
+script:pre-request {
+  bru.setEnvVar('timestamp', Date.now().toString());
+
+  if (!bru.getEnvVar('modbus_converter_uuid') && bru.getEnvVar('converter_uuid')) {
+    bru.setEnvVar('modbus_converter_uuid', bru.getEnvVar('converter_uuid'));
+  }
+}
+
+script:post-response {
+  const resp = res.getBody();
+
+  if (resp && resp.actionId) {
+    bru.setEnvVar('modbus_action_id', resp.actionId);
+    console.log('✓ Modbus EDIT queued');
+    console.log('  actionId: ' + resp.actionId);
+    console.log('  Poll: 04-GetModbusActionResult, then GET to refresh');
+  }
+}
+
+tests {
+  test("Edit action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.not.be.empty;
+  });
+}

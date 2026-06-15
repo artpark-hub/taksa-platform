@@ -160,9 +160,9 @@ stateDiagram-v2
 - OPC-UA browse / tag discovery
 - `writeDFC`
 - Preview-without-deploy endpoint
-- Modbus typed facade (planned)
 
 ## Related docs
 
+- [`MODBUS_FACADE_UI_GUIDE.md`](./MODBUS_FACADE_UI_GUIDE.md) — Modbus typed facade
 - `docs/ADR_PROTOCOL_CONVERTER_FACADE.md` — architecture
 - `docs/BENTHOS_PIPELINE_MAPPING.md` — YAML field mapping

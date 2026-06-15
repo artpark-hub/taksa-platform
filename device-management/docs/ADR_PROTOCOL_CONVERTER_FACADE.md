@@ -1,6 +1,6 @@
 # ADR: Protocol converter facade APIs
 
-> **UI integration:** [`OPC_UA_FACADE_UI_GUIDE.md`](./OPC_UA_FACADE_UI_GUIDE.md)
+> **UI integration:** [`OPC_UA_FACADE_UI_GUIDE.md`](./OPC_UA_FACADE_UI_GUIDE.md) · [`MODBUS_FACADE_UI_GUIDE.md`](./MODBUS_FACADE_UI_GUIDE.md)
 
 ## Status
 
@@ -74,6 +74,15 @@ Aligned with **taksa-benthos-umh** `opcua_plugin` and `tag_processor_plugin`:
 - **Downsampler** is runtime-injected by umh-core as a separate pipeline processor — not in structured facade v1.
 - **UNS output** is runtime-injected — `output` on GET is read-only info only.
 - Desired bridge **`state`**: `active` (default) or `stopped` on deploy/edit.
+
+### Modbus structured contract (v1)
+
+Aligned with **taksa-benthos-umh** `modbus` input and shared `tag_processor`:
+
+- Input: standard (controller, slave IDs, unified/legacy addresses, poll timing) + advanced (byte order, optimization, workarounds).
+- `meta.protocol` = `modbus`; `readDFC.inputs.type` = `modbus` (umh-core derives both from the benthos input plugin).
+- Read flow reuses OPC-UA facade `read_flow` (processor/buffer dual-mode); conditions use `modbus_tag_name`.
+- Deploy/edit/get/poll semantics match OPC-UA facade (workflow deploy, GET-after-edit).
 
 ### Extension without proto changes
 

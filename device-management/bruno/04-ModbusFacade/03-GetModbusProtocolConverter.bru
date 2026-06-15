@@ -1,0 +1,46 @@
+meta {
+  name: Get Modbus protocol converter (facade)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/modbus/{{modbus_converter_uuid}}
+}
+
+headers {
+  Accept: application/json
+}
+
+script:pre-request {
+  if (!bru.getEnvVar('modbus_converter_uuid') && bru.getEnvVar('converter_uuid')) {
+    bru.setEnvVar('modbus_converter_uuid', bru.getEnvVar('converter_uuid'));
+  }
+
+  if (!bru.getEnvVar('modbus_converter_uuid')) {
+    console.warn('⚠ Set modbus_converter_uuid (run 00-List… or deploy workflow)');
+  }
+}
+
+script:post-response {
+  const resp = res.getBody();
+
+  if (resp && resp.actionId) {
+    bru.setEnvVar('modbus_action_id', resp.actionId);
+    console.log('✓ Modbus GET queued');
+    console.log('  actionId: ' + resp.actionId);
+    console.log('  Poll: 04-GetModbusActionResult');
+  }
+}
+
+tests {
+  test("GET action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.not.be.empty;
+  });
+}
