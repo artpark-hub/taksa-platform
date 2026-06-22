@@ -32,19 +32,31 @@ func IsModbusProtocolConverter(pc *v2.ProtocolConverter) bool {
 		return false
 	}
 	if pc.Meta != nil {
-		p := strings.ToLower(strings.TrimSpace(pc.Meta.GetProtocol()))
-		if p == ProtocolMetaValue || p == "modbus" || p == "modbus-tcp" {
+		if isModbusWireLabel(pc.Meta.GetProtocol()) {
 			return true
 		}
 	}
 	if pc.ReadDFC != nil && pc.ReadDFC.Inputs != nil {
-		t := strings.ToLower(strings.TrimSpace(pc.ReadDFC.Inputs.Type))
-		if t == InputType {
+		in := pc.ReadDFC.Inputs
+		if isModbusWireLabel(in.GetType()) {
 			return true
 		}
-		if strings.Contains(strings.ToLower(pc.ReadDFC.Inputs.GetData()), "modbus:") {
+		if isModbusInputYAML(in.GetData()) {
 			return true
 		}
 	}
 	return false
+}
+
+func isModbusWireLabel(s string) bool {
+	n := strings.ToLower(strings.TrimSpace(s))
+	if n == "" {
+		return false
+	}
+	return n == ProtocolMetaValue || n == "modbus_tcp" || n == "modbus-tcp" || strings.Contains(n, "modbus")
+}
+
+func isModbusInputYAML(data string) bool {
+	d := strings.ToLower(data)
+	return strings.Contains(d, "modbus:") || strings.Contains(d, "\nmodbus:")
 }

@@ -17,11 +17,14 @@ var (
 
 var conditionFieldExpressions = map[string]string{
 	"Node ID":              "msg.meta.opcua_attr_nodeid",
+	"Modbus Tag Name":      "msg.meta.modbus_tag_name",
 	"Location Path Suffix": "msg.meta.location_path_suffix",
 	"Data Contract":        "msg.meta.data_contract",
 	"Virtual Path":         "msg.meta.virtual_path",
 	"Tag Name":             "msg.meta.tag_name",
 }
+
+var modbusIncludesRE = regexp.MustCompile(`^!?msg\.meta\.modbus_tag_name\.includes\((.+)\)$`)
 
 func buildProcessorYAMLFromStructured(proc *v1.OpcUaProcessorStructuredConfig) (string, error) {
 	if proc == nil {
@@ -157,6 +160,8 @@ func clauseExpression(c *v1.OpcUaConditionClause) string {
 		return fmt.Sprintf("String(%s).endsWith(%s)", fieldExpr, val)
 	case "contains":
 		return fmt.Sprintf("String(%s).includes(%s)", fieldExpr, val)
+	case "not contains":
+		return fmt.Sprintf("!String(%s).includes(%s)", fieldExpr, val)
 	case "greater than (>)":
 		return fmt.Sprintf("%s > %s", fieldExpr, val)
 	case "less than (<)":
@@ -218,7 +223,7 @@ func indentBlock(value string, spaces int) string {
 
 func parseProcessorStructured(processorYAML, bufferYAML string, templateVars map[string]string) (*v1.OpcUaReadFlowSection, v1.SectionParseStatus) {
 	section := &v1.OpcUaReadFlowSection{
-		DataType: v1.OpcUaBridgeDataType_TIME_SERIES,
+		DataType: v1.BridgeDataType_TIME_SERIES,
 		Processor: &v1.OpcUaProcessorStructuredConfig{},
 		YamlInject: &v1.OpcUaYamlInjectConfig{
 			RawYaml: strings.TrimSpace(bufferYAML),
@@ -263,10 +268,35 @@ func parseProcessorStructured(processorYAML, bufferYAML string, templateVars map
 	if status == v1.SectionParseStatus_PARSE_OK && hasUnparsedConditions(processorYAML, conditionCode, proc.Conditions) {
 		status = v1.SectionParseStatus_PARSE_PARTIAL
 	}
+	section.ProcessorMode, section.BufferMode = inferReadFlowModes(status, proc, processorYAML, bufferYAML)
 	return section, status
 }
 
+func inferReadFlowModes(
+	status v1.SectionParseStatus,
+	proc *v1.OpcUaProcessorStructuredConfig,
+	processorYAML, bufferYAML string,
+) (v1.EditSectionMode, v1.EditSectionMode) {
+	if status == v1.SectionParseStatus_PARSE_FAILED || proc == nil {
+		return v1.EditSectionMode_RAW, v1.EditSectionMode_RAW
+	}
+	if status == v1.SectionParseStatus_PARSE_OK {
+		return v1.EditSectionMode_STRUCTURED, v1.EditSectionMode_STRUCTURED
+	}
+	// PARSE_PARTIAL: structured fields are usable when processor YAML was parsed.
+	if strings.TrimSpace(processorYAML) != "" &&
+		(proc.GetDefaultsCode() != "" || len(proc.GetConditions()) > 0 || len(proc.GetTagMappings()) > 0) {
+		return v1.EditSectionMode_STRUCTURED, v1.EditSectionMode_STRUCTURED
+	}
+	if strings.TrimSpace(bufferYAML) != "" {
+		return v1.EditSectionMode_RAW, v1.EditSectionMode_STRUCTURED
+	}
+	return v1.EditSectionMode_RAW, v1.EditSectionMode_RAW
+}
+
 func mergeTagMappings(fromTemplate, fromSwitch []*v1.OpcUaTagMapping) []*v1.OpcUaTagMapping {
+	fromTemplate = filterTemplateTagMappings(fromTemplate)
+	fromSwitch = filterTemplateTagMappings(fromSwitch)
 	if len(fromSwitch) == 0 {
 		return fromTemplate
 	}
@@ -304,6 +334,30 @@ func mergeTagMappings(fromTemplate, fromSwitch []*v1.OpcUaTagMapping) []*v1.OpcU
 		out = append(out, cloneTagMapping(tm))
 	}
 	return out
+}
+
+func filterTemplateTagMappings(mappings []*v1.OpcUaTagMapping) []*v1.OpcUaTagMapping {
+	if len(mappings) == 0 {
+		return mappings
+	}
+	out := make([]*v1.OpcUaTagMapping, 0, len(mappings))
+	for _, m := range mappings {
+		if m == nil || isTemplatePlaceholder(m.GetNodeId()) {
+			continue
+		}
+		if isTemplatePlaceholder(m.GetTagName()) ||
+			isTemplatePlaceholder(m.GetDataContract()) ||
+			isTemplatePlaceholder(m.GetVirtualPath()) ||
+			isTemplatePlaceholder(m.GetLocationPathSuffix()) {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+func isTemplatePlaceholder(s string) bool {
+	return strings.Contains(s, "{{") || strings.Contains(s, "}}")
 }
 
 func cloneTagMapping(m *v1.OpcUaTagMapping) *v1.OpcUaTagMapping {
@@ -387,6 +441,9 @@ func parseTagMappingsFromDefaultCode(code string) []*v1.OpcUaTagMapping {
 			continue
 		}
 		nodeID := strings.Trim(strings.TrimSpace(m[1]), `"'`)
+		if isTemplatePlaceholder(nodeID) {
+			continue
+		}
 		tm := &v1.OpcUaTagMapping{NodeId: nodeID, DataContract: "_historian"}
 		for j := i + 1; j < len(lines); j++ {
 			inner := strings.TrimSpace(lines[j])
@@ -455,9 +512,7 @@ func parseConditionsFromYAML(conditionYAML string) []*v1.OpcUaProcessorCondition
 			IfExpression: expr,
 			Joiner:       joiner,
 			Action:       action,
-			Clauses: []*v1.OpcUaConditionClause{
-				parseClauseExpression(expr),
-			},
+			Clauses:      parseClauseExpressions(expr),
 		})
 	}
 	return out
@@ -489,8 +544,63 @@ func splitConditionEntries(text string) []string {
 	return entries
 }
 
+func parseClauseExpressions(expression string) []*v1.OpcUaConditionClause {
+	expr := strings.TrimSpace(expression)
+	if expr == "" {
+		return nil
+	}
+	if clauses := splitCompoundClauses(expr); len(clauses) > 0 {
+		return clauses
+	}
+	if c := parseClauseExpression(expr); c != nil {
+		return []*v1.OpcUaConditionClause{c}
+	}
+	return nil
+}
+
+func splitCompoundClauses(expression string) []*v1.OpcUaConditionClause {
+	joiner := "AND"
+	parts := strings.Split(expression, " && ")
+	if len(parts) == 1 {
+		parts = strings.Split(expression, " || ")
+		if len(parts) > 1 {
+			joiner = "OR"
+		}
+	}
+	if len(parts) <= 1 {
+		return nil
+	}
+	out := make([]*v1.OpcUaConditionClause, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if c := parseClauseExpression(part); c != nil {
+			out = append(out, c)
+			continue
+		}
+		return nil
+	}
+	_ = joiner
+	return out
+}
+
 func parseClauseExpression(expression string) *v1.OpcUaConditionClause {
 	expr := strings.TrimSpace(expression)
+	if expr == "" {
+		return nil
+	}
+	negated := false
+	if strings.HasPrefix(expr, "!") {
+		negated = true
+		expr = strings.TrimSpace(strings.TrimPrefix(expr, "!"))
+	}
+	if m := modbusIncludesRE.FindStringSubmatch(expr); len(m) > 1 {
+		val := extractJSQuotedLiteral(m[1])
+		op := "contains"
+		if negated {
+			op = "not contains"
+		}
+		return &v1.OpcUaConditionClause{Field: "Modbus Tag Name", Operator: op, Value: val}
+	}
 	for label, fieldExpr := range conditionFieldExpressions {
 		if strings.HasPrefix(expr, fieldExpr) {
 			c := &v1.OpcUaConditionClause{Field: label}
@@ -505,7 +615,23 @@ func parseClauseExpression(expression string) *v1.OpcUaConditionClause {
 			return c
 		}
 	}
-	return &v1.OpcUaConditionClause{Field: "Node ID", Operator: "equals (===)"}
+	if strings.Contains(expr, ".includes(") {
+		return nil
+	}
+	return nil
+}
+
+func extractJSQuotedLiteral(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	if m := regexp.MustCompile(`["']([^"']*)["']`).FindStringSubmatch(s); len(m) > 1 {
+		return m[1]
+	}
+	return s
 }
 
 func stripBlockIndent(value string) string {

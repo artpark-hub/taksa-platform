@@ -19,6 +19,9 @@ func ValidateDeployRequest(req *v1.DeployModbusProtocolConverterRequest) error {
 		return err
 	}
 	if req.GetApplyReadConfig() {
+		if req.GetReadFlow() == nil {
+			return fmt.Errorf("read_flow is required when apply_read_config is true")
+		}
 		if err := validateInputSection(req.GetInput()); err != nil {
 			return err
 		}

@@ -10,12 +10,6 @@ option go_package = "github.com/artpark-hub/taksa-platform/device-management/api
 option java_multiple_files = true;
 option java_package = "api.devicemgmt.v1";
 
-// Bridge data type (UMH Configuration card). v1 supports time-series read bridges only.
-enum OpcUaBridgeDataType {
-  OPC_UA_BRIDGE_DATA_TYPE_UNSPECIFIED = 0;
-  TIME_SERIES = 1;
-}
-
 // ============================================================================
 // Input (OPC UA) — Standard / Advanced / Additional settings
 // YAML schema: taksa-benthos-umh opcua_plugin (core_connection.go, read.go)
@@ -23,20 +17,20 @@ enum OpcUaBridgeDataType {
 
 message OpcUaNodeSubscription {
   // OPC-UA node identifier, e.g. "ns=2;s=MyVariable", "i=84".
-  string node_id = 1 [json_name = "node_id"];
+  string node_id = 1;
   // UI-only label from browse; not written to YAML.
-  string display_name = 2 [json_name = "display_name"];
+  string display_name = 2;
 }
 
 message OpcUaStandardInputConfig {
-  repeated OpcUaNodeSubscription subscribe_node_ids = 1 [json_name = "subscribe_node_ids"];
+  repeated OpcUaNodeSubscription subscribe_node_ids = 1;
   // Multiline or comma-separated node IDs (alternative to subscribe_node_ids).
-  string node_ids_text = 2 [json_name = "node_ids_text"];
+  string node_ids_text = 2;
   string endpoint = 3;
   // Poll interval in milliseconds when subscribe_enabled is false (benthos-umh pollRate).
-  int32 poll_rate = 4 [json_name = "poll_rate"];
-  bool subscribe_enabled = 5 [json_name = "subscribe_enabled"];
-  bool use_heartbeat = 6 [json_name = "use_heartbeat"];
+  int32 poll_rate = 4;
+  bool subscribe_enabled = 5;
+  bool use_heartbeat = 6;
 }
 
 message OpcUaAdvancedInputConfig {
@@ -44,19 +38,19 @@ message OpcUaAdvancedInputConfig {
   string profile = 1;
   string username = 2;
   string password = 3;
-  string security_mode = 4 [json_name = "security_mode"];
-  string security_policy = 5 [json_name = "security_policy"];
-  string client_certificate_base64 = 6 [json_name = "client_certificate_base64"];
-  string server_certificate_fingerprint = 7 [json_name = "server_certificate_fingerprint"];
-  string user_certificate_base64 = 8 [json_name = "user_certificate_base64"];
-  string user_private_key_base64 = 9 [json_name = "user_private_key_base64"];
-  int32 session_timeout_ms = 10 [json_name = "session_timeout_ms"];
+  string security_mode = 4;
+  string security_policy = 5;
+  string client_certificate_base64 = 6;
+  string server_certificate_fingerprint = 7;
+  string user_certificate_base64 = 8;
+  string user_private_key_base64 = 9;
+  int32 session_timeout_ms = 10;
   bool insecure = 11;
-  bool direct_connect = 12 [json_name = "direct_connect"];
-  bool auto_reconnect = 13 [json_name = "auto_reconnect"];
-  int32 reconnect_interval_seconds = 14 [json_name = "reconnect_interval_seconds"];
-  int32 queue_size = 15 [json_name = "queue_size"];
-  double sampling_interval = 16 [json_name = "sampling_interval"];
+  bool direct_connect = 12;
+  bool auto_reconnect = 13;
+  int32 reconnect_interval_seconds = 14;
+  int32 queue_size = 15;
+  double sampling_interval = 16;
 }
 
 message OpcUaAdditionalSetting {
@@ -67,12 +61,12 @@ message OpcUaAdditionalSetting {
 message OpcUaInputStructuredConfig {
   OpcUaStandardInputConfig standard = 1;
   OpcUaAdvancedInputConfig advanced = 2;
-  repeated OpcUaAdditionalSetting additional_settings = 3 [json_name = "additional_settings"];
+  repeated OpcUaAdditionalSetting additional_settings = 3;
 }
 
 message OpcUaInputSection {
   OpcUaInputStructuredConfig structured = 1;
-  string raw_yaml = 2 [json_name = "raw_yaml"];
+  string raw_yaml = 2;
   EditSectionMode mode = 3;
 }
 
@@ -82,17 +76,17 @@ message OpcUaInputSection {
 // ============================================================================
 
 message OpcUaProcessorDefaults {
-  string location_path = 1 [json_name = "location_path"];
-  string data_contract = 2 [json_name = "data_contract"];
-  string virtual_path = 3 [json_name = "virtual_path"];
+  string location_path = 1;
+  string data_contract = 2;
+  string virtual_path = 3;
 }
 
 message OpcUaTagMapping {
-  string node_id = 1 [json_name = "node_id"];
-  string tag_name = 2 [json_name = "tag_name"];
-  string data_contract = 3 [json_name = "data_contract"];
-  string virtual_path = 4 [json_name = "virtual_path"];
-  string location_path_suffix = 5 [json_name = "location_path_suffix"];
+  string node_id = 1;
+  string tag_name = 2;
+  string data_contract = 3;
+  string virtual_path = 4;
+  string location_path_suffix = 5;
   map<string, string> metadata = 6;
 }
 
@@ -106,32 +100,32 @@ message OpcUaProcessorCondition {
   repeated OpcUaConditionClause clauses = 1;
   string joiner = 2;
   string action = 3;
-  string if_expression = 4 [json_name = "if_expression"];
+  string if_expression = 4;
 }
 
 message OpcUaProcessorStructuredConfig {
   OpcUaProcessorDefaults defaults = 1;
-  repeated OpcUaTagMapping tag_mappings = 2 [json_name = "tag_mappings"];
+  repeated OpcUaTagMapping tag_mappings = 2;
   repeated OpcUaProcessorCondition conditions = 3;
-  string defaults_code = 4 [json_name = "defaults_code"];
-  string conditions_yaml = 5 [json_name = "conditions_yaml"];
+  string defaults_code = 4;
+  string conditions_yaml = 5;
   // tag_processor.advancedProcessing — default "return msg;"
-  string advanced_processing = 6 [json_name = "advanced_processing"];
+  string advanced_processing = 6;
 }
 
 // Inject block: buffer, cache_resources, rate_limit_resources (readDFC.rawYAML).
 message OpcUaYamlInjectConfig {
-  string raw_yaml = 1 [json_name = "raw_yaml"];
+  string raw_yaml = 1;
 }
 
 message OpcUaReadFlowSection {
-  OpcUaBridgeDataType data_type = 1 [json_name = "data_type"];
+  BridgeDataType data_type = 1;
   OpcUaProcessorStructuredConfig processor = 2;
-  OpcUaYamlInjectConfig yaml_inject = 3 [json_name = "yaml_inject"];
-  string raw_processor_yaml = 4 [json_name = "raw_processor_yaml"];
-  string raw_buffer_yaml = 5 [json_name = "raw_buffer_yaml"];
-  EditSectionMode processor_mode = 6 [json_name = "processor_mode"];
-  EditSectionMode buffer_mode = 7 [json_name = "buffer_mode"];
+  OpcUaYamlInjectConfig yaml_inject = 3;
+  string raw_processor_yaml = 4;
+  string raw_buffer_yaml = 5;
+  EditSectionMode processor_mode = 6;
+  EditSectionMode buffer_mode = 7;
 }
 
 message OpcUaOutputInfo {
@@ -149,9 +143,9 @@ message DeployOpcUaProtocolConverterRequest {
   ProtocolConverterConnection connection = 3;
   ProtocolConverterLocation location = 4;
   OpcUaInputSection input = 5;
-  OpcUaReadFlowSection read_flow = 6 [json_name = "read_flow"];
-  map<string, string> template_variables = 7 [json_name = "template_variables"];
-  bool apply_read_config = 8 [json_name = "apply_read_config"];
+  OpcUaReadFlowSection read_flow = 6;
+  map<string, string> template_variables = 7;
+  bool apply_read_config = 8;
   // umh-core desired FSM state: "active" (default) or "stopped".
   string state = 9;
 }
@@ -163,8 +157,8 @@ message EditOpcUaProtocolConverterRequest {
   ProtocolConverterConnection connection = 4;
   ProtocolConverterLocation location = 5;
   OpcUaInputSection input = 6;
-  OpcUaReadFlowSection read_flow = 7 [json_name = "read_flow"];
-  map<string, string> template_variables = 8 [json_name = "template_variables"];
+  OpcUaReadFlowSection read_flow = 7;
+  map<string, string> template_variables = 8;
   string state = 9;
 }
 
@@ -178,32 +172,32 @@ message OpcUaProtocolConverter {
   string name = 2;
   ProtocolConverterConnection connection = 3;
   ProtocolConverterLocation location = 4;
-  OpcUaBridgeDataType data_type = 5 [json_name = "data_type"];
+  BridgeDataType data_type = 5;
   OpcUaInputSection input = 6;
-  OpcUaReadFlowSection read_flow = 7 [json_name = "read_flow"];
+  OpcUaReadFlowSection read_flow = 7;
   OpcUaOutputInfo output = 8;
-  string raw_input_yaml = 9 [json_name = "raw_input_yaml"];
-  string raw_processor_yaml = 10 [json_name = "raw_processor_yaml"];
-  string raw_buffer_yaml = 11 [json_name = "raw_buffer_yaml"];
-  map<string, string> template_variables = 12 [json_name = "template_variables"];
-  SectionParseStatus input_parse = 13 [json_name = "input_parse"];
-  SectionParseStatus processor_parse = 14 [json_name = "processor_parse"];
-  string deployment_status = 15 [json_name = "deployment_status"];
-  string health_status = 16 [json_name = "health_status"];
-  string error_message = 17 [json_name = "error_message"];
+  string raw_input_yaml = 9;
+  string raw_processor_yaml = 10;
+  string raw_buffer_yaml = 11;
+  map<string, string> template_variables = 12;
+  SectionParseStatus input_parse = 13;
+  SectionParseStatus processor_parse = 14;
+  string deployment_status = 15;
+  string health_status = 16;
+  string error_message = 17;
   // From umh-core meta / GET payload.
-  string processing_mode = 18 [json_name = "processing_mode"];
+  string processing_mode = 18;
   string protocol = 19;
   string state = 20;
 }
 
 message OpcUaProtocolConverterActionResponse {
-  string action_id = 1 [json_name = "action_id"];
+  string action_id = 1;
   ActionStatus status = 2;
-  google.protobuf.Timestamp completed_at = 3 [json_name = "completed_at"];
-  string error_message = 4 [json_name = "error_message"];
+  google.protobuf.Timestamp completed_at = 3;
+  string error_message = 4;
   ProtocolConverterWorkflowStage stage = 5;
   ProtocolConverterWorkflowSteps steps = 6;
-  ProtocolConverterRollbackStatus rollback_status = 7 [json_name = "rollback_status"];
+  ProtocolConverterRollbackStatus rollback_status = 7;
   OpcUaProtocolConverter result = 8;
 }

@@ -37,7 +37,7 @@ func TestBuildConfigurePayload_fromFixtureShape(t *testing.T) {
 			},
 		},
 		ReadFlow: &v1.OpcUaReadFlowSection{
-			DataType:      v1.OpcUaBridgeDataType_TIME_SERIES,
+			DataType:      v1.BridgeDataType_TIME_SERIES,
 			ProcessorMode: v1.EditSectionMode_STRUCTURED,
 			Processor: &v1.OpcUaProcessorStructuredConfig{
 				Defaults: &v1.OpcUaProcessorDefaults{

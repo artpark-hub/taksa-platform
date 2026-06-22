@@ -33,12 +33,12 @@ body:json {
       "structured": {
         "standard": {
           "controller": "tcp://{{ .IP }}:{{ .PORT }}",
-          "slave_ids": [1],
-          "unified_addresses": [
+          "slaveIds": [1],
+          "unifiedAddresses": [
             "FirstFlagOfDiscreteInput.holding.1025.UINT16",
             "ZeroElementOfInputRegister.holding.1024.UINT16"
           ],
-          "time_between_reads": "1s",
+          "timeBetweenReads": "1s",
           "timeout": "1s"
         }
       }

@@ -198,6 +198,14 @@ func (s *DeviceMgmtService) GetModbusProtocolConverterActionResponse(ctx context
 		if action.Type == "edit-protocol-converter" && modbus.IsMinimalProtocolConverterReply(pc) {
 			return resp, nil
 		}
+		// Device GET can return a sparse payload (empty readDFC) while catalog already
+		// knows this UUID is modbus from deploy/configure sync.
+		if action.Type == "get-protocol-converter" && s.isModbusCatalogConverter(ctx, tenantID, action.DeviceId, pc.GetUuid()) {
+			facade := modbus.ToFacade(pc)
+			s.enrichModbusFacadeFromCatalog(ctx, tenantID, action.DeviceId, facade)
+			resp.Result = facade
+			return resp, nil
+		}
 		return nil, status.Error(codes.FailedPrecondition, "protocol converter is not Modbus kind")
 	}
 	facade := modbus.ToFacade(pc)
@@ -298,4 +306,12 @@ func (s *DeviceMgmtService) assertModbusConverterKind(ctx context.Context, tenan
 			fmt.Sprintf("protocol converter %s is kind %q, not modbus", uuid, row.Type))
 	}
 	return nil
+}
+
+func (s *DeviceMgmtService) isModbusCatalogConverter(ctx context.Context, tenantID, deviceID, uuid string) bool {
+	if s.protocolConverterRepo == nil || uuid == "" {
+		return false
+	}
+	row, err := s.protocolConverterRepo.GetByUUID(ctx, tenantID, deviceID, uuid)
+	return err == nil && row != nil && pcconv.IsModbusCatalogType(row.Type)
 }

@@ -1644,13 +1644,13 @@ components:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterLocation'
                 input:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ModbusInputSection'
-                read_flow:
+                readFlow:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaReadFlowSection'
-                template_variables:
+                templateVariables:
                     type: object
                     additionalProperties:
                         type: string
-                apply_read_config:
+                applyReadConfig:
                     type: boolean
                 state:
                     type: string
@@ -1667,13 +1667,13 @@ components:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterLocation'
                 input:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaInputSection'
-                read_flow:
+                readFlow:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaReadFlowSection'
-                template_variables:
+                templateVariables:
                     type: object
                     additionalProperties:
                         type: string
-                apply_read_config:
+                applyReadConfig:
                     type: boolean
                 state:
                     type: string
@@ -2017,9 +2017,9 @@ components:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterLocation'
                 input:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ModbusInputSection'
-                read_flow:
+                readFlow:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaReadFlowSection'
-                template_variables:
+                templateVariables:
                     type: object
                     additionalProperties:
                         type: string
@@ -2040,9 +2040,9 @@ components:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterLocation'
                 input:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaInputSection'
-                read_flow:
+                readFlow:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaReadFlowSection'
-                template_variables:
+                templateVariables:
                     type: object
                     additionalProperties:
                         type: string
@@ -2304,19 +2304,19 @@ components:
         api.devicemgmt.v1.ModbusAdvancedInputConfig:
             type: object
             properties:
-                transmission_mode:
+                transmissionMode:
                     type: string
                 optimization:
                     type: string
-                optimization_max_register_fill:
+                optimizationMaxRegisterFill:
                     type: integer
                     format: int32
-                byte_order:
+                byteOrder:
                     type: string
-                busy_retries:
+                busyRetries:
                     type: integer
                     format: int32
-                busy_retries_wait:
+                busyRetriesWait:
                     type: string
                 workarounds:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ModbusWorkaroundsConfig'
@@ -2325,7 +2325,7 @@ components:
             properties:
                 structured:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ModbusInputStructuredConfig'
-                raw_yaml:
+                rawYaml:
                     type: string
                 mode:
                     type: integer
@@ -2337,7 +2337,7 @@ components:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ModbusStandardInputConfig'
                 advanced:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ModbusAdvancedInputConfig'
-                additional_settings:
+                additionalSettings:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.ModbusAdditionalSetting'
@@ -2364,7 +2364,7 @@ components:
                     format: double
                 output:
                     type: string
-                slave_id:
+                slaveId:
                     type: integer
                     format: uint32
         api.devicemgmt.v1.ModbusProtocolConverter:
@@ -2378,38 +2378,38 @@ components:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterConnection'
                 location:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterLocation'
-                data_type:
+                dataType:
                     type: integer
                     format: enum
                 input:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ModbusInputSection'
-                read_flow:
+                readFlow:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaReadFlowSection'
                 output:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaOutputInfo'
-                raw_input_yaml:
+                rawInputYaml:
                     type: string
-                raw_processor_yaml:
+                rawProcessorYaml:
                     type: string
-                raw_buffer_yaml:
+                rawBufferYaml:
                     type: string
-                template_variables:
+                templateVariables:
                     type: object
                     additionalProperties:
                         type: string
-                input_parse:
+                inputParse:
                     type: integer
                     format: enum
-                processor_parse:
+                processorParse:
                     type: integer
                     format: enum
-                deployment_status:
+                deploymentStatus:
                     type: string
-                health_status:
+                healthStatus:
                     type: string
-                error_message:
+                errorMessage:
                     type: string
-                processing_mode:
+                processingMode:
                     type: string
                 protocol:
                     type: string
@@ -2418,22 +2418,22 @@ components:
         api.devicemgmt.v1.ModbusProtocolConverterActionResponse:
             type: object
             properties:
-                action_id:
+                actionId:
                     type: string
                 status:
                     type: integer
                     format: enum
-                completed_at:
+                completedAt:
                     type: string
                     format: date-time
-                error_message:
+                errorMessage:
                     type: string
                 stage:
                     type: integer
                     format: enum
                 steps:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterWorkflowSteps'
-                rollback_status:
+                rollbackStatus:
                     type: integer
                     format: enum
                 result:
@@ -2444,12 +2444,12 @@ components:
                 controller:
                     type: string
                     description: e.g. tcp://{{ .IP }}:{{ .PORT }}
-                slave_ids:
+                slaveIds:
                     type: array
                     items:
                         type: integer
                         format: uint32
-                unified_addresses:
+                unifiedAddresses:
                     type: array
                     items:
                         type: string
@@ -2459,22 +2459,22 @@ components:
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.ModbusLegacyAddress'
                     description: Deprecated on device when unified_addresses is set.
-                time_between_reads:
+                timeBetweenReads:
                     type: string
                 timeout:
                     type: string
         api.devicemgmt.v1.ModbusWorkaroundsConfig:
             type: object
             properties:
-                pause_after_connect:
+                pauseAfterConnect:
                     type: string
-                one_request_per_field:
+                oneRequestPerField:
                     type: boolean
-                read_coils_starting_at_zero:
+                readCoilsStartingAtZero:
                     type: boolean
-                time_between_requests:
+                timeBetweenRequests:
                     type: string
-                string_register_location:
+                stringRegisterLocation:
                     type: string
         api.devicemgmt.v1.OpcUaAdditionalSetting:
             type: object
@@ -2493,34 +2493,34 @@ components:
                     type: string
                 password:
                     type: string
-                security_mode:
+                securityMode:
                     type: string
-                security_policy:
+                securityPolicy:
                     type: string
-                client_certificate_base64:
+                clientCertificateBase64:
                     type: string
-                server_certificate_fingerprint:
+                serverCertificateFingerprint:
                     type: string
-                user_certificate_base64:
+                userCertificateBase64:
                     type: string
-                user_private_key_base64:
+                userPrivateKeyBase64:
                     type: string
-                session_timeout_ms:
+                sessionTimeoutMs:
                     type: integer
                     format: int32
                 insecure:
                     type: boolean
-                direct_connect:
+                directConnect:
                     type: boolean
-                auto_reconnect:
+                autoReconnect:
                     type: boolean
-                reconnect_interval_seconds:
+                reconnectIntervalSeconds:
                     type: integer
                     format: int32
-                queue_size:
+                queueSize:
                     type: integer
                     format: int32
-                sampling_interval:
+                samplingInterval:
                     type: number
                     format: double
         api.devicemgmt.v1.OpcUaConditionClause:
@@ -2537,7 +2537,7 @@ components:
             properties:
                 structured:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaInputStructuredConfig'
-                raw_yaml:
+                rawYaml:
                     type: string
                 mode:
                     type: integer
@@ -2549,17 +2549,17 @@ components:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaStandardInputConfig'
                 advanced:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaAdvancedInputConfig'
-                additional_settings:
+                additionalSettings:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaAdditionalSetting'
         api.devicemgmt.v1.OpcUaNodeSubscription:
             type: object
             properties:
-                node_id:
+                nodeId:
                     type: string
                     description: OPC-UA node identifier, e.g. "ns=2;s=MyVariable", "i=84".
-                display_name:
+                displayName:
                     type: string
                     description: UI-only label from browse; not written to YAML.
         api.devicemgmt.v1.OpcUaOutputInfo:
@@ -2580,23 +2580,23 @@ components:
                     type: string
                 action:
                     type: string
-                if_expression:
+                ifExpression:
                     type: string
         api.devicemgmt.v1.OpcUaProcessorDefaults:
             type: object
             properties:
-                location_path:
+                locationPath:
                     type: string
-                data_contract:
+                dataContract:
                     type: string
-                virtual_path:
+                virtualPath:
                     type: string
         api.devicemgmt.v1.OpcUaProcessorStructuredConfig:
             type: object
             properties:
                 defaults:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaProcessorDefaults'
-                tag_mappings:
+                tagMappings:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaTagMapping'
@@ -2604,11 +2604,11 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaProcessorCondition'
-                defaults_code:
+                defaultsCode:
                     type: string
-                conditions_yaml:
+                conditionsYaml:
                     type: string
-                advanced_processing:
+                advancedProcessing:
                     type: string
                     description: tag_processor.advancedProcessing — default "return msg;"
         api.devicemgmt.v1.OpcUaProtocolConverter:
@@ -2622,38 +2622,38 @@ components:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterConnection'
                 location:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterLocation'
-                data_type:
+                dataType:
                     type: integer
                     format: enum
                 input:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaInputSection'
-                read_flow:
+                readFlow:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaReadFlowSection'
                 output:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaOutputInfo'
-                raw_input_yaml:
+                rawInputYaml:
                     type: string
-                raw_processor_yaml:
+                rawProcessorYaml:
                     type: string
-                raw_buffer_yaml:
+                rawBufferYaml:
                     type: string
-                template_variables:
+                templateVariables:
                     type: object
                     additionalProperties:
                         type: string
-                input_parse:
+                inputParse:
                     type: integer
                     format: enum
-                processor_parse:
+                processorParse:
                     type: integer
                     format: enum
-                deployment_status:
+                deploymentStatus:
                     type: string
-                health_status:
+                healthStatus:
                     type: string
-                error_message:
+                errorMessage:
                     type: string
-                processing_mode:
+                processingMode:
                     type: string
                     description: From umh-core meta / GET payload.
                 protocol:
@@ -2663,22 +2663,22 @@ components:
         api.devicemgmt.v1.OpcUaProtocolConverterActionResponse:
             type: object
             properties:
-                action_id:
+                actionId:
                     type: string
                 status:
                     type: integer
                     format: enum
-                completed_at:
+                completedAt:
                     type: string
                     format: date-time
-                error_message:
+                errorMessage:
                     type: string
                 stage:
                     type: integer
                     format: enum
                 steps:
                     $ref: '#/components/schemas/api.devicemgmt.v1.ProtocolConverterWorkflowSteps'
-                rollback_status:
+                rollbackStatus:
                     type: integer
                     format: enum
                 result:
@@ -2686,55 +2686,55 @@ components:
         api.devicemgmt.v1.OpcUaReadFlowSection:
             type: object
             properties:
-                data_type:
+                dataType:
                     type: integer
                     format: enum
                 processor:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaProcessorStructuredConfig'
-                yaml_inject:
+                yamlInject:
                     $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaYamlInjectConfig'
-                raw_processor_yaml:
+                rawProcessorYaml:
                     type: string
-                raw_buffer_yaml:
+                rawBufferYaml:
                     type: string
-                processor_mode:
+                processorMode:
                     type: integer
                     format: enum
-                buffer_mode:
+                bufferMode:
                     type: integer
                     format: enum
         api.devicemgmt.v1.OpcUaStandardInputConfig:
             type: object
             properties:
-                subscribe_node_ids:
+                subscribeNodeIds:
                     type: array
                     items:
                         $ref: '#/components/schemas/api.devicemgmt.v1.OpcUaNodeSubscription'
-                node_ids_text:
+                nodeIdsText:
                     type: string
                     description: Multiline or comma-separated node IDs (alternative to subscribe_node_ids).
                 endpoint:
                     type: string
-                poll_rate:
+                pollRate:
                     type: integer
                     description: Poll interval in milliseconds when subscribe_enabled is false (benthos-umh pollRate).
                     format: int32
-                subscribe_enabled:
+                subscribeEnabled:
                     type: boolean
-                use_heartbeat:
+                useHeartbeat:
                     type: boolean
         api.devicemgmt.v1.OpcUaTagMapping:
             type: object
             properties:
-                node_id:
+                nodeId:
                     type: string
-                tag_name:
+                tagName:
                     type: string
-                data_contract:
+                dataContract:
                     type: string
-                virtual_path:
+                virtualPath:
                     type: string
-                location_path_suffix:
+                locationPathSuffix:
                     type: string
                 metadata:
                     type: object
@@ -2743,7 +2743,7 @@ components:
         api.devicemgmt.v1.OpcUaYamlInjectConfig:
             type: object
             properties:
-                raw_yaml:
+                rawYaml:
                     type: string
             description: 'Inject block: buffer, cache_resources, rate_limit_resources (readDFC.rawYAML).'
         api.devicemgmt.v1.ProtocolConverterActionResponse:
@@ -2804,7 +2804,7 @@ components:
         api.devicemgmt.v1.ProtocolConverterWorkflowStep:
             type: object
             properties:
-                action_id:
+                actionId:
                     type: string
                 status:
                     type: integer

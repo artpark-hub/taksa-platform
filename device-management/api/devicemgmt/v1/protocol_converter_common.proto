@@ -33,6 +33,13 @@ enum SectionParseStatus {
   PARSE_FAILED  = 3;
 }
 
+// Bridge data type (UMH Configuration card). Shared by OPC-UA and Modbus facades.
+// v1 supports time-series read bridges only.
+enum BridgeDataType {
+  BRIDGE_DATA_TYPE_UNSPECIFIED = 0;
+  TIME_SERIES = 1;
+}
+
 message TagProcessorCondition {
   string condition = 1;
   string action    = 2;
@@ -41,20 +48,20 @@ message TagProcessorCondition {
 message TagProcessorConfig {
   string defaults = 1;
   repeated TagProcessorCondition conditions = 2;
-  string advanced_processing = 3 [json_name = "advanced_processing"];
+  string advanced_processing = 3;
   // When mode=RAW, this is sent verbatim (after validation).
-  string raw_yaml = 4 [json_name = "raw_yaml"];
+  string raw_yaml = 4;
 }
 
 message ReadFlowBufferConfig {
-  string raw_yaml = 1 [json_name = "raw_yaml"];
+  string raw_yaml = 1;
 }
 
 message ReadFlowConfig {
-  TagProcessorConfig tag_processor = 1 [json_name = "tag_processor"];
+  TagProcessorConfig tag_processor = 1;
   ReadFlowBufferConfig buffer       = 2;
   // Input-section raw override (opcua:/modbus: block).
-  string raw_input_yaml = 3 [json_name = "raw_input_yaml"];
+  string raw_input_yaml = 3;
 }
 
 // Workflow stage — only meaningful when workflow status is PROCESSING.
@@ -73,7 +80,7 @@ enum ProtocolConverterRollbackStatus {
 }
 
 message ProtocolConverterWorkflowStep {
-  string action_id = 1 [json_name = "action_id"];
+  string action_id = 1;
   ActionStatus status = 2;
 }
 

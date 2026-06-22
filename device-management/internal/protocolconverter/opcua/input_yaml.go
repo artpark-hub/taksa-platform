@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter/yamlindent"
 )
 
 var hiddenInputYAMLKeys = map[string]struct{}{
@@ -175,12 +176,16 @@ func parseInputStructured(raw string) (*v1.OpcUaInputStructuredConfig, v1.Sectio
 	adv := cfg.Advanced
 
 	lines := strings.Split(strings.ReplaceAll(raw, "\r\n", "\n"), "\n")
+	keyIndent := yamlindent.BlockKeyIndent(lines, "opcua:")
 	status := v1.SectionParseStatus_PARSE_OK
 
 	for i := 0; i < len(lines); i++ {
 		rawLine := lines[i]
 		trimmed := strings.TrimSpace(rawLine)
-		if trimmed == "" || trimmed == "opcua:" || strings.HasPrefix(trimmed, "#") || !strings.HasPrefix(rawLine, "  ") {
+		if trimmed == "" || trimmed == "opcua:" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if yamlindent.Leading(rawLine) != keyIndent {
 			continue
 		}
 		sep := strings.Index(trimmed, ":")
@@ -192,7 +197,7 @@ func parseInputStructured(raw string) (*v1.OpcUaInputStructuredConfig, v1.Sectio
 		value := stripYAMLScalar(rawValue)
 
 		if yamlKey == "nodeIDs" {
-			ids := parseNodeIDsBlock(lines, i, rawValue)
+			ids := parseNodeIDsBlock(lines, i, keyIndent, rawValue)
 			for _, id := range ids {
 				std.SubscribeNodeIds = append(std.SubscribeNodeIds, &v1.OpcUaNodeSubscription{NodeId: id})
 			}
@@ -203,10 +208,15 @@ func parseInputStructured(raw string) (*v1.OpcUaInputStructuredConfig, v1.Sectio
 		}
 
 		if rawValue == "|" || rawValue == "|-" {
+			blockIndent := keyIndent + 2
 			var block []string
-			for i+1 < len(lines) && strings.HasPrefix(lines[i+1], "    ") {
+			for i+1 < len(lines) && yamlindent.Leading(lines[i+1]) >= blockIndent {
 				i++
-				block = append(block, lines[i][4:])
+				line := lines[i]
+				if yamlindent.Leading(line) >= blockIndent {
+					line = line[blockIndent:]
+				}
+				block = append(block, line)
 			}
 			value = strings.TrimRight(strings.Join(block, "\n"), " \t")
 		}
@@ -272,19 +282,14 @@ func parseInputStructured(raw string) (*v1.OpcUaInputStructuredConfig, v1.Sectio
 	return cfg, status
 }
 
-func parseNodeIDsBlock(lines []string, index int, rawValue string) []string {
+func parseNodeIDsBlock(lines []string, index, keyIndent int, rawValue string) []string {
 	if rawValue != "" && rawValue != "[]" {
 		return splitNodeIDLines(parseInlineNodeIDs(rawValue))
 	}
-	var ids []string
-	for index+1 < len(lines) {
-		next := lines[index+1]
-		trimmed := strings.TrimSpace(next)
-		if !strings.HasPrefix(next, "    ") || !strings.HasPrefix(trimmed, "- ") {
-			break
-		}
-		index++
-		if id := stripYAMLScalar(strings.TrimSpace(trimmed[2:])); id != "" {
+	items, _ := yamlindent.ListItemsAfterKey(lines, index, keyIndent)
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		if id := stripYAMLScalar(item); id != "" {
 			ids = append(ids, id)
 		}
 	}

@@ -78,10 +78,19 @@ func TestParseProcessorStructured_conditionsListForm(t *testing.T) {
 	if !strings.Contains(conds[0].GetIfExpression(), "ns=4;i=6211") {
 		t.Fatalf("unexpected if: %q", conds[0].GetIfExpression())
 	}
+	if len(conds[0].GetClauses()) != 1 || conds[0].GetClauses()[0].GetField() != "Node ID" {
+		t.Fatalf("unexpected clauses: %+v", conds[0].GetClauses())
+	}
+	if conds[0].GetClauses()[0].GetValue() != "ns=4;i=6211" {
+		t.Fatalf("unexpected clause value: %q", conds[0].GetClauses()[0].GetValue())
+	}
 	if !strings.Contains(conds[0].GetAction(), "273.15") {
 		t.Fatalf("unexpected then: %q", conds[0].GetAction())
 	}
 	if readFlow.GetProcessor().GetConditionsYaml() == "[]" {
 		t.Fatal("conditions_yaml should not be empty for list-form conditions")
+	}
+	if readFlow.GetProcessorMode() != v1.EditSectionMode_STRUCTURED {
+		t.Fatalf("processor mode: %v", readFlow.GetProcessorMode())
 	}
 }
