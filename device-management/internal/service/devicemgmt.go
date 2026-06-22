@@ -1034,6 +1034,17 @@ func (s *DeviceMgmtService) DeleteProtocolConverter(ctx context.Context, req *v1
 		return nil, status.Error(codes.InvalidArgument, "uuid is required")
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
+	if s.pcWorkflowUc != nil {
+		if msg := s.pcWorkflowUc.DeleteBlockedMessage(ctx, tenantID, req.DeviceId, req.Uuid); msg != "" {
+			return nil, status.Error(codes.FailedPrecondition, msg)
+		}
+	}
+
 	// Create DeleteProtocolConverterPayload as JSON
 	// umh-core expects: {"uuid": "<uuid>"}
 	deletePayload := map[string]string{
@@ -1225,9 +1236,14 @@ func (s *DeviceMgmtService) ListProtocolConverters(ctx context.Context, req *v1.
 	}
 
 	for i, pc := range converters {
-		// Determine health status from DB or device heartbeat
+		deploymentStatus := pc.DeploymentStatus
 		healthStatus := pc.HealthStatus
-		if healthStatus == "UNKNOWN" && deviceHealthStatus != "UNKNOWN" {
+
+		// Facade deploy workflows are multi-step; do not present ACTIVE/ONLINE until complete.
+		if s.pcWorkflowUc != nil && s.pcWorkflowUc.HasActiveWorkflowForConverter(ctx, tenantID, req.DeviceId, pc.UUID) {
+			deploymentStatus = "PENDING"
+			healthStatus = "UNKNOWN"
+		} else if healthStatus == "UNKNOWN" && deviceHealthStatus != "UNKNOWN" {
 			healthStatus = deviceHealthStatus
 		}
 
@@ -1248,7 +1264,7 @@ func (s *DeviceMgmtService) ListProtocolConverters(ctx context.Context, req *v1.
 			Name:               pc.Name,
 			Type:               pc.Type,
 			ConnectionUUID:     pc.ConnectionUUID,
-			DeploymentStatus:   pc.DeploymentStatus,
+			DeploymentStatus:   deploymentStatus,
 			HealthStatus:       healthStatus,
 			LastSyncTime:       lastSyncTime,
 			ErrorMessage:       errorMessage,

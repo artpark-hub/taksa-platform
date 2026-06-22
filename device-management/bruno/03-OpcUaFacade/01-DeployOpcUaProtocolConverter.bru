@@ -57,8 +57,17 @@ body:json {
         "rawYaml": "buffer:\n  none: {}\n"
       }
     },
-    "applyReadConfig": true
+    "applyReadConfig": true,
+    "templateVariables": {
+      "IP": "192.168.1.50",
+      "PORT": "4840"
+    }
   }
+}
+
+docs {
+  Minimal structured OPC-UA deploy example. JSON field names use camelCase
+  (readFlow, applyReadConfig, subscribeNodeIds, nodeId, templateVariables, etc.).
 }
 
 script:pre-request {

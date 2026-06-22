@@ -41,6 +41,26 @@ Set in `environments/default.bru` (Bruno desktop) or your active environment:
 2. **05-EditOpcUaProtocolConverter**  
 3. **04-GetOpcUaActionResult** — poll until `COMPLETED`
 
+### D — Deploy real bridge fixture (Generic-opcua-bridge-1)
+
+1. **06-DeployGenericOpcUaBridge1-Structured** — structured input + RAW processor YAML  
+2. **02-GetOpcUaWorkflowResult** → **03** + **04** to verify round-trip
+
+## JSON casing
+
+Request and response bodies use **camelCase** (protojson default), matching other Device Management APIs:
+
+| Request / response | Examples |
+|--------------------|----------|
+| Top-level | `deviceId`, `applyReadConfig`, `readFlow`, `templateVariables` |
+| OPC-UA input | `subscribeNodeIds`, `nodeId`, `subscribeEnabled`, `useHeartbeat`, `securityMode` |
+| Modbus input | `slaveIds`, `unifiedAddresses`, `timeBetweenReads`, `byteOrder` |
+| Read flow | `processorMode`, `bufferMode`, `rawProcessorYaml`, `yamlInject`, `rawYaml` |
+| Processor | `tagMappings`, `locationPath`, `defaultsCode`, `ifExpression`, `advancedProcessing` |
+| GET parse | `inputParse`, `processorParse`, `rawInputYaml`, `dataType` (`TIME_SERIES`) |
+
+Snake_case keys in JSON bodies are ignored by the HTTP binder — use camelCase only.
+
 ## Endpoints
 
 | Bruno | Method | Path |
@@ -50,6 +70,7 @@ Set in `environments/default.bru` (Bruno desktop) or your active environment:
 | 03 Get | GET | `/devices/{device_id}/protocol-converters/opc-ua/{uuid}` |
 | 04 Action poll | GET | `/devices/{device_id}/protocol-converters/opc-ua/actions/{action_id}/result` |
 | 05 Edit | PATCH | `/devices/{device_id}/protocol-converters/opc-ua/{uuid}` |
+| 06 Deploy fixture | POST | `/devices/{device_id}/protocol-converters/opc-ua` |
 
 Generic list/delete remain on `/protocol-converters` (see `02-ProtocolConverters`).
 

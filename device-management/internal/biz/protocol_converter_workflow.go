@@ -15,6 +15,7 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter/modbus"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter/opcua"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
@@ -104,6 +105,7 @@ func (uc *ProtocolConverterWorkflowUsecase) StartOpcUaDeploy(ctx context.Context
 	if err := uc.store.ActionWorkflows().Save(ctx, wf); err != nil {
 		return nil, fmt.Errorf("save workflow: %w", err)
 	}
+	uc.seedPendingCatalog(ctx, tenantID, req.GetDeviceId(), converterUUID, name)
 	return wf, nil
 }
 
@@ -174,7 +176,58 @@ func (uc *ProtocolConverterWorkflowUsecase) StartModbusDeploy(ctx context.Contex
 	if err := uc.store.ActionWorkflows().Save(ctx, wf); err != nil {
 		return nil, fmt.Errorf("save workflow: %w", err)
 	}
+	uc.seedPendingCatalog(ctx, tenantID, req.GetDeviceId(), converterUUID, name)
 	return wf, nil
+}
+
+// HasActiveWorkflowForConverter reports whether a facade deploy workflow is still in flight.
+func (uc *ProtocolConverterWorkflowUsecase) HasActiveWorkflowForConverter(ctx context.Context, tenantID, deviceID, converterUUID string) bool {
+	if uc == nil || uc.store == nil || converterUUID == "" {
+		return false
+	}
+	active, err := uc.store.ActionWorkflows().HasActiveForDeviceConverter(ctx, tenantID, deviceID, converterUUID)
+	return err == nil && active
+}
+
+// ShouldDeferCatalogPromotion keeps catalog entries PENDING until the workflow finishes.
+func (uc *ProtocolConverterWorkflowUsecase) ShouldDeferCatalogPromotion(ctx context.Context, tenantID, deviceID, actionID, converterUUID string) bool {
+	if uc == nil || uc.store == nil {
+		return false
+	}
+	if wf, err := uc.findWorkflowForAction(ctx, tenantID, actionID); err == nil && wf != nil && isWorkflowInFlight(wf.Status) {
+		return true
+	}
+	return uc.HasActiveWorkflowForConverter(ctx, tenantID, deviceID, converterUUID)
+}
+
+// DeleteBlockedMessage returns a user-facing reason when delete must wait for an in-flight deploy workflow.
+func (uc *ProtocolConverterWorkflowUsecase) DeleteBlockedMessage(ctx context.Context, tenantID, deviceID, converterUUID string) string {
+	if uc == nil || uc.store == nil || !uc.HasActiveWorkflowForConverter(ctx, tenantID, deviceID, converterUUID) {
+		return ""
+	}
+	wf, err := uc.store.ActionWorkflows().GetActiveForDeviceConverter(ctx, tenantID, deviceID, converterUUID)
+	if err != nil || wf == nil {
+		return "protocol converter deploy is in progress; cancel the deploy workflow or wait for it to complete before deleting"
+	}
+	stage := wf.Stage
+	if stage == "" {
+		stage = "IN_PROGRESS"
+	}
+	return fmt.Sprintf(
+		"protocol converter deploy is in progress (stage: %s). Cancel workflow action %s or wait for it to complete before deleting",
+		stage, wf.ID,
+	)
+}
+
+func isWorkflowInFlight(status models.ActionStatus) bool {
+	return status == models.ActionStatusQueued || status == models.ActionStatusProcessing
+}
+
+func (uc *ProtocolConverterWorkflowUsecase) seedPendingCatalog(ctx context.Context, tenantID, deviceID, converterUUID, name string) {
+	if uc.protocolConverterRepo == nil || converterUUID == "" {
+		return
+	}
+	_ = uc.protocolConverterRepo.UpsertPending(ctx, tenantID, deviceID, converterUUID, name, "protocol-converter", "")
 }
 
 // HandleActionTerminal advances workflow state when a child action reaches a terminal status.
@@ -282,8 +335,11 @@ func (uc *ProtocolConverterWorkflowUsecase) onRollbackTerminal(ctx context.Conte
 	wf.Status = models.ActionStatusFailed
 	wf.CompletedAt = time.Now()
 	wf.Stage = ""
-	if finalStatus == models.ActionStatusCompleted {
+	if finalStatus == models.ActionStatusCompleted || protocolconverter.IsNotFoundError(errorMessage) {
 		wf.RollbackStatus = models.RollbackClean
+		if uc.protocolConverterRepo != nil && wf.ConverterUUID != "" {
+			_ = uc.protocolConverterRepo.Delete(ctx, tenantID, wf.DeviceID, wf.ConverterUUID)
+		}
 	} else {
 		wf.RollbackStatus = models.RollbackOrphanShell
 		if errorMessage != "" {
@@ -299,6 +355,9 @@ func (uc *ProtocolConverterWorkflowUsecase) failWorkflow(ctx context.Context, te
 	wf.ErrorMessage = msg
 	wf.CompletedAt = time.Now()
 	_ = uc.store.ActionWorkflows().Update(ctx, tenantID, wf)
+	if uc.protocolConverterRepo != nil && wf.ConverterUUID != "" {
+		_ = uc.protocolConverterRepo.Delete(ctx, tenantID, wf.DeviceID, wf.ConverterUUID)
+	}
 }
 
 func (uc *ProtocolConverterWorkflowUsecase) completeWorkflow(ctx context.Context, tenantID string, wf *models.ActionWorkflow) {
@@ -306,6 +365,9 @@ func (uc *ProtocolConverterWorkflowUsecase) completeWorkflow(ctx context.Context
 	wf.Stage = ""
 	wf.CompletedAt = time.Now()
 	_ = uc.store.ActionWorkflows().Update(ctx, tenantID, wf)
+	if uc.protocolConverterRepo != nil && wf.ConverterUUID != "" {
+		_ = uc.protocolConverterRepo.PromoteDeployed(ctx, tenantID, wf.DeviceID, wf.ConverterUUID)
+	}
 }
 
 func (uc *ProtocolConverterWorkflowUsecase) queueProtocolConverterAction(ctx context.Context, deviceID, actionType string, payload *v2.ProtocolConverter) (*models.Action, error) {

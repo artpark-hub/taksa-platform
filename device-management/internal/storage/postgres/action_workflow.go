@@ -104,6 +104,19 @@ func (s *ActionWorkflowStore) HasActiveForDeviceConverter(ctx context.Context, t
 	return s.hasActive(ctx, `tenant_id = $1 AND device_id = $2 AND converter_uuid = $3`, tenantID, deviceID, converterUUID)
 }
 
+func (s *ActionWorkflowStore) GetActiveForDeviceConverter(ctx context.Context, tenantID, deviceID, converterUUID string) (*models.ActionWorkflow, error) {
+	return s.getOne(ctx, `SELECT id, tenant_id, device_id, workflow_type, protocol_kind,
+		converter_uuid, converter_name, status, stage, rollback_status,
+		deploy_action_id, configure_action_id, rollback_action_id,
+		pending_configure_json, error_message, created_at, updated_at, expires_at, completed_at
+		FROM action_workflows
+		WHERE tenant_id = $1 AND device_id = $2 AND converter_uuid = $3
+		  AND status IN ($4, $5)
+		ORDER BY created_at DESC
+		LIMIT 1`, tenantID, deviceID, converterUUID,
+		int32(models.ActionStatusQueued), int32(models.ActionStatusProcessing))
+}
+
 func (s *ActionWorkflowStore) HasActiveForDeviceName(ctx context.Context, tenantID, deviceID, converterName string) (bool, error) {
 	return s.hasActive(ctx, `tenant_id = $1 AND device_id = $2 AND converter_name = $3`, tenantID, deviceID, converterName)
 }

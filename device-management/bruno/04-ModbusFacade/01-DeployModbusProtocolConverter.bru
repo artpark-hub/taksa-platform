@@ -71,8 +71,17 @@ body:json {
         "rawYaml": "buffer:\n  none: {}\n"
       }
     },
-    "applyReadConfig": true
+    "applyReadConfig": true,
+    "templateVariables": {
+      "IP": "192.168.1.10",
+      "PORT": "502"
+    }
   }
+}
+
+docs {
+  Minimal structured Modbus deploy example. JSON field names use camelCase
+  (readFlow, applyReadConfig, slaveIds, templateVariables, etc.).
 }
 
 script:pre-request {

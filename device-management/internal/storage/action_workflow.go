@@ -15,5 +15,6 @@ type ActionWorkflowStore interface {
 	GetByRollbackActionID(ctx context.Context, tenantID, rollbackActionID string) (*models.ActionWorkflow, error)
 	Update(ctx context.Context, tenantID string, wf *models.ActionWorkflow) error
 	HasActiveForDeviceConverter(ctx context.Context, tenantID, deviceID, converterUUID string) (bool, error)
+	GetActiveForDeviceConverter(ctx context.Context, tenantID, deviceID, converterUUID string) (*models.ActionWorkflow, error)
 	HasActiveForDeviceName(ctx context.Context, tenantID, deviceID, converterName string) (bool, error)
 }

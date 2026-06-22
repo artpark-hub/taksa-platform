@@ -38,6 +38,25 @@ Typed protocol-converter facade for Modbus TCP bridges (`/protocol-converters/mo
 3. **04-GetModbusActionResult** — `result` may be absent on success  
 4. **03** + **04** — mandatory GET refresh after edit
 
+### D — Deploy real bridge fixture (Generic-modbus-bridge-1)
+
+1. **06-DeployGenericModbusBridge1-Structured** — structured input + RAW processor  
+2. **02-GetModbusWorkflowResult** → **03** + **04** to verify round-trip
+
+## JSON casing
+
+Request and response bodies use **camelCase** (protojson default):
+
+| Area | Examples |
+|------|----------|
+| Top-level | `deviceId`, `applyReadConfig`, `readFlow`, `templateVariables` |
+| Modbus input | `slaveIds`, `unifiedAddresses`, `timeBetweenReads`, `byteOrder` |
+| Read flow | `processorMode`, `bufferMode`, `rawProcessorYaml`, `yamlInject`, `rawYaml` |
+| Processor | `tagMappings`, `defaultsCode`, `ifExpression`, `advancedProcessing` |
+| GET parse | `inputParse`, `processorParse`, `rawInputYaml`, `dataType` (`TIME_SERIES`) |
+
+Snake_case JSON keys are silently dropped — use camelCase only.
+
 ## CLI examples
 
 ```bash

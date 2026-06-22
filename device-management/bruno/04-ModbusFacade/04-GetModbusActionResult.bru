@@ -26,7 +26,9 @@ script:post-response {
 
     if (resp.result) {
       console.log('  uuid: ' + (resp.result.uuid || ''));
-      console.log('  input_parse: ' + (resp.result.inputParse || resp.result.input_parse || ''));
+      console.log('  inputParse: ' + (resp.result.inputParse || ''));
+      console.log('  processorParse: ' + (resp.result.processorParse || ''));
+      console.log('  dataType: ' + (resp.result.dataType || ''));
 
       if (resp.result.uuid) {
         bru.setEnvVar('modbus_converter_uuid', resp.result.uuid);

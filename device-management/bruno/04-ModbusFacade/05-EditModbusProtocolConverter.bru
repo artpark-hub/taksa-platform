@@ -81,6 +81,11 @@ body:json {
   }
 }
 
+docs {
+  Queue edit with server-built readDFC. JSON field names use camelCase.
+  Requires `modbus_converter_uuid` and `connection`. Poll 04, then GET to refresh.
+}
+
 script:pre-request {
   bru.setEnvVar('timestamp', Date.now().toString());
 

@@ -43,8 +43,9 @@ script:post-response {
     if (resp.result) {
       console.log('  uuid: ' + (resp.result.uuid || ''));
       console.log('  name: ' + (resp.result.name || ''));
-      console.log('  input_parse: ' + (resp.result.inputParse || resp.result.input_parse || ''));
-      console.log('  processor_parse: ' + (resp.result.processorParse || resp.result.processor_parse || ''));
+      console.log('  inputParse: ' + (resp.result.inputParse || ''));
+      console.log('  processorParse: ' + (resp.result.processorParse || ''));
+      console.log('  dataType: ' + (resp.result.dataType || ''));
 
       if (resp.result.uuid) {
         bru.setEnvVar('opcua_converter_uuid', resp.result.uuid);
@@ -72,8 +73,9 @@ tests {
       return;
     }
     expect(resp.result).to.have.property('uuid');
-    const rawInput = resp.result.rawInputYaml || resp.result.raw_input_yaml;
-    expect(rawInput).to.be.a('string');
+    expect(resp.result).to.have.property('rawInputYaml');
+    expect(resp.result.rawInputYaml).to.be.a('string');
+    expect(resp.result.dataType).to.equal('TIME_SERIES');
   });
 
   test("FAILED has errorMessage", function() {

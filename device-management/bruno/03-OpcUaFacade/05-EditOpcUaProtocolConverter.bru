@@ -36,39 +36,39 @@ body:json {
       "structured": {
         "standard": {
           "endpoint": "opc.tcp://{{ .IP }}:{{ .PORT }}",
-          "subscribe_enabled": true,
-          "use_heartbeat": true,
-          "subscribe_node_ids": [
-            { "node_id": "ns=2;s=MyVariable" },
-            { "node_id": "ns=2;s=Tank1.Temperature" }
+          "subscribeEnabled": true,
+          "useHeartbeat": true,
+          "subscribeNodeIds": [
+            { "nodeId": "ns=2;s=MyVariable" },
+            { "nodeId": "ns=2;s=Tank1.Temperature" }
           ]
         },
         "advanced": {
           "profile": "kepware",
-          "security_mode": "SignAndEncrypt",
-          "security_policy": "Basic256Sha256",
+          "securityMode": "SignAndEncrypt",
+          "securityPolicy": "Basic256Sha256",
           "username": "opcuser",
           "password": "opc-password"
         }
       }
     },
-    "read_flow": {
-      "data_type": "TIME_SERIES",
-      "processor_mode": "STRUCTURED",
-      "buffer_mode": "STRUCTURED",
+    "readFlow": {
+      "dataType": "TIME_SERIES",
+      "processorMode": "STRUCTURED",
+      "bufferMode": "STRUCTURED",
       "processor": {
         "defaults": {
-          "location_path": "{{ .location_path }}",
-          "data_contract": "_historian",
-          "virtual_path": ""
+          "locationPath": "{{ .location_path }}",
+          "dataContract": "_historian",
+          "virtualPath": ""
         },
-        "tag_mappings": [
+        "tagMappings": [
           {
-            "node_id": "ns=2;s=Tank1.Temperature",
-            "location_path_suffix": "tank1",
-            "data_contract": "_historian",
-            "virtual_path": "temperature",
-            "tag_name": "tank1_temperature"
+            "nodeId": "ns=2;s=Tank1.Temperature",
+            "locationPathSuffix": "tank1",
+            "dataContract": "_historian",
+            "virtualPath": "temperature",
+            "tagName": "tank1_temperature"
           }
         ],
         "conditions": [
@@ -84,10 +84,10 @@ body:json {
             "action": "msg.meta.unit = \"celsius\";\nreturn msg;"
           }
         ],
-        "advanced_processing": "return msg;"
+        "advancedProcessing": "return msg;"
       },
-      "yaml_inject": {
-        "raw_yaml": "buffer:\n  none: {}\n"
+      "yamlInject": {
+        "rawYaml": "buffer:\n  none: {}\n"
       }
     }
   }
@@ -99,8 +99,9 @@ docs {
   Requires `opcua_converter_uuid` (from list, GET result, or deploy workflow).
   Poll completion with 04-GetOpcUaActionResult.
   
+  JSON field names use camelCase (readFlow, subscribeNodeIds, nodeId, etc.).
   `connection` is required by the facade edit handler.
-  Only include sections you intend to change; this example updates input + read_flow.
+  Only include sections you intend to change; this example updates input + readFlow.
 }
 
 script:pre-request {

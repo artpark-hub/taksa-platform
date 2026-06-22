@@ -303,16 +303,44 @@ func (r *ProtocolConverterRepo) DeleteByDevice(ctx context.Context, tenantID, de
 	return nil
 }
 
-// Upsert creates or updates a protocol converter (for sync operations)
+// UpsertPending records a converter in the catalog before deploy/configure has finished.
+func (r *ProtocolConverterRepo) UpsertPending(ctx context.Context, tenantID, deviceID, uuid, name, converterType, connectionUUID string) error {
+	existing, err := r.GetByUUID(ctx, tenantID, deviceID, uuid)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
+			"name":              name,
+			"type":              converterType,
+			"connection_uuid":   connectionUUID,
+			"deployment_status": "PENDING",
+			"health_status":     "UNKNOWN",
+			"error_message":     "",
+			"last_synced":       time.Now(),
+		})
+	}
+	return r.Insert(ctx, tenantID, deviceID, uuid, name, converterType, connectionUUID)
+}
+
+// PromoteDeployed marks a converter as fully deployed in the catalog.
+func (r *ProtocolConverterRepo) PromoteDeployed(ctx context.Context, tenantID, deviceID, uuid string) error {
+	return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
+		"deployment_status": "ACTIVE",
+		"health_status":     "ONLINE",
+		"error_message":     "",
+		"last_synced":       time.Now(),
+	})
+}
+
+// Upsert creates or updates a protocol converter as ACTIVE (device-confirmed deploy).
 func (r *ProtocolConverterRepo) Upsert(ctx context.Context, tenantID, deviceID, uuid, name, converterType, connectionUUID string) error {
-	// Check if exists
 	existing, err := r.GetByUUID(ctx, tenantID, deviceID, uuid)
 	if err != nil {
 		return err
 	}
 
 	if existing != nil {
-		// Update existing
 		return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 			"name":              name,
 			"type":              converterType,
@@ -323,17 +351,11 @@ func (r *ProtocolConverterRepo) Upsert(ctx context.Context, tenantID, deviceID, 
 		})
 	}
 
-	// Insert new - first insert with PENDING, then update to ACTIVE
 	if err := r.Insert(ctx, tenantID, deviceID, uuid, name, converterType, connectionUUID); err != nil {
 		return err
 	}
-	
-	// Set to ACTIVE for successful deploy
-	return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
-		"deployment_status": "ACTIVE",
-		"health_status":     "ONLINE",
-		"last_synced":       time.Now(),
-	})
+
+	return r.PromoteDeployed(ctx, tenantID, deviceID, uuid)
 }
 
 // ParseMetadata parses the metadata JSON string into a map
