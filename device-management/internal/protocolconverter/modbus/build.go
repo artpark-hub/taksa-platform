@@ -166,7 +166,7 @@ func buildInputYAMLFromStructured(cfg *v1.ModbusInputStructuredConfig) (string, 
 			if a.GetLength() > 0 {
 				lines = append(lines, fmt.Sprintf("      length: %d", a.GetLength()))
 			}
-			if a.GetBit() > 0 {
+			if strings.EqualFold(a.GetType(), "BIT") || a.GetBit() > 0 {
 				lines = append(lines, fmt.Sprintf("      bit: %d", a.GetBit()))
 			}
 			if a.GetScale() != 0 {
@@ -200,9 +200,25 @@ func buildInputYAMLFromStructured(cfg *v1.ModbusInputStructuredConfig) (string, 
 		lines = append(lines, fmt.Sprintf("  busyRetriesWait: %s", formatYAMLScalar(brw)))
 	}
 	if w := adv.GetWorkarounds(); w != nil {
+		var workaroundLines []string
 		if pac := strings.TrimSpace(w.GetPauseAfterConnect()); pac != "" {
+			workaroundLines = append(workaroundLines, fmt.Sprintf("    pauseAfterConnect: %s", formatYAMLScalar(pac)))
+		}
+		if w.GetOneRequestPerField() {
+			workaroundLines = append(workaroundLines, "    oneRequestPerField: true")
+		}
+		if w.GetReadCoilsStartingAtZero() {
+			workaroundLines = append(workaroundLines, "    readCoilsStartingAtZero: true")
+		}
+		if tbr := strings.TrimSpace(w.GetTimeBetweenRequests()); tbr != "" {
+			workaroundLines = append(workaroundLines, fmt.Sprintf("    timeBetweenRequests: %s", formatYAMLScalar(tbr)))
+		}
+		if srl := strings.TrimSpace(w.GetStringRegisterLocation()); srl != "" {
+			workaroundLines = append(workaroundLines, fmt.Sprintf("    stringRegisterLocation: %s", formatYAMLScalar(srl)))
+		}
+		if len(workaroundLines) > 0 {
 			lines = append(lines, "  workarounds:")
-			lines = append(lines, fmt.Sprintf("    pauseAfterConnect: %s", formatYAMLScalar(pac)))
+			lines = append(lines, workaroundLines...)
 		}
 	}
 

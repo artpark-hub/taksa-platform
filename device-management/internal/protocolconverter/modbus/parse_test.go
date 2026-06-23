@@ -112,3 +112,36 @@ func TestBridgeDataTypeFromReadFlow(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+func TestParseInputStructured_legacyAddressInlineName(t *testing.T) {
+	raw := `modbus:
+  controller: tcp://127.0.0.1:502
+  slaveIDs:
+    - 1
+  addresses:
+    - name: solo_inline
+    - name: coil_flag
+      address: 10
+      type: BIT
+      bit: 0
+    - name: inline_only
+      address: 11
+`
+	cfg, status := parseInputStructured(raw)
+	if status != v1.SectionParseStatus_PARSE_OK {
+		t.Fatalf("parse status: %v", status)
+	}
+	addrs := cfg.GetStandard().GetAddresses()
+	if len(addrs) != 3 {
+		t.Fatalf("addresses: %d", len(addrs))
+	}
+	if addrs[0].GetName() != "solo_inline" {
+		t.Fatalf("solo inline: %+v", addrs[0])
+	}
+	if addrs[1].GetName() != "coil_flag" || addrs[1].GetBit() != 0 {
+		t.Fatalf("first address: %+v", addrs[1])
+	}
+	if addrs[2].GetName() != "inline_only" || addrs[2].GetAddress() != 11 {
+		t.Fatalf("second address: %+v", addrs[2])
+	}
+}

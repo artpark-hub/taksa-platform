@@ -12,6 +12,32 @@ func IsGenericCatalogType(t string) bool {
 	return n == "" || n == "protocol-converter"
 }
 
+// CatalogWireTypeFromProtocolKind maps workflow protocol kind to catalog list type.
+func CatalogWireTypeFromProtocolKind(protocolKind string) string {
+	switch strings.ToLower(strings.TrimSpace(protocolKind)) {
+	case "opcua", "opc-ua":
+		return "opcua"
+	case "modbus", "modbus_tcp", "modbus-tcp":
+		return "modbus"
+	default:
+		return ""
+	}
+}
+
+// ResolveCatalogWireType prefers a known wire protocol over the generic DFC kind when merging.
+func ResolveCatalogWireType(incoming, existing string) string {
+	if !IsGenericCatalogType(incoming) {
+		return incoming
+	}
+	if !IsGenericCatalogType(existing) {
+		return existing
+	}
+	if incoming != "" {
+		return incoming
+	}
+	return existing
+}
+
 // IsOpcUaCatalogType reports whether the catalog already records an OPC-UA wire protocol.
 func IsOpcUaCatalogType(t string) bool {
 	n := strings.ToLower(strings.TrimSpace(t))

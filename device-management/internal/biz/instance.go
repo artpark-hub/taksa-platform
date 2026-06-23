@@ -2310,14 +2310,9 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 			}
 		}
 
-		// If converter was ACTIVE in DB but not in StatusMessage, reconcile catalog with device.
+		// If converter was ACTIVE in DB but not in StatusMessage, mark as OFFLINE only.
+		// Catalog removal for failed deploys is handled by workflow rollback and delete actions.
 		if !found && dbConverter.DeploymentStatus == "ACTIVE" {
-			if dbConverter.HealthStatus == "OFFLINE" {
-				if err := uc.protocolConverterRepo.Delete(ctx, tenantID, deviceID, dbConverter.UUID); err != nil {
-					fmt.Printf("Warning: Failed to remove offline orphan converter %s: %v\n", dbConverter.UUID, err)
-				}
-				continue
-			}
 			err := uc.protocolConverterRepo.UpdateStatus(ctx,
 				tenantID,
 				deviceID,

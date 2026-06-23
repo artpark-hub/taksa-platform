@@ -124,11 +124,11 @@ Use GET poll `result` to populate the UI. Structured fields are best-effort pars
 
 | Field | List | Typed GET |
 |-------|------|-----------|
-| `type` | `opcua` or `protocol-converter` | `protocol` on result |
+| `type` | `opcua` (set at facade deploy) or `protocol-converter` for generic/legacy bridges | `protocol` on GET result refines if needed |
 | Health / deployment | yes | yes (merged from catalog on poll) |
 | Full YAML / structured | no | yes |
 
-Filter list by `type=opcua` after first GET backfills catalog type.
+Filter list by `type=opcua` to show only OPC-UA bridges.
 
 ## Errors
 

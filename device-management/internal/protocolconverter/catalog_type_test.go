@@ -83,3 +83,29 @@ func TestWireTypeFromMap(t *testing.T) {
 		t.Fatalf("WireTypeFromMap inputs = %q, want modbus", got)
 	}
 }
+
+func TestCatalogWireTypeFromProtocolKind(t *testing.T) {
+	for _, tc := range []struct {
+		in, want string
+	}{
+		{"opcua", "opcua"},
+		{"modbus_tcp", "modbus"},
+		{"", ""},
+	} {
+		if got := CatalogWireTypeFromProtocolKind(tc.in); got != tc.want {
+			t.Errorf("CatalogWireTypeFromProtocolKind(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestResolveCatalogWireType(t *testing.T) {
+	if got := ResolveCatalogWireType("protocol-converter", "opcua"); got != "opcua" {
+		t.Fatalf("preserve existing wire type: got %q", got)
+	}
+	if got := ResolveCatalogWireType("modbus", "protocol-converter"); got != "modbus" {
+		t.Fatalf("prefer incoming wire type: got %q", got)
+	}
+	if got := ResolveCatalogWireType("protocol-converter", "protocol-converter"); got != "protocol-converter" {
+		t.Fatalf("both generic: got %q", got)
+	}
+}

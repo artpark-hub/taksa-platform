@@ -128,10 +128,15 @@ func parseInputStructured(raw string) (*v1.ModbusInputStructuredConfig, v1.Secti
 		lineIndent := yamlindent.Leading(rawLine)
 
 		if inAddresses && strings.HasPrefix(trimmed, "- ") && lineIndent >= listItemIndent {
-			if currentAddr != nil && currentAddr.GetName() != "" {
+			if currentAddr != nil && legacyAddressPopulated(currentAddr) {
 				std.Addresses = append(std.Addresses, currentAddr)
 			}
 			currentAddr = &v1.ModbusLegacyAddress{}
+			rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+			if strings.Contains(rest, ":") {
+				kv := strings.SplitN(rest, ":", 2)
+				setLegacyAddressField(currentAddr, strings.TrimSpace(kv[0]), stripYAMLScalar(strings.TrimSpace(kv[1])))
+			}
 			continue
 		}
 		if inAddresses && lineIndent >= addressEntryIndent && currentAddr != nil {
@@ -139,38 +144,7 @@ func parseInputStructured(raw string) (*v1.ModbusInputStructuredConfig, v1.Secti
 			if len(kv) != 2 {
 				continue
 			}
-			key := strings.TrimSpace(kv[0])
-			val := stripYAMLScalar(strings.TrimSpace(kv[1]))
-			switch key {
-			case "name":
-				currentAddr.Name = val
-			case "register":
-				currentAddr.Register = val
-			case "address":
-				if n, err := strconv.ParseUint(val, 10, 32); err == nil {
-					currentAddr.Address = uint32(n)
-				}
-			case "type":
-				currentAddr.Type = val
-			case "length":
-				if n, err := strconv.Atoi(val); err == nil {
-					currentAddr.Length = uint32(n)
-				}
-			case "bit":
-				if n, err := strconv.Atoi(val); err == nil {
-					currentAddr.Bit = uint32(n)
-				}
-			case "scale":
-				if f, err := strconv.ParseFloat(val, 64); err == nil {
-					currentAddr.Scale = f
-				}
-			case "output":
-				currentAddr.Output = val
-			case "slaveID":
-				if n, err := strconv.Atoi(val); err == nil {
-					currentAddr.SlaveId = uint32(n)
-				}
-			}
+			setLegacyAddressField(currentAddr, strings.TrimSpace(kv[0]), stripYAMLScalar(strings.TrimSpace(kv[1])))
 			continue
 		}
 
@@ -267,7 +241,7 @@ func parseInputStructured(raw string) (*v1.ModbusInputStructuredConfig, v1.Secti
 			})
 		}
 	}
-	if currentAddr != nil && currentAddr.GetName() != "" {
+	if currentAddr != nil && legacyAddressPopulated(currentAddr) {
 		std.Addresses = append(std.Addresses, currentAddr)
 	}
 
@@ -275,6 +249,43 @@ func parseInputStructured(raw string) (*v1.ModbusInputStructuredConfig, v1.Secti
 		status = v1.SectionParseStatus_PARSE_PARTIAL
 	}
 	return cfg, status
+}
+
+func legacyAddressPopulated(a *v1.ModbusLegacyAddress) bool {
+	return a.GetName() != "" || a.GetAddress() > 0 || a.GetRegister() != ""
+}
+
+func setLegacyAddressField(a *v1.ModbusLegacyAddress, key, val string) {
+	switch key {
+	case "name":
+		a.Name = val
+	case "register":
+		a.Register = val
+	case "address":
+		if n, err := strconv.ParseUint(val, 10, 32); err == nil {
+			a.Address = uint32(n)
+		}
+	case "type":
+		a.Type = val
+	case "length":
+		if n, err := strconv.Atoi(val); err == nil {
+			a.Length = uint32(n)
+		}
+	case "bit":
+		if n, err := strconv.Atoi(val); err == nil {
+			a.Bit = uint32(n)
+		}
+	case "scale":
+		if f, err := strconv.ParseFloat(val, 64); err == nil {
+			a.Scale = f
+		}
+	case "output":
+		a.Output = val
+	case "slaveID":
+		if n, err := strconv.Atoi(val); err == nil {
+			a.SlaveId = uint32(n)
+		}
+	}
 }
 
 func parseInlineUintList(raw string) []string {

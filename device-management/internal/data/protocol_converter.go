@@ -9,6 +9,8 @@ import (
 	"time"
 
 	uuidgen "github.com/google/uuid"
+
+	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter"
 )
 
 // convertPlaceholders converts SQLite ? placeholders to PostgreSQL $1, $2 style
@@ -310,6 +312,7 @@ func (r *ProtocolConverterRepo) UpsertPending(ctx context.Context, tenantID, dev
 		return err
 	}
 	if existing != nil {
+		converterType = protocolconverter.ResolveCatalogWireType(converterType, existing.Type)
 		return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 			"name":              name,
 			"type":              converterType,
@@ -324,13 +327,21 @@ func (r *ProtocolConverterRepo) UpsertPending(ctx context.Context, tenantID, dev
 }
 
 // PromoteDeployed marks a converter as fully deployed in the catalog.
-func (r *ProtocolConverterRepo) PromoteDeployed(ctx context.Context, tenantID, deviceID, uuid string) error {
-	return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
+// wireType, when non-empty, backfills the catalog wire protocol (opcua/modbus).
+func (r *ProtocolConverterRepo) PromoteDeployed(ctx context.Context, tenantID, deviceID, uuid, wireType string) error {
+	updates := map[string]interface{}{
 		"deployment_status": "ACTIVE",
 		"health_status":     "ONLINE",
 		"error_message":     "",
 		"last_synced":       time.Now(),
-	})
+	}
+	if wireType != "" && !protocolconverter.IsGenericCatalogType(wireType) {
+		if existing, err := r.GetByUUID(ctx, tenantID, deviceID, uuid); err == nil && existing != nil {
+			wireType = protocolconverter.ResolveCatalogWireType(wireType, existing.Type)
+		}
+		updates["type"] = wireType
+	}
+	return r.Update(ctx, tenantID, deviceID, uuid, updates)
 }
 
 // Upsert creates or updates a protocol converter as ACTIVE (device-confirmed deploy).
@@ -341,6 +352,7 @@ func (r *ProtocolConverterRepo) Upsert(ctx context.Context, tenantID, deviceID, 
 	}
 
 	if existing != nil {
+		converterType = protocolconverter.ResolveCatalogWireType(converterType, existing.Type)
 		return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 			"name":              name,
 			"type":              converterType,
@@ -355,7 +367,7 @@ func (r *ProtocolConverterRepo) Upsert(ctx context.Context, tenantID, deviceID, 
 		return err
 	}
 
-	return r.PromoteDeployed(ctx, tenantID, deviceID, uuid)
+	return r.PromoteDeployed(ctx, tenantID, deviceID, uuid, "")
 }
 
 // ParseMetadata parses the metadata JSON string into a map

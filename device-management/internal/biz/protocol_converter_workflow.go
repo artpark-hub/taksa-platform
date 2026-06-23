@@ -105,7 +105,7 @@ func (uc *ProtocolConverterWorkflowUsecase) StartOpcUaDeploy(ctx context.Context
 	if err := uc.store.ActionWorkflows().Save(ctx, wf); err != nil {
 		return nil, fmt.Errorf("save workflow: %w", err)
 	}
-	uc.seedPendingCatalog(ctx, tenantID, req.GetDeviceId(), converterUUID, name)
+	uc.seedPendingCatalog(ctx, tenantID, req.GetDeviceId(), converterUUID, name, models.ProtocolKindOpcUa)
 	return wf, nil
 }
 
@@ -176,7 +176,7 @@ func (uc *ProtocolConverterWorkflowUsecase) StartModbusDeploy(ctx context.Contex
 	if err := uc.store.ActionWorkflows().Save(ctx, wf); err != nil {
 		return nil, fmt.Errorf("save workflow: %w", err)
 	}
-	uc.seedPendingCatalog(ctx, tenantID, req.GetDeviceId(), converterUUID, name)
+	uc.seedPendingCatalog(ctx, tenantID, req.GetDeviceId(), converterUUID, name, models.ProtocolKindModbusTCP)
 	return wf, nil
 }
 
@@ -223,11 +223,25 @@ func isWorkflowInFlight(status models.ActionStatus) bool {
 	return status == models.ActionStatusQueued || status == models.ActionStatusProcessing
 }
 
-func (uc *ProtocolConverterWorkflowUsecase) seedPendingCatalog(ctx context.Context, tenantID, deviceID, converterUUID, name string) {
+func isWorkflowTerminal(status models.ActionStatus) bool {
+	switch status {
+	case models.ActionStatusCompleted, models.ActionStatusFailed,
+		models.ActionStatusCancelled, models.ActionStatusExpired:
+		return true
+	default:
+		return false
+	}
+}
+
+func (uc *ProtocolConverterWorkflowUsecase) seedPendingCatalog(ctx context.Context, tenantID, deviceID, converterUUID, name, protocolKind string) {
 	if uc.protocolConverterRepo == nil || converterUUID == "" {
 		return
 	}
-	_ = uc.protocolConverterRepo.UpsertPending(ctx, tenantID, deviceID, converterUUID, name, "protocol-converter", "")
+	catalogType := protocolconverter.CatalogWireTypeFromProtocolKind(protocolKind)
+	if catalogType == "" {
+		catalogType = "protocol-converter"
+	}
+	_ = uc.protocolConverterRepo.UpsertPending(ctx, tenantID, deviceID, converterUUID, name, catalogType, "")
 }
 
 // HandleActionTerminal advances workflow state when a child action reaches a terminal status.
@@ -244,7 +258,7 @@ func (uc *ProtocolConverterWorkflowUsecase) HandleActionTerminal(ctx context.Con
 	if err != nil || wf == nil {
 		return
 	}
-	if isActionTerminalForPushIgnore(wf.Status) {
+	if isWorkflowTerminal(wf.Status) {
 		return
 	}
 
@@ -366,7 +380,8 @@ func (uc *ProtocolConverterWorkflowUsecase) completeWorkflow(ctx context.Context
 	wf.CompletedAt = time.Now()
 	_ = uc.store.ActionWorkflows().Update(ctx, tenantID, wf)
 	if uc.protocolConverterRepo != nil && wf.ConverterUUID != "" {
-		_ = uc.protocolConverterRepo.PromoteDeployed(ctx, tenantID, wf.DeviceID, wf.ConverterUUID)
+		wireType := protocolconverter.CatalogWireTypeFromProtocolKind(wf.ProtocolKind)
+		_ = uc.protocolConverterRepo.PromoteDeployed(ctx, tenantID, wf.DeviceID, wf.ConverterUUID, wireType)
 	}
 }
 
@@ -414,7 +429,8 @@ func (uc *ProtocolConverterWorkflowUsecase) GetWorkflow(ctx context.Context, ten
 	return wf, nil
 }
 
-// CancelWorkflow cancels QUEUED child actions and marks workflow cancelled.
+// CancelWorkflow cancels QUEUED child actions, removes catalog state, and best-effort
+// deletes a deploy shell if deploy already succeeded on the device.
 func (uc *ProtocolConverterWorkflowUsecase) CancelWorkflow(ctx context.Context, tenantID, deviceID, workflowID string) error {
 	wf, err := uc.GetWorkflow(ctx, tenantID, workflowID)
 	if err != nil {
@@ -423,12 +439,31 @@ func (uc *ProtocolConverterWorkflowUsecase) CancelWorkflow(ctx context.Context, 
 	if wf.DeviceID != deviceID {
 		return fmt.Errorf("workflow does not belong to device")
 	}
+	if isWorkflowTerminal(wf.Status) {
+		return fmt.Errorf("workflow is already terminal")
+	}
+
 	for _, childID := range []string{wf.DeployActionID, wf.ConfigureActionID, wf.RollbackActionID} {
 		if childID == "" {
 			continue
 		}
 		_, _ = uc.actionUc.CancelAction(ctx, tenantID, deviceID, childID)
 	}
+
+	deployReachedDevice := false
+	if wf.DeployActionID != "" {
+		if action, err := uc.actionUc.GetAction(ctx, tenantID, wf.DeployActionID); err == nil && action != nil {
+			deployReachedDevice = action.Status == models.ActionStatusCompleted
+		}
+	}
+	if deployReachedDevice && wf.ConverterUUID != "" {
+		_, _ = uc.queueDeleteProtocolConverter(ctx, deviceID, wf.ConverterUUID)
+	}
+
+	if uc.protocolConverterRepo != nil && wf.ConverterUUID != "" {
+		_ = uc.protocolConverterRepo.Delete(ctx, tenantID, deviceID, wf.ConverterUUID)
+	}
+
 	wf.Status = models.ActionStatusCancelled
 	wf.Stage = ""
 	wf.CompletedAt = time.Now()

@@ -155,11 +155,11 @@ Use GET poll `result` to populate the UI. Structured fields are best-effort pars
 
 | Field | List | Typed GET |
 |-------|------|-----------|
-| `type` | `modbus` or `protocol-converter` | `protocol` on result (`modbus`) |
+| `type` | `modbus` (set at facade deploy) or `protocol-converter` for generic/legacy bridges | `protocol` on GET result refines if needed |
 | Health / deployment | yes | yes (merged from catalog on poll) |
 | Full YAML / structured | no | yes |
 
-Filter list by `type=modbus` after first GET backfills catalog type.
+Filter list by `type=modbus` to show only Modbus bridges.
 
 ## Errors
 

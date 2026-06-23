@@ -153,10 +153,13 @@ func (s *DeviceMgmtService) GetOpcUaProtocolConverterActionResponse(ctx context.
 		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
 	}
 
-	if s.pcWorkflowUc != nil {
+		if s.pcWorkflowUc != nil {
 		if wf, err := s.pcWorkflowUc.GetWorkflow(ctx, tenantID, req.ActionId); err == nil && wf != nil {
 			if req.DeviceId != "" && wf.DeviceID != req.DeviceId {
 				return nil, status.Error(codes.PermissionDenied, "workflow does not belong to device")
+			}
+			if wf.WorkflowType != models.WorkflowTypeDeployOpcUa {
+				return nil, status.Error(codes.NotFound, "action is not an OPC-UA deploy workflow")
 			}
 			return s.buildOpcUaWorkflowPollResponse(ctx, tenantID, wf)
 		}
