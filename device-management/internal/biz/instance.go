@@ -23,6 +23,7 @@ import (
 	"github.com/artpark-hub/taksa-platform/device-management/internal/data"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/middleware"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/models"
+	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter"
 	"github.com/artpark-hub/taksa-platform/device-management/internal/storage"
 )
 
@@ -204,6 +205,7 @@ type InstanceUsecase struct {
 	actionCleanup         ActionCleanupSettings
 	deployment            *conf.Deployment
 	actionUc              *ActionUsecase
+	pcWorkflowUc          *ProtocolConverterWorkflowUsecase
 
 	natsMirrorReconcileCancel context.CancelFunc
 	natsMirrorReconcileWG     sync.WaitGroup
@@ -224,6 +226,7 @@ func NewInstanceUsecase(
 	actionCleanup ActionCleanupSettings,
 	deployment *conf.Deployment,
 	actionUc *ActionUsecase,
+	pcWorkflowUc *ProtocolConverterWorkflowUsecase,
 ) *InstanceUsecase {
 	return &InstanceUsecase{
 		store:                 store,
@@ -236,6 +239,7 @@ func NewInstanceUsecase(
 		actionCleanup:         actionCleanup,
 		deployment:            deployment,
 		actionUc:              actionUc,
+		pcWorkflowUc:          pcWorkflowUc,
 	}
 }
 
@@ -1110,27 +1114,31 @@ func (uc *InstanceUsecase) correlateResponseByTraceId(ctx context.Context, devic
 
 	uc.persistActionErrorMessageIfFailed(ctx, tenantID, track.ActionID, finalStatus, errorMessage)
 
-	// 6. Sync protocol converter and data model state if action completed
-	// Use RESULT payload from device (resultPayload), not the REQUEST payload (action.Payload)
-	// NOTE: Use finalStatus (computed above), not action.Status (stale in-memory object)
-	// NOTE: Call sync even for delete operations which may have empty resultPayload
-	if action != nil && finalStatus == models.ActionStatusCompleted {
-		// Create a copy of action with updated status for sync
+	// 6. Sync protocol converter and data model state from action result.
+	// Use RESULT payload from device (resultPayload), not the REQUEST payload (action.Payload).
+	if action != nil {
 		actionWithStatus := *action
 		actionWithStatus.Status = finalStatus
-
-		// For non-delete operations, only sync if we have result payload
-		// For delete operations, sync even with empty payload (empty payload means successful delete)
-		shouldSync := len(resultPayload) > 0 || action.Type == "delete-protocol-converter" || action.Type == "delete-datamodel" || action.Type == "delete-stream-processor"
-
-		if shouldSync {
-			_ = uc.syncProtocolConverterActionResult(ctx, &actionWithStatus, []byte(resultPayload))
-			_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, []byte(resultPayload))
-			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(resultPayload))
+		if errorMessage != "" {
+			actionWithStatus.ErrorMessage = errorMessage
 		}
-		uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
-	} else if action != nil {
-		uc.HandleNATSMirrorActionFailure(ctx, action, finalStatus, errorMessage)
+
+		if finalStatus == models.ActionStatusCompleted {
+			shouldSync := len(resultPayload) > 0 || action.Type == "delete-protocol-converter" || action.Type == "delete-datamodel" || action.Type == "delete-stream-processor"
+			if shouldSync {
+				_ = uc.syncProtocolConverterActionResult(ctx, &actionWithStatus, []byte(resultPayload))
+				_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, []byte(resultPayload))
+				_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(resultPayload))
+			}
+			uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
+		} else {
+			uc.HandleNATSMirrorActionFailure(ctx, action, finalStatus, errorMessage)
+			uc.syncProtocolConverterActionOnTerminal(ctx, &actionWithStatus, []byte(resultPayload))
+		}
+
+		if uc.pcWorkflowUc != nil {
+			uc.pcWorkflowUc.HandleActionTerminal(ctx, &actionWithStatus, finalStatus, errorMessage, []byte(decodedPayload))
+		}
 	}
 
 	// 7. Mark tracking as completed
@@ -1220,27 +1228,42 @@ func (uc *InstanceUsecase) correlateResponseByActionUUID(ctx context.Context, te
 
 	uc.persistActionErrorMessageIfFailed(ctx, tenantID, action.Id, finalStatus, errorMessage)
 
+	syncMsg := deviceMsg
+	if syncMsg == nil {
+		syncMsg, _ = uc.store.Messages().GetByID(ctx, messageID)
+	}
+	var syncPayload []byte
+	if syncMsg != nil {
+		syncPayload = []byte(syncMsg.Content)
+	}
+
 	// 6. Sync state if this is a protocol converter or data model action
 	// This mirrors the logic in correlateResponseByTraceId to ensure DB persistence
 	// regardless of which correlation method (trace_id vs actionUUID) is used
-	if finalStatus == models.ActionStatusCompleted && action != nil {
+	if action != nil {
 		actionWithStatus := *action
 		actionWithStatus.Status = finalStatus
-		syncMsg := deviceMsg
-		if syncMsg == nil {
-			syncMsg, err = uc.store.Messages().GetByID(ctx, messageID)
-			if err != nil {
-				syncMsg = nil
+		if errorMessage != "" {
+			actionWithStatus.ErrorMessage = errorMessage
+		}
+
+		if finalStatus == models.ActionStatusCompleted {
+			if syncMsg != nil {
+				_ = uc.syncProtocolConverterActionResult(ctx, &actionWithStatus, syncPayload)
+				_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, syncPayload)
+				_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, syncPayload)
+			}
+			uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
+		} else {
+			uc.HandleNATSMirrorActionFailure(ctx, action, finalStatus, errorMessage)
+			if syncMsg != nil {
+				uc.syncProtocolConverterActionOnTerminal(ctx, &actionWithStatus, syncPayload)
 			}
 		}
-		if syncMsg != nil {
-			_ = uc.syncProtocolConverterActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
-			_ = uc.syncDataModelActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
-			_ = uc.syncStreamProcessorActionResult(ctx, &actionWithStatus, []byte(syncMsg.Content))
+
+		if uc.pcWorkflowUc != nil {
+			uc.pcWorkflowUc.HandleActionTerminal(ctx, &actionWithStatus, finalStatus, errorMessage, syncPayload)
 		}
-		uc.RecordNATSMirrorDeploySuccess(ctx, &actionWithStatus)
-	} else if action != nil {
-		uc.HandleNATSMirrorActionFailure(ctx, action, finalStatus, errorMessage)
 	}
 
 	return nil
@@ -1373,6 +1396,55 @@ func extractPayloadFromMessage(content string, actionID string) ([]byte, error) 
 	return nil, fmt.Errorf("no actionReplyPayload found in message for action %s", actionID)
 }
 
+// syncProtocolConverterActionOnTerminal syncs catalog state for failed protocol-converter actions.
+func (uc *InstanceUsecase) syncProtocolConverterActionOnTerminal(ctx context.Context, action *models.Action, payload []byte) {
+	if uc == nil || uc.protocolConverterRepo == nil || action == nil {
+		return
+	}
+	switch action.Type {
+	case "deploy-protocol-converter", "edit-protocol-converter", "delete-protocol-converter", "get-protocol-converter":
+	default:
+		return
+	}
+	shouldSync := len(payload) > 0 || action.Type == "delete-protocol-converter" || action.Status == models.ActionStatusFailed
+	if !shouldSync {
+		return
+	}
+	_ = uc.syncProtocolConverterActionResult(ctx, action, payload)
+}
+
+func resolveActionErrorMessage(action *models.Action, responsePayload map[string]interface{}) string {
+	if action != nil {
+		if msg := strings.TrimSpace(action.ErrorMessage); msg != "" {
+			return msg
+		}
+	}
+	if responsePayload != nil {
+		if errMsg, ok := responsePayload["error"].(string); ok && strings.TrimSpace(errMsg) != "" {
+			return strings.TrimSpace(errMsg)
+		}
+		if errMsg, ok := responsePayload["errorMessage"].(string); ok && strings.TrimSpace(errMsg) != "" {
+			return strings.TrimSpace(errMsg)
+		}
+	}
+	return ""
+}
+
+func (uc *InstanceUsecase) handleProtocolConverterDeleteFailure(ctx context.Context, tenantID, deviceID, uuid, errMsg string) {
+	if uuid == "" {
+		return
+	}
+	if protocolconverter.IsNotFoundError(errMsg) {
+		if err := uc.protocolConverterRepo.Delete(ctx, tenantID, deviceID, uuid); err != nil {
+			fmt.Printf("Warning: Failed to remove orphan protocol converter %s: %v\n", uuid, err)
+		} else {
+			fmt.Printf("Info: Protocol converter %s absent on device; removed catalog entry\n", uuid)
+		}
+		return
+	}
+	_ = uc.protocolConverterRepo.UpdateStatus(ctx, tenantID, deviceID, uuid, "FAILED", "OFFLINE", errMsg)
+}
+
 // syncProtocolConverterActionResult syncs protocol converter state from action result
 // Called when an action-result is received for protocol converter operations
 func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context, action *models.Action, payload []byte) error {
@@ -1453,13 +1525,11 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				var origPayload map[string]interface{}
 				if err := json.Unmarshal(action.Payload.Value, &origPayload); err == nil {
 					if uuid, ok := origPayload["uuid"].(string); ok && uuid != "" {
-						// If action succeeded, delete from DB
 						if action.Status == models.ActionStatusCompleted {
 							_ = uc.protocolConverterRepo.Delete(ctx, tenantID, action.DeviceId, uuid)
 						} else if action.Status == models.ActionStatusFailed {
-							// If action failed, mark as OFFLINE but keep record
-							_ = uc.protocolConverterRepo.UpdateStatus(ctx, tenantID, action.DeviceId, uuid,
-								"FAILED", "OFFLINE", "Failed to delete protocol converter")
+							uc.handleProtocolConverterDeleteFailure(ctx, tenantID, action.DeviceId, uuid,
+								resolveActionErrorMessage(action, responsePayload))
 						}
 						return nil
 					}
@@ -1475,20 +1545,18 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 		// For deploy: UUID is generated from name (same as umh-core does)
 		// UUID generation is deterministic: GenerateUUIDFromName(name) == same UUID every time for same name
 		if actionType == "deploy" {
-			if name, ok := protocolConverter["name"].(string); ok && name != "" {
-				// Import would be needed: "github.com/artpark-hub/taksa-platform/device-management/api/umh-core/v2"
-				// For now, try to get from request payload
-				if action.Payload != nil {
-					var origPayload map[string]interface{}
-					if err := json.Unmarshal(action.Payload.Value, &origPayload); err == nil {
-						if name, ok := origPayload["name"].(string); ok && name != "" {
-							// Use the name to look up the converter, or generate UUID from name
-							// For deterministic UUID generation: would need to implement same logic as umh-core
-							// Fallback: use name as temporary identifier
-							uuid = name // Temporary - ideally generate proper UUID from name
-						}
-					}
+			name := ""
+			if n, ok := protocolConverter["name"].(string); ok && n != "" {
+				name = n
+			}
+			if name == "" && action.Payload != nil {
+				var origPayload map[string]interface{}
+				if err := json.Unmarshal(action.Payload.Value, &origPayload); err == nil {
+					name, _ = origPayload["name"].(string)
 				}
+			}
+			if name != "" {
+				uuid = GenerateUUIDFromName(name)
 			}
 		}
 
@@ -1514,26 +1582,15 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 		case "deploy":
 			// For deploy: UPSERT to create new record
 			name, _ := protocolConverter["name"].(string)
-			converterType := "protocol-converter"
-
-			// Try to extract protocol type from response meta first
-			if meta, ok := protocolConverter["meta"].(map[string]interface{}); ok {
-				if protocol, ok := meta["protocol"].(string); ok && protocol != "" {
-					converterType = protocol
-				}
+			converterType := protocolconverter.WireTypeFromMap(protocolConverter)
+			if protocolconverter.IsGenericCatalogType(converterType) {
+				converterType = "protocol-converter"
 			}
 
-			// If not in response, extract from request payload
-			if converterType == "protocol-converter" && action.Payload != nil {
-				var requestPayload map[string]interface{}
-				if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
-					if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
-						if inputs, ok := readDFC["inputs"].(map[string]interface{}); ok {
-							if inputType, ok := inputs["type"].(string); ok && inputType != "" {
-								converterType = inputType
-							}
-						}
-					}
+			// Deploy replies are often shell-only; read meta/readDFC from the queued request.
+			if protocolconverter.IsGenericCatalogType(converterType) && action.Payload != nil {
+				if t := protocolconverter.WireTypeFromJSON(action.Payload.Value); !protocolconverter.IsGenericCatalogType(t) {
+					converterType = t
 				}
 			}
 
@@ -1544,7 +1601,12 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				}
 			}
 
-			err := uc.protocolConverterRepo.Upsert(ctx, tenantID, action.DeviceId, uuid, name, converterType, connectionUUID)
+			var err error
+			if uc.pcWorkflowUc != nil && uc.pcWorkflowUc.ShouldDeferCatalogPromotion(ctx, tenantID, action.DeviceId, action.Id, uuid) {
+				err = uc.protocolConverterRepo.UpsertPending(ctx, tenantID, action.DeviceId, uuid, name, converterType, connectionUUID)
+			} else {
+				err = uc.protocolConverterRepo.Upsert(ctx, tenantID, action.DeviceId, uuid, name, converterType, connectionUUID)
+			}
 			if err != nil {
 				fmt.Printf("Warning: Failed to upsert protocol converter: %v\n", err)
 			}
@@ -1568,27 +1630,15 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 				_ = uc.protocolConverterRepo.Delete(ctx, tenantID, action.DeviceId, oldUUID)
 
 				// Create new record with new UUID and updated details
-				converterType := "protocol-converter"
+				converterType := protocolconverter.WireTypeFromMap(protocolConverter)
+				if protocolconverter.IsGenericCatalogType(converterType) {
+					converterType = "protocol-converter"
+				}
 				connectionUUID := ""
 
-				// Try to extract protocol type from response meta first
-				if meta, ok := protocolConverter["meta"].(map[string]interface{}); ok {
-					if protocol, ok := meta["protocol"].(string); ok && protocol != "" {
-						converterType = protocol
-					}
-				}
-
-				// If not in response, extract from request payload
-				if converterType == "protocol-converter" && action.Payload != nil {
-					var requestPayload map[string]interface{}
-					if err := json.Unmarshal(action.Payload.Value, &requestPayload); err == nil {
-						if readDFC, ok := requestPayload["readDFC"].(map[string]interface{}); ok {
-							if inputs, ok := readDFC["inputs"].(map[string]interface{}); ok {
-								if inputType, ok := inputs["type"].(string); ok && inputType != "" {
-									converterType = inputType
-								}
-							}
-						}
+				if protocolconverter.IsGenericCatalogType(converterType) && action.Payload != nil {
+					if t := protocolconverter.WireTypeFromJSON(action.Payload.Value); !protocolconverter.IsGenericCatalogType(t) {
+						converterType = t
 					}
 				}
 
@@ -1604,17 +1654,23 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 					fmt.Printf("Warning: Failed to upsert renamed protocol converter: %v\n", err)
 				}
 			} else {
-				// UUID unchanged (name unchanged) - just update status and details
-				err := uc.protocolConverterRepo.UpdateStatus(ctx,
-					tenantID,
-					action.DeviceId,
-					uuid,
-					"ACTIVE", // deployment_status
-					"ONLINE", // health_status
-					"",       // error_message (clear any previous errors)
-				)
-				if err != nil {
-					fmt.Printf("Warning: Failed to update protocol converter status: %v\n", err)
+				// UUID unchanged — edit replies are often {uuid} only; type lives in request payload.
+				converterType := protocolconverter.WireTypeFromMap(protocolConverter)
+				if protocolconverter.IsGenericCatalogType(converterType) && action.Payload != nil {
+					if t := protocolconverter.WireTypeFromJSON(action.Payload.Value); !protocolconverter.IsGenericCatalogType(t) {
+						converterType = t
+					}
+				}
+				updates := map[string]interface{}{
+					"deployment_status": "ACTIVE",
+					"health_status":     "ONLINE",
+					"error_message":     "",
+				}
+				if !protocolconverter.IsGenericCatalogType(converterType) {
+					updates["type"] = converterType
+				}
+				if err := uc.protocolConverterRepo.Update(ctx, tenantID, action.DeviceId, uuid, updates); err != nil {
+					fmt.Printf("Warning: Failed to update protocol converter after edit: %v\n", err)
 				}
 			}
 
@@ -1624,27 +1680,26 @@ func (uc *InstanceUsecase) syncProtocolConverterActionResult(ctx context.Context
 			if err != nil {
 				fmt.Printf("Warning: Failed to delete protocol converter: %v\n", err)
 			}
+
+		case "get":
+			// Backfill wire protocol in catalog from device payload (listing otherwise shows DFC kind only).
+			converterType := protocolconverter.WireTypeFromMap(protocolConverter)
+			if !protocolconverter.IsGenericCatalogType(converterType) {
+				if err := uc.protocolConverterRepo.Update(ctx, tenantID, action.DeviceId, uuid, map[string]interface{}{
+					"type": converterType,
+				}); err != nil {
+					fmt.Printf("Warning: Failed to update protocol converter type from get: %v\n", err)
+				}
+			}
 		}
 	} else if action.Status == models.ActionStatusFailed {
-		// Failed action: mark as FAILED/OFFLINE
-		errorMessage := ""
-		if errMsg, ok := responsePayload["error"].(string); ok {
-			errorMessage = errMsg
-		} else if errMsg, ok := responsePayload["errorMessage"].(string); ok {
-			errorMessage = errMsg
-		}
+		errMsg := resolveActionErrorMessage(action, responsePayload)
 
 		if actionType == "delete" {
-			// Delete failure: mark as OFFLINE but keep record
-			err := uc.protocolConverterRepo.UpdateStatus(ctx, tenantID, action.DeviceId, uuid,
-				"FAILED", "OFFLINE", errorMessage)
-			if err != nil {
-				fmt.Printf("Warning: Failed to update protocol converter status on delete failure: %v\n", err)
-			}
+			uc.handleProtocolConverterDeleteFailure(ctx, tenantID, action.DeviceId, uuid, errMsg)
 		} else {
-			// Deploy/Edit failure: mark as FAILED
 			err := uc.protocolConverterRepo.UpdateStatus(ctx, tenantID, action.DeviceId, uuid,
-				"FAILED", "OFFLINE", errorMessage)
+				"FAILED", "OFFLINE", errMsg)
 			if err != nil {
 				fmt.Printf("Warning: Failed to update protocol converter status on failure: %v\n", err)
 			}
@@ -2198,16 +2253,36 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 			continue // Skip if no UUID
 		}
 
-		// Use Upsert to create or update
-		// This handles both new converters and converters transitioning from PENDING to ACTIVE
-		err := uc.protocolConverterRepo.Upsert(ctx,
-			tenantID,
-			deviceID,
-			converter.UUID,
-			converter.Name,
-			converter.Type,
-			converter.ConnectionUUID,
-		)
+		catalogType := converter.Type
+		// Heartbeat only reports dfcType; do not overwrite opcua/modbus learned from deploy/get.
+		if protocolconverter.IsGenericCatalogType(catalogType) {
+			if existing, err := uc.protocolConverterRepo.GetByUUID(ctx, tenantID, deviceID, converter.UUID); err == nil && existing != nil {
+				if !protocolconverter.IsGenericCatalogType(existing.Type) {
+					catalogType = existing.Type
+				}
+			}
+		}
+
+		var err error
+		if uc.pcWorkflowUc != nil && uc.pcWorkflowUc.HasActiveWorkflowForConverter(ctx, tenantID, deviceID, converter.UUID) {
+			err = uc.protocolConverterRepo.UpsertPending(ctx,
+				tenantID,
+				deviceID,
+				converter.UUID,
+				converter.Name,
+				catalogType,
+				converter.ConnectionUUID,
+			)
+		} else {
+			err = uc.protocolConverterRepo.Upsert(ctx,
+				tenantID,
+				deviceID,
+				converter.UUID,
+				converter.Name,
+				catalogType,
+				converter.ConnectionUUID,
+			)
+		}
 		if err != nil {
 			fmt.Printf("Warning: Failed to sync protocol converter %s: %v\n", converter.UUID, err)
 		}
@@ -2235,15 +2310,16 @@ func (uc *InstanceUsecase) syncProtocolConvertersFromStatusMessage(ctx context.C
 			}
 		}
 
-		// If converter was ACTIVE in DB but not in StatusMessage, mark as OFFLINE
+		// If converter was ACTIVE in DB but not in StatusMessage, mark as OFFLINE only.
+		// Catalog removal for failed deploys is handled by workflow rollback and delete actions.
 		if !found && dbConverter.DeploymentStatus == "ACTIVE" {
 			err := uc.protocolConverterRepo.UpdateStatus(ctx,
 				tenantID,
 				deviceID,
 				dbConverter.UUID,
 				dbConverter.DeploymentStatus,
-				"OFFLINE", // Mark health as offline
-				"",        // Clear error message
+				"OFFLINE",
+				"",
 			)
 			if err != nil {
 				fmt.Printf("Warning: Failed to mark converter %s as offline: %v\n", dbConverter.UUID, err)

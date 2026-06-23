@@ -17,6 +17,7 @@ type Store struct {
 	messages                 *MessageStore
 	messageTracking          storage.MessageTrackingStore
 	actionMessageTracking    *ActionMessageTrackingStore
+	actionWorkflows          *ActionWorkflowStore
 	certificates             *CertificateStore
 	settings                 *SettingStore
 }
@@ -36,6 +37,7 @@ func NewStore(db *sql.DB) (storage.Store, error) {
 		messages:              &MessageStore{db: db},
 		messageTracking:       newMessageTrackingStore(db),
 		actionMessageTracking: newActionMessageTrackingStore(db),
+		actionWorkflows:       &ActionWorkflowStore{db: db},
 		certificates:          NewCertificateStore(db),
 		settings:              &SettingStore{db: db},
 	}, nil
@@ -84,6 +86,11 @@ func (s *Store) Settings() storage.SettingStore {
 // ActionMessageTracking returns the action message tracking store
 func (s *Store) ActionMessageTracking() storage.ActionMessageTracker {
 	return s.actionMessageTracking
+}
+
+// ActionWorkflows returns the action workflow store.
+func (s *Store) ActionWorkflows() storage.ActionWorkflowStore {
+	return s.actionWorkflows
 }
 
 // Close closes the database connection

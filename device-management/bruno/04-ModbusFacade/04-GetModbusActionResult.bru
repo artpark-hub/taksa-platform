@@ -1,0 +1,52 @@
+meta {
+  name: Poll Modbus facade action result (get / edit)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/modbus/actions/{{modbus_action_id}}/result
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Poll typed Modbus facade results for GET and EDIT child actions.
+  For deploy workflow polling use 02-GetModbusWorkflowResult instead.
+  EDIT actions may return COMPLETED without `result` — run GET to refresh.
+}
+
+script:post-response {
+  const resp = res.getBody();
+
+  if (resp && resp.status) {
+    console.log('✓ Action status: ' + resp.status);
+
+    if (resp.result) {
+      console.log('  uuid: ' + (resp.result.uuid || ''));
+      console.log('  inputParse: ' + (resp.result.inputParse || ''));
+      console.log('  processorParse: ' + (resp.result.processorParse || ''));
+      console.log('  dataType: ' + (resp.result.dataType || ''));
+
+      if (resp.result.uuid) {
+        bru.setEnvVar('modbus_converter_uuid', resp.result.uuid);
+        bru.setEnvVar('converter_uuid', resp.result.uuid);
+      }
+    } else if (['QUEUED', 'DELIVERED', 'PROCESSING'].includes(resp.status)) {
+      console.log('  ⏳ Still processing — poll again');
+    }
+  }
+}
+
+tests {
+  test("Action result retrieved", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has status", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+  });
+}

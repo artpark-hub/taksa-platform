@@ -1,0 +1,116 @@
+package protocolconverter
+
+import (
+	"encoding/json"
+	"strings"
+)
+
+// IsGenericCatalogType reports whether the catalog type is the DFC kind, not a wire protocol.
+// Heartbeat sync only knows dfcType "protocol-converter"; deploy/get responses carry opcua/modbus.
+func IsGenericCatalogType(t string) bool {
+	n := strings.ToLower(strings.TrimSpace(t))
+	return n == "" || n == "protocol-converter"
+}
+
+// CatalogWireTypeFromProtocolKind maps workflow protocol kind to catalog list type.
+func CatalogWireTypeFromProtocolKind(protocolKind string) string {
+	switch strings.ToLower(strings.TrimSpace(protocolKind)) {
+	case "opcua", "opc-ua":
+		return "opcua"
+	case "modbus", "modbus_tcp", "modbus-tcp":
+		return "modbus"
+	default:
+		return ""
+	}
+}
+
+// ResolveCatalogWireType prefers a known wire protocol over the generic DFC kind when merging.
+func ResolveCatalogWireType(incoming, existing string) string {
+	if !IsGenericCatalogType(incoming) {
+		return incoming
+	}
+	if !IsGenericCatalogType(existing) {
+		return existing
+	}
+	if incoming != "" {
+		return incoming
+	}
+	return existing
+}
+
+// IsOpcUaCatalogType reports whether the catalog already records an OPC-UA wire protocol.
+func IsOpcUaCatalogType(t string) bool {
+	n := strings.ToLower(strings.TrimSpace(t))
+	return n == "opcua" || n == "opc-ua" || strings.Contains(n, "opcua")
+}
+
+// IsKnownNonOpcUaCatalogType reports a catalog type that is definitely not OPC-UA.
+func IsKnownNonOpcUaCatalogType(t string) bool {
+	if IsGenericCatalogType(t) || IsOpcUaCatalogType(t) {
+		return false
+	}
+	return IsModbusCatalogType(t) || strings.Contains(strings.ToLower(strings.TrimSpace(t)), "sparkplug")
+}
+
+// IsModbusCatalogType reports whether the catalog records a Modbus wire protocol.
+func IsModbusCatalogType(t string) bool {
+	n := strings.ToLower(strings.TrimSpace(t))
+	return n == "modbus" || n == "modbus_tcp" || n == "modbus-tcp" || strings.Contains(n, "modbus")
+}
+
+// IsKnownNonModbusCatalogType reports a catalog type that is definitely not Modbus.
+func IsKnownNonModbusCatalogType(t string) bool {
+	if IsGenericCatalogType(t) || IsModbusCatalogType(t) {
+		return false
+	}
+	return IsOpcUaCatalogType(t) || strings.Contains(strings.ToLower(strings.TrimSpace(t)), "sparkplug")
+}
+
+// WireTypeFromJSON extracts wire protocol from a queued action payload (protojson or JSON object).
+func WireTypeFromJSON(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return ""
+	}
+	return WireTypeFromMap(m)
+}
+
+// WireTypeFromMap extracts readDFC.inputs.type or meta.protocol from an umh-core payload map.
+func WireTypeFromMap(pc map[string]interface{}) string {
+	if pc == nil {
+		return ""
+	}
+	for _, metaKey := range []string{"meta", "Meta"} {
+		meta, ok := pc[metaKey].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for _, protocolKey := range []string{"protocol", "Protocol"} {
+			if protocol, ok := meta[protocolKey].(string); ok && protocol != "" {
+				return protocol
+			}
+		}
+	}
+	for _, key := range []string{"readDFC", "read_dfc", "ReadDFC"} {
+		readDFC, ok := pc[key].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		inputs, ok := readDFC["inputs"].(map[string]interface{})
+		if !ok {
+			inputs, ok = readDFC["Inputs"].(map[string]interface{})
+		}
+		if !ok {
+			continue
+		}
+		for _, inputKey := range []string{"type", "Type"} {
+			if inputType, ok := inputs[inputKey].(string); ok && inputType != "" {
+				return inputType
+			}
+		}
+	}
+	return ""
+}

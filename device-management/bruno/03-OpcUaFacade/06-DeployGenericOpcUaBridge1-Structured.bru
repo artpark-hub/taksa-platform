@@ -1,0 +1,83 @@
+meta {
+  name: Deploy Generic-opcua-bridge-1 (structured, RAW processor)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/opc-ua
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}",
+    "name": "Generic-opcua-bridge-1",
+    "state": "active",
+    "applyReadConfig": true,
+    "connection": {
+      "ip": "172.25.60.31",
+      "port": 4840
+    },
+    "location": {
+      "levels": {
+        "0": "Artpark",
+        "1": "Artgarage",
+        "2": "GroundFloor",
+        "3": "Line1"
+      }
+    },
+    "input": {
+      "mode": "STRUCTURED",
+      "structured": {
+        "standard": {
+          "subscribeNodeIds": [
+            { "nodeId": "ns=1;i=1" },
+            { "nodeId": "ns=1;i=2" },
+            { "nodeId": "ns=1;i=3" },
+            { "nodeId": "ns=1;i=9" },
+            { "nodeId": "ns=1;i=1000" }
+          ],
+          "endpoint": "opc.tcp://{{ .IP }}:{{ .PORT }}",
+          "subscribeEnabled": true,
+          "useHeartbeat": true
+        },
+        "advanced": {
+          "profile": "auto"
+        }
+      }
+    },
+    "readFlow": {
+      "dataType": "TIME_SERIES",
+      "processorMode": "RAW",
+      "bufferMode": "STRUCTURED",
+      "rawProcessorYaml": "tag_processor:\n    advancedProcessing: return msg;\n    conditions:\n        - if: msg.meta.opcua_attr_nodeid === \"ns=4;i=6211\"\n          then: |\n            msg.payload = parseFloat(msg.payload) + 273.15;\n            msg.meta.tag_name = \"CurrentTemperatureKelvin\";\n            msg.meta.unit = \"Kelvin\";\n            return msg;\n    defaults: |-\n        msg.meta.location_path = \"{{ .location_path }}\";\n        msg.meta.data_contract = \"_historian\";\n        msg.meta.tag_name = msg.meta.opcua_tag_name;\n        msg.payload = msg.payload;\n        msg.meta.virtual_path = \"\";\n        msg.meta.timestamp_ms = msg.meta.opcua_source_timestamp;\n        switch(msg.meta.opcua_attr_nodeid) {\n          case \"ns=1;i=1\":\n            msg.meta.tag_name = \"state\";\n            break;\n          case \"ns=1;i=2\":\n            msg.meta.tag_name = \"cycle_count\";\n            break;\n          case \"ns=1;i=3\":\n            msg.meta.tag_name = \"good_count\";\n            break;\n          case \"ns=1;i=9\":\n            msg.meta.tag_name = \"die_temperature_c\";\n            break;\n          case \"ns=1;i=1000\":\n            msg.meta.tag_name = \"MetalFormingPress\";\n            break;\n          default:\n            break;\n        }\n        return msg;\n",
+      "yamlInject": {
+        "rawYaml": "buffer:\n    none: {}"
+      }
+    },
+    "templateVariables": {
+      "IP": "172.25.60.31",
+      "PORT": "4840",
+      "AddressMappings": "[{\"Address\":\"ns=1;i=1\",\"TagName\":\"state\",\"DataContract\":\"_historian\",\"LocationPathSuffix\":\"\",\"VirtualPath\":\"\"},{\"Address\":\"ns=1;i=2\",\"TagName\":\"cycle_count\",\"DataContract\":\"_historian\",\"LocationPathSuffix\":\"\",\"VirtualPath\":\"\"},{\"Address\":\"ns=1;i=3\",\"TagName\":\"good_count\",\"DataContract\":\"_historian\",\"LocationPathSuffix\":\"\",\"VirtualPath\":\"\"},{\"Address\":\"ns=1;i=9\",\"TagName\":\"die_temperature_c\",\"DataContract\":\"_historian\",\"LocationPathSuffix\":\"\",\"VirtualPath\":\"\"},{\"Address\":\"ns=1;i=1000\",\"TagName\":\"MetalFormingPress\",\"DataContract\":\"_historian\",\"LocationPathSuffix\":\"\",\"VirtualPath\":\"\"}]"
+    }
+  }
+}
+
+docs {
+  Realistic deploy for Generic-opcua-bridge-1: structured input + RAW processor YAML.
+  Uses camelCase JSON keys (readFlow, applyReadConfig, subscribeNodeIds, rawProcessorYaml, etc.).
+  Name is fixed — 409 if bridge already exists; delete or rename for a fresh deploy test.
+  Poll: 02-GetOpcUaWorkflowResult → optional 03+04 GET verify.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  if (resp && resp.actionId) {
+    bru.setEnvVar('opcua_workflow_action_id', resp.actionId);
+  }
+}

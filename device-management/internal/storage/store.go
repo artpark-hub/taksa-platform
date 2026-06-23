@@ -85,6 +85,9 @@ type Store interface {
 	// Action message tracking store - for traceability
 	ActionMessageTracking() ActionMessageTracker
 
+	// Action workflows - composite orchestration (facade deploy + configure).
+	ActionWorkflows() ActionWorkflowStore
+
 	// Close closes the underlying database connection
 	Close() error
 }

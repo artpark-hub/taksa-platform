@@ -1,0 +1,69 @@
+meta {
+  name: Get OPC-UA protocol converter (facade)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/opc-ua/{{opcua_converter_uuid}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Queue async get-protocol-converter for an OPC-UA bridge.
+  
+  Works for bridges deployed via the facade OR the generic protocol-converter API,
+  as long as the device has an OPC-UA read flow for this UUID.
+  
+  Prerequisites:
+  - `device_id` — target DCD (online / logged in)
+  - `opcua_converter_uuid` — bridge UUID (run 00-List… or set manually)
+  
+  Returns `actionId` — poll with 04-GetOpcUaActionResult.
+  
+  Note: If the DM catalog lists this UUID with a non-OPC-UA type, the request
+  fails with FailedPrecondition before the action is queued.
+}
+
+script:pre-request {
+  if (!bru.getEnvVar('opcua_converter_uuid') && bru.getEnvVar('converter_uuid')) {
+    bru.setEnvVar('opcua_converter_uuid', bru.getEnvVar('converter_uuid'));
+  }
+
+  if (!bru.getEnvVar('opcua_converter_uuid')) {
+    console.warn('⚠ Set opcua_converter_uuid (run 00-List… or deploy workflow)');
+  }
+}
+
+script:post-response {
+  const resp = res.getBody();
+
+  if (resp && resp.actionId) {
+    bru.setEnvVar('opcua_action_id', resp.actionId);
+    console.log('✓ OPC-UA GET queued');
+    console.log('  actionId: ' + resp.actionId);
+    console.log('  Poll: 04-GetOpcUaActionResult');
+  }
+}
+
+tests {
+  test("GET action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.be.a('string');
+    expect(resp.actionId).to.not.be.empty;
+  });
+
+  test("Action ID is UUID format", function() {
+    const resp = res.getBody();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(resp.actionId).to.match(uuidRegex);
+  });
+}

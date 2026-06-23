@@ -1,0 +1,47 @@
+meta {
+  name: List protocol converters (set opcua_converter_uuid)
+  type: http
+  seq: 0
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Optional helper when testing GET/EDIT against an existing bridge on the DCD.
+  
+  Lists protocol converters for the device and saves the first converter UUID
+  into `opcua_converter_uuid` (and `converter_uuid` for compatibility).
+  
+  Set `device_id` in the environment, or run after deploy workflow completes.
+  To target a specific bridge, set `opcua_converter_uuid` manually instead.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  const converters = resp?.converters || resp?.Converters || [];
+
+  if (converters.length > 0) {
+    const uuid = converters[0].uuid || converters[0].Uuid;
+    if (uuid) {
+      bru.setEnvVar('opcua_converter_uuid', uuid);
+      bru.setEnvVar('converter_uuid', uuid);
+      console.log('✓ opcua_converter_uuid = ' + uuid);
+      console.log('  name: ' + (converters[0].name || converters[0].Name || ''));
+      console.log('  type: ' + (converters[0].type || converters[0].Type || ''));
+    }
+  } else {
+    console.warn('⚠ No converters in list — set opcua_converter_uuid manually');
+  }
+}
+
+tests {
+  test("HTTP 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

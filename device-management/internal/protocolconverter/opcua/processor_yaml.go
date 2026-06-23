@@ -1,0 +1,768 @@
+package opcua
+
+import (
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+
+	v1 "github.com/artpark-hub/taksa-platform/device-management/api/devicemgmt/v1"
+)
+
+var (
+	dataContractFromDefaultsRE = regexp.MustCompile(`msg\.meta\.data_contract\s*=\s*["']([^"']*)["']`)
+	virtualPathFromDefaultsRE  = regexp.MustCompile(`msg\.meta\.virtual_path\s*=\s*["']([^"']*)["']`)
+	nodeIDFromCaseRE           = regexp.MustCompile(`^case\s+(.+?):`)
+)
+
+var conditionFieldExpressions = map[string]string{
+	"Node ID":              "msg.meta.opcua_attr_nodeid",
+	"Modbus Tag Name":      "msg.meta.modbus_tag_name",
+	"Location Path Suffix": "msg.meta.location_path_suffix",
+	"Data Contract":        "msg.meta.data_contract",
+	"Virtual Path":         "msg.meta.virtual_path",
+	"Tag Name":             "msg.meta.tag_name",
+}
+
+var modbusIncludesRE = regexp.MustCompile(`^!?msg\.meta\.modbus_tag_name\.includes\((.+)\)$`)
+
+func buildProcessorYAMLFromStructured(proc *v1.OpcUaProcessorStructuredConfig) (string, error) {
+	if proc == nil {
+		return defaultProcessorYAML(), nil
+	}
+
+	defaultCode := strings.TrimSpace(proc.GetDefaultsCode())
+	if defaultCode == "" {
+		defaultCode = buildDefaultProcessorCode(proc.GetDefaults(), proc.GetTagMappings())
+	}
+	conditionCode := strings.TrimSpace(proc.GetConditionsYaml())
+	if conditionCode == "" {
+		conditionCode = buildConditionsYAML(proc.GetConditions())
+	}
+
+	adv := strings.TrimSpace(proc.GetAdvancedProcessing())
+	if adv == "" {
+		adv = "return msg;"
+	}
+	return buildTagProcessorWrapper(defaultCode, conditionCode, adv), nil
+}
+
+func defaultProcessorYAML() string {
+	return buildTagProcessorWrapper(buildDefaultProcessorCode(nil, nil), "[]", "return msg;")
+}
+
+func buildDefaultProcessorCode(defaults *v1.OpcUaProcessorDefaults, mappings []*v1.OpcUaTagMapping) string {
+	dc := "_historian"
+	vp := ""
+	lp := "{{ .location_path }}"
+	if defaults != nil {
+		if v := strings.TrimSpace(defaults.GetDataContract()); v != "" {
+			dc = v
+		}
+		if v := strings.TrimSpace(defaults.GetVirtualPath()); v != "" {
+			vp = v
+		}
+		if v := strings.TrimSpace(defaults.GetLocationPath()); v != "" {
+			lp = v
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("msg.meta.location_path = %s;\n", jsonString(lp)))
+	b.WriteString(fmt.Sprintf("msg.meta.data_contract = %s;\n", jsonString(dc)))
+	b.WriteString("msg.meta.tag_name = msg.meta.opcua_tag_name;\n")
+	b.WriteString("msg.payload = msg.payload;\n")
+	b.WriteString(fmt.Sprintf("msg.meta.virtual_path = %s;\n", jsonString(vp)))
+	b.WriteString("msg.meta.timestamp_ms = msg.meta.opcua_source_timestamp;\n")
+	b.WriteString("switch(msg.meta.opcua_attr_nodeid) {\n")
+	for _, row := range mappings {
+		nodeID := strings.TrimSpace(row.GetNodeId())
+		if nodeID == "" {
+			continue
+		}
+		b.WriteString(fmt.Sprintf("  case %s:\n", jsonString(nodeID)))
+		if suffix := strings.TrimSpace(row.GetLocationPathSuffix()); suffix != "" {
+			b.WriteString(fmt.Sprintf("    msg.meta.location_path += %s;\n", jsonString("."+suffix)))
+		}
+		rowDC := strings.TrimSpace(row.GetDataContract())
+		if rowDC != "" && rowDC != dc {
+			b.WriteString(fmt.Sprintf("    msg.meta.data_contract = %s;\n", jsonString(rowDC)))
+		}
+		if v := strings.TrimSpace(row.GetVirtualPath()); v != "" {
+			b.WriteString(fmt.Sprintf("    msg.meta.virtual_path = %s;\n", jsonString(v)))
+		}
+		if v := strings.TrimSpace(row.GetTagName()); v != "" {
+			b.WriteString(fmt.Sprintf("    msg.meta.tag_name = %s;\n", jsonString(v)))
+		}
+		b.WriteString("    break;\n")
+	}
+	b.WriteString("  default:\n    break;\n}\nreturn msg;")
+	return b.String()
+}
+
+func buildConditionsYAML(conditions []*v1.OpcUaProcessorCondition) string {
+	if len(conditions) == 0 {
+		return "[]"
+	}
+	var b strings.Builder
+	for i, cond := range conditions {
+		expr := strings.TrimSpace(cond.GetIfExpression())
+		if expr == "" {
+			expr = conditionExpression(cond)
+		}
+		action := strings.TrimSpace(cond.GetAction())
+		if action == "" {
+			action = "return msg;"
+		}
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString("- if: ")
+		b.WriteString(expr)
+		b.WriteString("\n  then: |\n")
+		for _, line := range strings.Split(action, "\n") {
+			b.WriteString("    ")
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func conditionExpression(cond *v1.OpcUaProcessorCondition) string {
+	clauses := cond.GetClauses()
+	if len(clauses) == 0 {
+		return "true"
+	}
+	joiner := " && "
+	if cond.GetJoiner() == "OR" {
+		joiner = " || "
+	}
+	parts := make([]string, 0, len(clauses))
+	for _, c := range clauses {
+		parts = append(parts, clauseExpression(c))
+	}
+	return strings.Join(parts, joiner)
+}
+
+func clauseExpression(c *v1.OpcUaConditionClause) string {
+	fieldExpr := conditionFieldExpressions[c.GetField()]
+	if fieldExpr == "" {
+		fieldExpr = conditionFieldExpressions["Node ID"]
+	}
+	val := jsonString(c.GetValue())
+	switch c.GetOperator() {
+	case "not equals (!==)":
+		return fmt.Sprintf("%s !== %s", fieldExpr, val)
+	case "starts with":
+		return fmt.Sprintf("String(%s).startsWith(%s)", fieldExpr, val)
+	case "ends with":
+		return fmt.Sprintf("String(%s).endsWith(%s)", fieldExpr, val)
+	case "contains":
+		return fmt.Sprintf("String(%s).includes(%s)", fieldExpr, val)
+	case "not contains":
+		return fmt.Sprintf("!String(%s).includes(%s)", fieldExpr, val)
+	case "greater than (>)":
+		return fmt.Sprintf("%s > %s", fieldExpr, val)
+	case "less than (<)":
+		return fmt.Sprintf("%s < %s", fieldExpr, val)
+	case "greater or equal (>=)":
+		return fmt.Sprintf("%s >= %s", fieldExpr, val)
+	case "less or equal (<=)":
+		return fmt.Sprintf("%s <= %s", fieldExpr, val)
+	default:
+		return fmt.Sprintf("%s === %s", fieldExpr, val)
+	}
+}
+
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}
+
+func buildTagProcessorWrapper(defaultCode, conditionCode, advancedProcessing string) string {
+	cond := strings.TrimSpace(conditionCode)
+	if cond == "" {
+		cond = "[]"
+	}
+	adv := strings.TrimSpace(advancedProcessing)
+	if adv == "" {
+		adv = "return msg;"
+	}
+	var b strings.Builder
+	b.WriteString("tag_processor:\n")
+	if strings.Contains(adv, "\n") {
+		b.WriteString("  advancedProcessing: |-\n")
+		b.WriteString(indentBlock(adv, 4))
+	} else {
+		b.WriteString("  advancedProcessing: ")
+		b.WriteString(adv)
+		b.WriteString("\n")
+	}
+	b.WriteString("  conditions:\n")
+	if cond == "[]" {
+		b.WriteString("    []\n")
+	} else {
+		b.WriteString(indentBlock(cond, 4))
+	}
+	b.WriteString("  defaults: |-\n")
+	b.WriteString(indentBlock(strings.TrimSpace(defaultCode), 4))
+	return b.String()
+}
+
+func indentBlock(value string, spaces int) string {
+	pad := strings.Repeat(" ", spaces)
+	var b strings.Builder
+	for _, line := range strings.Split(value, "\n") {
+		b.WriteString(pad)
+		b.WriteString(line)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
+func parseProcessorStructured(processorYAML, bufferYAML string, templateVars map[string]string) (*v1.OpcUaReadFlowSection, v1.SectionParseStatus) {
+	section := &v1.OpcUaReadFlowSection{
+		DataType: v1.BridgeDataType_TIME_SERIES,
+		Processor: &v1.OpcUaProcessorStructuredConfig{},
+		YamlInject: &v1.OpcUaYamlInjectConfig{
+			RawYaml: strings.TrimSpace(bufferYAML),
+		},
+		RawProcessorYaml: processorYAML,
+		RawBufferYaml:    bufferYAML,
+	}
+
+	processorYAML = strings.TrimSpace(processorYAML)
+	if processorYAML == "" {
+		return section, v1.SectionParseStatus_PARSE_FAILED
+	}
+
+	defaultCode := extractYAMLSection(processorYAML, "defaults", "conditions", "advancedProcessing")
+	conditionCode := extractConditionsYAML(processorYAML)
+	advancedCode := extractYAMLSection(processorYAML, "advancedProcessing", "defaults", "conditions")
+	if defaultCode == "" {
+		defaultCode = buildDefaultProcessorCode(nil, nil)
+	}
+	if conditionCode == "" {
+		conditionCode = "[]"
+	}
+
+	proc := section.Processor
+	proc.DefaultsCode = defaultCode
+	proc.ConditionsYaml = conditionCode
+	proc.Defaults = parseDefaultsFromCode(defaultCode)
+
+	fromTemplate := parseAddressMappingsFromTemplate(templateVars)
+	fromSwitch := parseTagMappingsFromDefaultCode(defaultCode)
+	proc.TagMappings = mergeTagMappings(fromTemplate, fromSwitch)
+	proc.Conditions = parseConditionsFromYAML(conditionCode)
+	if advancedCode == "" {
+		advancedCode = "return msg;"
+	}
+	proc.AdvancedProcessing = advancedCode
+
+	status := v1.SectionParseStatus_PARSE_PARTIAL
+	if proc.Defaults != nil && len(proc.TagMappings) > 0 {
+		status = v1.SectionParseStatus_PARSE_OK
+	}
+	if status == v1.SectionParseStatus_PARSE_OK && hasUnparsedConditions(processorYAML, conditionCode, proc.Conditions) {
+		status = v1.SectionParseStatus_PARSE_PARTIAL
+	}
+	section.ProcessorMode, section.BufferMode = inferReadFlowModes(status, proc, processorYAML, bufferYAML)
+	return section, status
+}
+
+func inferReadFlowModes(
+	status v1.SectionParseStatus,
+	proc *v1.OpcUaProcessorStructuredConfig,
+	processorYAML, bufferYAML string,
+) (v1.EditSectionMode, v1.EditSectionMode) {
+	if status == v1.SectionParseStatus_PARSE_FAILED || proc == nil {
+		return v1.EditSectionMode_RAW, v1.EditSectionMode_RAW
+	}
+	if status == v1.SectionParseStatus_PARSE_OK {
+		return v1.EditSectionMode_STRUCTURED, v1.EditSectionMode_STRUCTURED
+	}
+	// PARSE_PARTIAL: structured fields are usable when processor YAML was parsed.
+	if strings.TrimSpace(processorYAML) != "" &&
+		(proc.GetDefaultsCode() != "" || len(proc.GetConditions()) > 0 || len(proc.GetTagMappings()) > 0) {
+		return v1.EditSectionMode_STRUCTURED, v1.EditSectionMode_STRUCTURED
+	}
+	if strings.TrimSpace(bufferYAML) != "" {
+		return v1.EditSectionMode_RAW, v1.EditSectionMode_STRUCTURED
+	}
+	return v1.EditSectionMode_RAW, v1.EditSectionMode_RAW
+}
+
+func mergeTagMappings(fromTemplate, fromSwitch []*v1.OpcUaTagMapping) []*v1.OpcUaTagMapping {
+	fromTemplate = filterTemplateTagMappings(fromTemplate)
+	fromSwitch = filterTemplateTagMappings(fromSwitch)
+	if len(fromSwitch) == 0 {
+		return fromTemplate
+	}
+	if len(fromTemplate) == 0 {
+		return fromSwitch
+	}
+	tmplByNode := make(map[string]*v1.OpcUaTagMapping, len(fromTemplate))
+	for _, m := range fromTemplate {
+		if id := strings.TrimSpace(m.GetNodeId()); id != "" {
+			tmplByNode[id] = m
+		}
+	}
+	out := make([]*v1.OpcUaTagMapping, 0, len(fromSwitch)+len(fromTemplate))
+	seen := make(map[string]struct{}, len(fromSwitch))
+	for _, sw := range fromSwitch {
+		id := strings.TrimSpace(sw.GetNodeId())
+		if id == "" {
+			continue
+		}
+		merged := cloneTagMapping(sw)
+		if tm, ok := tmplByNode[id]; ok {
+			mergeTagMappingExtras(merged, tm)
+		}
+		out = append(out, merged)
+		seen[id] = struct{}{}
+	}
+	for _, tm := range fromTemplate {
+		id := strings.TrimSpace(tm.GetNodeId())
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		out = append(out, cloneTagMapping(tm))
+	}
+	return out
+}
+
+func filterTemplateTagMappings(mappings []*v1.OpcUaTagMapping) []*v1.OpcUaTagMapping {
+	if len(mappings) == 0 {
+		return mappings
+	}
+	out := make([]*v1.OpcUaTagMapping, 0, len(mappings))
+	for _, m := range mappings {
+		if m == nil || isTemplatePlaceholder(m.GetNodeId()) {
+			continue
+		}
+		if isTemplatePlaceholder(m.GetTagName()) ||
+			isTemplatePlaceholder(m.GetDataContract()) ||
+			isTemplatePlaceholder(m.GetVirtualPath()) ||
+			isTemplatePlaceholder(m.GetLocationPathSuffix()) {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+func isTemplatePlaceholder(s string) bool {
+	return strings.Contains(s, "{{") || strings.Contains(s, "}}")
+}
+
+func cloneTagMapping(m *v1.OpcUaTagMapping) *v1.OpcUaTagMapping {
+	if m == nil {
+		return &v1.OpcUaTagMapping{}
+	}
+	cp := *m
+	if m.Metadata != nil {
+		cp.Metadata = make(map[string]string, len(m.Metadata))
+		for k, v := range m.Metadata {
+			cp.Metadata[k] = v
+		}
+	}
+	return &cp
+}
+
+func mergeTagMappingExtras(dst, src *v1.OpcUaTagMapping) {
+	if dst == nil || src == nil {
+		return
+	}
+	if strings.TrimSpace(dst.GetVirtualPath()) == "" {
+		dst.VirtualPath = src.GetVirtualPath()
+	}
+	if strings.TrimSpace(dst.GetLocationPathSuffix()) == "" {
+		dst.LocationPathSuffix = src.GetLocationPathSuffix()
+	}
+	if strings.TrimSpace(dst.GetDataContract()) == "" || dst.GetDataContract() == "_historian" {
+		if v := strings.TrimSpace(src.GetDataContract()); v != "" {
+			dst.DataContract = v
+		}
+	}
+}
+
+func hasUnparsedConditions(processorYAML, conditionCode string, parsed []*v1.OpcUaProcessorCondition) bool {
+	if strings.TrimSpace(conditionCode) == "" || conditionCode == "[]" {
+		return false
+	}
+	if len(parsed) > 0 {
+		return false
+	}
+	return strings.Contains(processorYAML, "conditions:") && strings.Contains(processorYAML, "- if:")
+}
+
+func extractConditionsYAML(processorYAML string) string {
+	if block := extractYAMLSection(processorYAML, "conditions", "defaults", "advancedProcessing"); block != "" {
+		return block
+	}
+	if list := extractYAMLIndentedSection(processorYAML, "conditions", "defaults", "advancedProcessing"); list != "" {
+		return list
+	}
+	return "[]"
+}
+
+func parseDefaultsFromCode(code string) *v1.OpcUaProcessorDefaults {
+	d := &v1.OpcUaProcessorDefaults{
+		DataContract: "_historian",
+		LocationPath: "{{ .location_path }}",
+	}
+	if m := dataContractFromDefaultsRE.FindStringSubmatch(code); len(m) > 1 {
+		d.DataContract = m[1]
+	}
+	if m := virtualPathFromDefaultsRE.FindStringSubmatch(code); len(m) > 1 {
+		d.VirtualPath = m[1]
+	}
+	if m := locationPathFromDefaultsRE.FindStringSubmatch(code); len(m) > 1 {
+		d.LocationPath = m[1]
+	}
+	return d
+}
+
+func parseTagMappingsFromDefaultCode(code string) []*v1.OpcUaTagMapping {
+	var mappings []*v1.OpcUaTagMapping
+	lines := strings.Split(code, "\n")
+	for i := 0; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+		if !strings.HasPrefix(line, "case ") {
+			continue
+		}
+		m := nodeIDFromCaseRE.FindStringSubmatch(line)
+		if len(m) < 2 {
+			continue
+		}
+		nodeID := strings.Trim(strings.TrimSpace(m[1]), `"'`)
+		if isTemplatePlaceholder(nodeID) {
+			continue
+		}
+		tm := &v1.OpcUaTagMapping{NodeId: nodeID, DataContract: "_historian"}
+		for j := i + 1; j < len(lines); j++ {
+			inner := strings.TrimSpace(lines[j])
+			if strings.HasPrefix(inner, "case ") || inner == "default:" {
+				break
+			}
+			if strings.Contains(inner, "location_path +=") {
+				if v := extractQuotedAssignment(inner); v != "" {
+					tm.LocationPathSuffix = strings.TrimPrefix(v, ".")
+				}
+			}
+			if strings.Contains(inner, "data_contract =") {
+				if v := extractQuotedAssignment(inner); v != "" {
+					tm.DataContract = v
+				}
+			}
+			if strings.Contains(inner, "virtual_path =") {
+				if v := extractQuotedAssignment(inner); v != "" {
+					tm.VirtualPath = v
+				}
+			}
+			if strings.Contains(inner, "tag_name =") && !strings.Contains(inner, "opcua_tag_name") {
+				if v := extractQuotedAssignment(inner); v != "" {
+					tm.TagName = v
+				}
+			}
+		}
+		mappings = append(mappings, tm)
+	}
+	return mappings
+}
+
+func extractQuotedAssignment(line string) string {
+	if idx := strings.Index(line, `"`); idx >= 0 {
+		rest := line[idx+1:]
+		if end := strings.Index(rest, `"`); end >= 0 {
+			return rest[:end]
+		}
+	}
+	return ""
+}
+
+func parseConditionsFromYAML(conditionYAML string) []*v1.OpcUaProcessorCondition {
+	entries := splitConditionEntries(conditionYAML)
+	var out []*v1.OpcUaProcessorCondition
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		ifMatch := regexp.MustCompile(`(?s)^-\s+if:\s*(.*?)(?:\n|$)`).FindStringSubmatch(entry)
+		thenMatch := regexp.MustCompile(`(?s)\n\s*then:\s*\|[-]?\n([\s\S]*)$`).FindStringSubmatch(entry)
+		if len(ifMatch) < 2 {
+			continue
+		}
+		expr := strings.TrimSpace(ifMatch[1])
+		action := "return msg;"
+		if len(thenMatch) >= 2 {
+			action = stripBlockIndent(thenMatch[1])
+		}
+		joiner := "AND"
+		if strings.Contains(expr, " || ") {
+			joiner = "OR"
+		}
+		out = append(out, &v1.OpcUaProcessorCondition{
+			IfExpression: expr,
+			Joiner:       joiner,
+			Action:       action,
+			Clauses:      parseClauseExpressions(expr),
+		})
+	}
+	return out
+}
+
+func splitConditionEntries(text string) []string {
+	text = strings.TrimSpace(text)
+	if text == "" || text == "[]" {
+		return nil
+	}
+	var entries []string
+	var current strings.Builder
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- if:") && current.Len() > 0 {
+			entries = append(entries, strings.TrimSpace(current.String()))
+			current.Reset()
+		}
+		if strings.HasPrefix(trimmed, "- if:") || current.Len() > 0 {
+			if current.Len() > 0 {
+				current.WriteByte('\n')
+			}
+			current.WriteString(line)
+		}
+	}
+	if current.Len() > 0 {
+		entries = append(entries, strings.TrimSpace(current.String()))
+	}
+	return entries
+}
+
+func parseClauseExpressions(expression string) []*v1.OpcUaConditionClause {
+	expr := strings.TrimSpace(expression)
+	if expr == "" {
+		return nil
+	}
+	if clauses := splitCompoundClauses(expr); len(clauses) > 0 {
+		return clauses
+	}
+	if c := parseClauseExpression(expr); c != nil {
+		return []*v1.OpcUaConditionClause{c}
+	}
+	return nil
+}
+
+func splitCompoundClauses(expression string) []*v1.OpcUaConditionClause {
+	joiner := "AND"
+	parts := strings.Split(expression, " && ")
+	if len(parts) == 1 {
+		parts = strings.Split(expression, " || ")
+		if len(parts) > 1 {
+			joiner = "OR"
+		}
+	}
+	if len(parts) <= 1 {
+		return nil
+	}
+	out := make([]*v1.OpcUaConditionClause, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if c := parseClauseExpression(part); c != nil {
+			out = append(out, c)
+			continue
+		}
+		return nil
+	}
+	_ = joiner
+	return out
+}
+
+func parseClauseExpression(expression string) *v1.OpcUaConditionClause {
+	expr := strings.TrimSpace(expression)
+	if expr == "" {
+		return nil
+	}
+	negated := false
+	if strings.HasPrefix(expr, "!") {
+		negated = true
+		expr = strings.TrimSpace(strings.TrimPrefix(expr, "!"))
+	}
+	if m := modbusIncludesRE.FindStringSubmatch(expr); len(m) > 1 {
+		val := extractJSQuotedLiteral(m[1])
+		op := "contains"
+		if negated {
+			op = "not contains"
+		}
+		return &v1.OpcUaConditionClause{Field: "Modbus Tag Name", Operator: op, Value: val}
+	}
+	for label, fieldExpr := range conditionFieldExpressions {
+		if strings.HasPrefix(expr, fieldExpr) {
+			c := &v1.OpcUaConditionClause{Field: label}
+			if strings.Contains(expr, "!==") {
+				c.Operator = "not equals (!==)"
+			} else {
+				c.Operator = "equals (===)"
+			}
+			if m := regexp.MustCompile(`["']([^"']*)["']\s*$`).FindStringSubmatch(expr); len(m) > 1 {
+				c.Value = m[1]
+			}
+			return c
+		}
+	}
+	if strings.Contains(expr, ".includes(") {
+		return nil
+	}
+	return nil
+}
+
+func extractJSQuotedLiteral(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	if m := regexp.MustCompile(`["']([^"']*)["']`).FindStringSubmatch(s); len(m) > 1 {
+		return m[1]
+	}
+	return s
+}
+
+func stripBlockIndent(value string) string {
+	lines := strings.Split(strings.Trim(strings.ReplaceAll(value, "\r\n", "\n"), "\n"), "\n")
+	if len(lines) == 0 {
+		return ""
+	}
+	minIndent := len(lines[0])
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		n := len(line) - len(strings.TrimLeft(line, " \t"))
+		if n < minIndent {
+			minIndent = n
+		}
+	}
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if len(line) >= minIndent {
+			line = line[minIndent:]
+		}
+		out = append(out, strings.TrimRight(line, " \t"))
+	}
+	return strings.TrimRight(strings.Join(out, "\n"), " \t")
+}
+
+func extractYAMLIndentedSection(yamlText, key string, nextKeys ...string) string {
+	text := stripTagProcessorRoot(yamlText)
+	lines := strings.Split(text, "\n")
+	keyPrefix := key + ":"
+	start := -1
+	keyIndent := 0
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, keyPrefix) {
+			continue
+		}
+		start = i
+		keyIndent = len(line) - len(strings.TrimLeft(line, " \t"))
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, keyPrefix))
+		if rest == "[]" {
+			return "[]"
+		}
+		if rest != "" && rest != "|" && rest != "|-" {
+			return rest
+		}
+		break
+	}
+	if start < 0 {
+		return ""
+	}
+	var body []string
+	for i := start + 1; i < len(lines); i++ {
+		line := lines[i]
+		if strings.TrimSpace(line) == "" {
+			body = append(body, line)
+			continue
+		}
+		if isTopLevelYAMLKey(line, nextKeys...) {
+			break
+		}
+		indent := len(line) - len(strings.TrimLeft(line, " \t"))
+		if indent <= keyIndent {
+			break
+		}
+		body = append(body, line)
+	}
+	return strings.TrimRight(strings.Join(body, "\n"), "\n")
+}
+
+func extractYAMLSection(yamlText, key string, nextKeys ...string) string {
+	text := stripTagProcessorRoot(yamlText)
+	lines := strings.Split(text, "\n")
+	keyPrefix := key + ":"
+	var start int = -1
+	isBlock := false
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, keyPrefix) {
+			continue
+		}
+		start = i
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, keyPrefix))
+		if rest == "|" || rest == "|-" {
+			isBlock = true
+		} else if rest != "" {
+			return stripYAMLScalar(rest)
+		}
+		break
+	}
+	if start < 0 {
+		return ""
+	}
+	if !isBlock {
+		return ""
+	}
+
+	var body []string
+	for i := start + 1; i < len(lines); i++ {
+		line := lines[i]
+		if strings.TrimSpace(line) == "" {
+			body = append(body, line)
+			continue
+		}
+		if isTopLevelYAMLKey(line, nextKeys...) {
+			break
+		}
+		if !strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "\t") {
+			break
+		}
+		body = append(body, line)
+	}
+	return stripBlockIndent(strings.Join(body, "\n"))
+}
+
+func isTopLevelYAMLKey(line string, keys ...string) bool {
+	trimmed := strings.TrimSpace(line)
+	for _, key := range keys {
+		if strings.HasPrefix(trimmed, key+":") {
+			return true
+		}
+	}
+	return false
+}
+
+func stripTagProcessorRoot(yaml string) string {
+	text := strings.TrimSpace(strings.ReplaceAll(yaml, "\r\n", "\n"))
+	if !strings.HasPrefix(text, "tag_processor:") {
+		return text
+	}
+	return stripBlockIndent(strings.Join(strings.Split(text, "\n")[1:], "\n"))
+}

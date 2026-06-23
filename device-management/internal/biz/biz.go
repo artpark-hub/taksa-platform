@@ -13,6 +13,7 @@ var ProviderSet = wire.NewSet(
 	NewInstanceUsecase,
 	ProvideDeviceUsecase,
 	NewActionUsecase,
+	NewProtocolConverterWorkflowUsecase,
 )
 
 // ProvideDeviceUsecase provides DeviceUsecase with deployment config

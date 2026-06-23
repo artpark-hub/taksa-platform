@@ -1,0 +1,96 @@
+meta {
+  name: Deploy Modbus Protocol Converter (facade)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/modbus
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}",
+    "name": "facade-modbus-{{timestamp}}",
+    "connection": {
+      "ip": "192.168.1.10",
+      "port": 502
+    },
+    "location": {
+      "levels": {
+        "0": "AcmeCorp",
+        "1": "PlantA"
+      }
+    },
+    "state": "active",
+    "input": {
+      "mode": "STRUCTURED",
+      "structured": {
+        "standard": {
+          "controller": "tcp://{{ .IP }}:{{ .PORT }}",
+          "slaveIds": [1],
+          "unifiedAddresses": [
+            "FirstFlagOfDiscreteInput.holding.1025.UINT16",
+            "ZeroElementOfInputRegister.holding.1024.UINT16"
+          ],
+          "timeBetweenReads": "1s",
+          "timeout": "1s"
+        }
+      }
+    },
+    "readFlow": {
+      "dataType": "TIME_SERIES",
+      "processorMode": "STRUCTURED",
+      "processor": {
+        "defaults": {
+          "locationPath": "{{ .location_path }}",
+          "dataContract": "_historian"
+        },
+        "conditions": [
+          {
+            "joiner": "AND",
+            "clauses": [
+              {
+                "field": "modbus_tag_name",
+                "operator": "equals (===)",
+                "value": "FirstFlagOfDiscreteInput"
+              }
+            ],
+            "action": "msg.payload = Number(msg.payload) > 0 ? 1 : 0;\nmsg.meta.unit = \"raw\";\nreturn msg;"
+          }
+        ],
+        "advancedProcessing": "return msg;"
+      },
+      "bufferMode": "STRUCTURED",
+      "yamlInject": {
+        "rawYaml": "buffer:\n  none: {}\n"
+      }
+    },
+    "applyReadConfig": true,
+    "templateVariables": {
+      "IP": "192.168.1.10",
+      "PORT": "502"
+    }
+  }
+}
+
+docs {
+  Minimal structured Modbus deploy example. JSON field names use camelCase
+  (readFlow, applyReadConfig, slaveIds, templateVariables, etc.).
+}
+
+script:pre-request {
+  bru.setEnvVar('timestamp', Date.now().toString());
+}
+
+script:post-response {
+  const resp = res.getBody();
+  if (resp && resp.actionId) {
+    bru.setEnvVar('modbus_workflow_action_id', resp.actionId);
+  }
+}

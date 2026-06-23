@@ -9,6 +9,8 @@ import (
 	"time"
 
 	uuidgen "github.com/google/uuid"
+
+	"github.com/artpark-hub/taksa-platform/device-management/internal/protocolconverter"
 )
 
 // convertPlaceholders converts SQLite ? placeholders to PostgreSQL $1, $2 style
@@ -303,16 +305,54 @@ func (r *ProtocolConverterRepo) DeleteByDevice(ctx context.Context, tenantID, de
 	return nil
 }
 
-// Upsert creates or updates a protocol converter (for sync operations)
+// UpsertPending records a converter in the catalog before deploy/configure has finished.
+func (r *ProtocolConverterRepo) UpsertPending(ctx context.Context, tenantID, deviceID, uuid, name, converterType, connectionUUID string) error {
+	existing, err := r.GetByUUID(ctx, tenantID, deviceID, uuid)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		converterType = protocolconverter.ResolveCatalogWireType(converterType, existing.Type)
+		return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
+			"name":              name,
+			"type":              converterType,
+			"connection_uuid":   connectionUUID,
+			"deployment_status": "PENDING",
+			"health_status":     "UNKNOWN",
+			"error_message":     "",
+			"last_synced":       time.Now(),
+		})
+	}
+	return r.Insert(ctx, tenantID, deviceID, uuid, name, converterType, connectionUUID)
+}
+
+// PromoteDeployed marks a converter as fully deployed in the catalog.
+// wireType, when non-empty, backfills the catalog wire protocol (opcua/modbus).
+func (r *ProtocolConverterRepo) PromoteDeployed(ctx context.Context, tenantID, deviceID, uuid, wireType string) error {
+	updates := map[string]interface{}{
+		"deployment_status": "ACTIVE",
+		"health_status":     "ONLINE",
+		"error_message":     "",
+		"last_synced":       time.Now(),
+	}
+	if wireType != "" && !protocolconverter.IsGenericCatalogType(wireType) {
+		if existing, err := r.GetByUUID(ctx, tenantID, deviceID, uuid); err == nil && existing != nil {
+			wireType = protocolconverter.ResolveCatalogWireType(wireType, existing.Type)
+		}
+		updates["type"] = wireType
+	}
+	return r.Update(ctx, tenantID, deviceID, uuid, updates)
+}
+
+// Upsert creates or updates a protocol converter as ACTIVE (device-confirmed deploy).
 func (r *ProtocolConverterRepo) Upsert(ctx context.Context, tenantID, deviceID, uuid, name, converterType, connectionUUID string) error {
-	// Check if exists
 	existing, err := r.GetByUUID(ctx, tenantID, deviceID, uuid)
 	if err != nil {
 		return err
 	}
 
 	if existing != nil {
-		// Update existing
+		converterType = protocolconverter.ResolveCatalogWireType(converterType, existing.Type)
 		return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
 			"name":              name,
 			"type":              converterType,
@@ -323,17 +363,11 @@ func (r *ProtocolConverterRepo) Upsert(ctx context.Context, tenantID, deviceID, 
 		})
 	}
 
-	// Insert new - first insert with PENDING, then update to ACTIVE
 	if err := r.Insert(ctx, tenantID, deviceID, uuid, name, converterType, connectionUUID); err != nil {
 		return err
 	}
-	
-	// Set to ACTIVE for successful deploy
-	return r.Update(ctx, tenantID, deviceID, uuid, map[string]interface{}{
-		"deployment_status": "ACTIVE",
-		"health_status":     "ONLINE",
-		"last_synced":       time.Now(),
-	})
+
+	return r.PromoteDeployed(ctx, tenantID, deviceID, uuid, "")
 }
 
 // ParseMetadata parses the metadata JSON string into a map

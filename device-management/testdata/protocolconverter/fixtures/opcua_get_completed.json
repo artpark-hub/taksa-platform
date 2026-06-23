@@ -1,0 +1,43 @@
+{
+  "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "line-1-opcua-bridge",
+  "connection": {
+    "ip": "192.168.1.50",
+    "port": 4840
+  },
+  "location": {
+    "0": "AcmeCorp",
+    "1": "PlantA",
+    "2": "Line1"
+  },
+  "state": "active",
+  "readDFC": {
+    "ignoreErrors": true,
+    "inputs": {
+      "type": "opcua",
+      "data": "opcua:\n  endpoint: 'opc.tcp://{{ .IP }}:{{ .PORT }}'\n  nodeIDs:\n    - \"ns=2;s=MyVariable\"\n  subscribeEnabled: true\n"
+    },
+    "pipeline": {
+      "threads": -1,
+      "processors": {
+        "0": {
+          "type": "tag_processor",
+          "data": "tag_processor:\n  advancedProcessing: return msg;\n  conditions:\n    []\n  defaults: |-\n    msg.meta.location_path = \"PlantA/Line1\";\n    return msg;\n"
+        }
+      }
+    },
+    "rawYAML": {
+      "data": "buffer:\n  none: {}\n"
+    }
+  },
+  "templateInfo": {
+    "variables": [
+      { "label": "IP", "value": "192.168.1.50" },
+      { "label": "PORT", "value": "4840" }
+    ]
+  },
+  "meta": {
+    "protocol": "opcua",
+    "processingMode": "timeseries"
+  }
+}

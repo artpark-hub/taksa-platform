@@ -134,10 +134,11 @@ type DeviceMgmtService struct {
 	dataModelRepo         *data.DataModelRepo
 	streamProcessorRepo   *data.StreamProcessorRepo
 	deviceTopicRepo       *data.DeviceTopicRepo
+	pcWorkflowUc          *biz.ProtocolConverterWorkflowUsecase
 }
 
 // NewDeviceMgmtService creates a new device management service
-func NewDeviceMgmtService(deviceUc *biz.DeviceUsecase, actionUc *biz.ActionUsecase, instanceUc *biz.InstanceUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo, deviceTopicRepo *data.DeviceTopicRepo) *DeviceMgmtService {
+func NewDeviceMgmtService(deviceUc *biz.DeviceUsecase, actionUc *biz.ActionUsecase, instanceUc *biz.InstanceUsecase, protocolConverterRepo *data.ProtocolConverterRepo, dataModelRepo *data.DataModelRepo, streamProcessorRepo *data.StreamProcessorRepo, deviceTopicRepo *data.DeviceTopicRepo, pcWorkflowUc *biz.ProtocolConverterWorkflowUsecase) *DeviceMgmtService {
 	return &DeviceMgmtService{
 		deviceUc:              deviceUc,
 		actionUc:              actionUc,
@@ -146,6 +147,7 @@ func NewDeviceMgmtService(deviceUc *biz.DeviceUsecase, actionUc *biz.ActionUseca
 		dataModelRepo:         dataModelRepo,
 		streamProcessorRepo:   streamProcessorRepo,
 		deviceTopicRepo:       deviceTopicRepo,
+		pcWorkflowUc:          pcWorkflowUc,
 	}
 }
 
@@ -570,6 +572,24 @@ func (s *DeviceMgmtService) CancelAction(ctx context.Context, req *v1.CancelActi
 	tenantID := middleware.GetTenantID(ctx)
 	if tenantID == "" {
 		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
+	if s.pcWorkflowUc != nil {
+		if wf, wfErr := s.pcWorkflowUc.GetWorkflow(ctx, tenantID, req.ActionId); wfErr == nil && wf != nil {
+			if err := s.pcWorkflowUc.CancelWorkflow(ctx, tenantID, req.DeviceId, req.ActionId); err != nil {
+				if strings.Contains(err.Error(), "does not belong") {
+					return nil, status.Error(codes.PermissionDenied, err.Error())
+				}
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			wf, _ = s.pcWorkflowUc.GetWorkflow(ctx, tenantID, req.ActionId)
+			return &v1.CancelActionResponse{
+				ActionId:     req.ActionId,
+				Status:       actionStatusToProto(wf.Status),
+				CompletedAt:  timeToProto(wf.CompletedAt),
+				ErrorMessage: wf.ErrorMessage,
+			}, nil
+		}
 	}
 
 	action, err := s.actionUc.CancelAction(ctx, tenantID, req.DeviceId, req.ActionId)
@@ -1014,6 +1034,17 @@ func (s *DeviceMgmtService) DeleteProtocolConverter(ctx context.Context, req *v1
 		return nil, status.Error(codes.InvalidArgument, "uuid is required")
 	}
 
+	tenantID := middleware.GetTenantID(ctx)
+	if tenantID == "" {
+		return nil, status.Error(codes.PermissionDenied, "tenant_id not found in context")
+	}
+
+	if s.pcWorkflowUc != nil {
+		if msg := s.pcWorkflowUc.DeleteBlockedMessage(ctx, tenantID, req.DeviceId, req.Uuid); msg != "" {
+			return nil, status.Error(codes.FailedPrecondition, msg)
+		}
+	}
+
 	// Create DeleteProtocolConverterPayload as JSON
 	// umh-core expects: {"uuid": "<uuid>"}
 	deletePayload := map[string]string{
@@ -1205,9 +1236,14 @@ func (s *DeviceMgmtService) ListProtocolConverters(ctx context.Context, req *v1.
 	}
 
 	for i, pc := range converters {
-		// Determine health status from DB or device heartbeat
+		deploymentStatus := pc.DeploymentStatus
 		healthStatus := pc.HealthStatus
-		if healthStatus == "UNKNOWN" && deviceHealthStatus != "UNKNOWN" {
+
+		// Facade deploy workflows are multi-step; do not present ACTIVE/ONLINE until complete.
+		if s.pcWorkflowUc != nil && s.pcWorkflowUc.HasActiveWorkflowForConverter(ctx, tenantID, req.DeviceId, pc.UUID) {
+			deploymentStatus = "PENDING"
+			healthStatus = "UNKNOWN"
+		} else if healthStatus == "UNKNOWN" && deviceHealthStatus != "UNKNOWN" {
 			healthStatus = deviceHealthStatus
 		}
 
@@ -1228,7 +1264,7 @@ func (s *DeviceMgmtService) ListProtocolConverters(ctx context.Context, req *v1.
 			Name:               pc.Name,
 			Type:               pc.Type,
 			ConnectionUUID:     pc.ConnectionUUID,
-			DeploymentStatus:   pc.DeploymentStatus,
+			DeploymentStatus:   deploymentStatus,
 			HealthStatus:       healthStatus,
 			LastSyncTime:       lastSyncTime,
 			ErrorMessage:       errorMessage,

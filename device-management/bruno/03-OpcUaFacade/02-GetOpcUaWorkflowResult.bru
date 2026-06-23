@@ -1,0 +1,53 @@
+meta {
+  name: Poll OPC-UA facade workflow result (deploy)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/opc-ua/actions/{{opcua_workflow_action_id}}/result
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Poll deploy+configure workflow from 01-DeployOpcUaProtocolConverter.
+  
+  Uses `opcua_workflow_action_id` (not `opcua_action_id`).
+  For GET/EDIT polling use 04-GetOpcUaActionResult instead.
+  
+  When COMPLETED:
+  - `result` is the typed OpcUaProtocolConverter (from device reply or applied configure payload)
+  - `steps` shows deploy / configure / rollback child action statuses
+  
+  If `result` is missing, confirm `steps.configure.status=COMPLETED` then run GET.
+}
+
+script:post-response {
+  const resp = res.getBody();
+
+  if (resp && resp.status) {
+    console.log('✓ Workflow status: ' + resp.status);
+    if (resp.stage) {
+      console.log('  stage: ' + resp.stage);
+    }
+    if (resp.result && resp.result.uuid) {
+      bru.setEnvVar('opcua_converter_uuid', resp.result.uuid);
+      bru.setEnvVar('converter_uuid', resp.result.uuid);
+      console.log('  opcua_converter_uuid: ' + resp.result.uuid);
+    }
+  }
+}
+
+tests {
+  test("HTTP 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has status", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('status');
+  });
+}

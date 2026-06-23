@@ -1,0 +1,47 @@
+meta {
+  name: List protocol converters (set modbus_converter_uuid)
+  type: http
+  seq: 0
+}
+
+get {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Optional helper when testing GET/EDIT against an existing Modbus bridge on the DCD.
+  Prefers the first converter with type containing "modbus", otherwise the first row.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  const converters = resp?.converters || resp?.Converters || [];
+
+  const modbus = converters.find((c) => {
+    const t = String(c.type || c.Type || '').toLowerCase();
+    return t.includes('modbus');
+  }) || converters[0];
+
+  if (modbus) {
+    const uuid = modbus.uuid || modbus.Uuid;
+    if (uuid) {
+      bru.setEnvVar('modbus_converter_uuid', uuid);
+      bru.setEnvVar('converter_uuid', uuid);
+      console.log('✓ modbus_converter_uuid = ' + uuid);
+      console.log('  name: ' + (modbus.name || modbus.Name || ''));
+      console.log('  type: ' + (modbus.type || modbus.Type || ''));
+    }
+  } else {
+    console.warn('⚠ No converters in list — set modbus_converter_uuid manually');
+  }
+}
+
+tests {
+  test("HTTP 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

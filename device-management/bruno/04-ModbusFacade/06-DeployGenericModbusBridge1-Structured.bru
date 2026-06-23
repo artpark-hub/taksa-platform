@@ -1,0 +1,154 @@
+meta {
+  name: Deploy Generic-modbus-bridge-1 (structured, from config.yaml)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/modbus
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}",
+    "name": "Generic-modbus-bridge-1",
+    "connection": {
+      "ip": "172.25.66.181",
+      "port": 502
+    },
+    "location": {
+      "levels": {
+        "0": "Artpark",
+        "1": "Artgarage",
+        "2": "GroundFloor",
+        "3": "Line2"
+      }
+    },
+    "state": "active",
+    "applyReadConfig": true,
+    "templateVariables": {
+      "IP": "172.25.66.181",
+      "PORT": "502",
+      "AddressMappings": "[{\"Address\":\"VoltageL1_L2.holding.3019.FLOAT32\",\"DataContract\":\"_historian\",\"LocationPathSuffix\":\"\",\"TagName\":\"\",\"VirtualPath\":\"\"},{\"Address\":\"VoltageL2_L3.holding.3021.FLOAT32\",\"DataContract\":\"_historian\",\"LocationPathSuffix\":\"\",\"TagName\":\"VoltageL2_L3\",\"VirtualPath\":\"\"},{\"Address\":\"VoltageL3_L1.holding.3023.FLOAT32\",\"DataContract\":\"_historian\",\"LocationPathSuffix\":\"\",\"TagName\":\"VoltageL3_L1\",\"VirtualPath\":\"\"},{\"Address\":\"Average_Voltage_L_N.holding.3035.FLOAT32\",\"DataContract\":\"_historian\",\"LocationPathSuffix\":\"\",\"TagName\":\"Average_Voltage_L_N\",\"VirtualPath\":\"\"}]"
+    },
+    "input": {
+      "mode": "STRUCTURED",
+      "structured": {
+        "standard": {
+          "controller": "tcp://{{ .IP }}:{{ .PORT }}",
+          "slaveIds": [1],
+          "unifiedAddresses": [
+            "VoltageL1_L2.holding.3019.FLOAT32",
+            "VoltageL2_L3.holding.3021.FLOAT32",
+            "VoltageL3_L1.holding.3023.FLOAT32",
+            "Average_Voltage_L_N.holding.3035.FLOAT32"
+          ],
+          "timeBetweenReads": "1s",
+          "timeout": "5s"
+        },
+        "advanced": {
+          "byteOrder": "ABCD"
+        }
+      }
+    },
+    "readFlow": {
+      "dataType": "TIME_SERIES",
+      "processorMode": "STRUCTURED",
+      "bufferMode": "STRUCTURED",
+      "processor": {
+        "advancedProcessing": "// No advanced processing is needed for this example.\nreturn msg;",
+        "defaultsCode": "// This sample connects to a Modbus device and automatically configures the message with proper metadata.\n// It assumes that the incoming message contains the Modbus tag information in its metadata.\n// 1. Set your location (e.g., \"enterprise.site.area.line.workcell.plc123\").\nmsg.meta.location_path = \"{{ .location_path }}\";\n\n// 2. Specify the data schema. Here we use the historian schema.\nmsg.meta.data_contract = \"_historian\";\n\n// 3. Use the Modbus tag name from the incoming metadata as the tag identifier.\nmsg.meta.tag_name = msg.meta.modbus_tag_name;\n\n// 4. Pass through the incoming payload without modification.\nmsg.payload = msg.payload;\n\n// 5. (Optional) Define a virtual grouping path if needed.\nmsg.meta.virtual_path = \"\";\n\n// 6. Set timestamp_ms to current time (Modbus protocol doesn't provide timestamps)\nmsg.meta.timestamp_ms = Date.now();\n\n// Auto-generated from CSV table\nswitch(msg.meta.modbus_tag_unified_address) {\n{{- range .AddressMappings }}\n  case \"{{ .Address }}\":\n    {{- if .LocationPathSuffix }}msg.meta.location_path += \".{{ .LocationPathSuffix }}\";{{- end }}\n    {{- if .DataContract }}msg.meta.data_contract = \"{{ .DataContract }}\";{{- end }}\n    {{- if .VirtualPath }}msg.meta.virtual_path = \"{{ .VirtualPath }}\";{{- end }}\n    {{- if .TagName }}msg.meta.tag_name = \"{{ .TagName }}\";{{- end }}\n    break;\n{{- end }}\n  default:\n    break;\n}\n\nreturn msg;",
+        "tagMappings": [
+          {
+            "nodeId": "VoltageL1_L2.holding.3019.FLOAT32",
+            "dataContract": "_historian",
+            "tagName": "",
+            "virtualPath": "",
+            "locationPathSuffix": ""
+          },
+          {
+            "nodeId": "VoltageL2_L3.holding.3021.FLOAT32",
+            "dataContract": "_historian",
+            "tagName": "VoltageL2_L3",
+            "virtualPath": "",
+            "locationPathSuffix": ""
+          },
+          {
+            "nodeId": "VoltageL3_L1.holding.3023.FLOAT32",
+            "dataContract": "_historian",
+            "tagName": "VoltageL3_L1",
+            "virtualPath": "",
+            "locationPathSuffix": ""
+          },
+          {
+            "nodeId": "Average_Voltage_L_N.holding.3035.FLOAT32",
+            "dataContract": "_historian",
+            "tagName": "Average_Voltage_L_N",
+            "virtualPath": "",
+            "locationPathSuffix": ""
+          }
+        ],
+        "conditions": [
+          {
+            "ifExpression": "msg.meta.modbus_tag_name.includes(\"Phase_angle\")",
+            "action": "msg.payload = Number(msg.payload);\nmsg.meta.unit = \"deg\";\nmsg.meta.modbus_tag_datatype = \"float64\";\nmsg.meta.modbus_tag_datatype_json = \"number\";\nreturn msg;"
+          },
+          {
+            "ifExpression": "msg.meta.modbus_tag_name.includes(\"load_percentage\")",
+            "action": "msg.payload = Number(msg.payload);\nmsg.meta.unit = \"%\";\nmsg.meta.modbus_tag_datatype = \"float64\";\nmsg.meta.modbus_tag_datatype_json = \"number\";\nreturn msg;"
+          },
+          {
+            "ifExpression": "msg.meta.modbus_tag_name.includes(\"Power_Factor\")",
+            "action": "msg.payload = Number(msg.payload);\nmsg.meta.unit = \"\";\nmsg.meta.modbus_tag_datatype = \"float64\";\nmsg.meta.modbus_tag_datatype_json = \"number\";\nreturn msg;"
+          },
+          {
+            "ifExpression": "msg.meta.modbus_tag_name.includes(\"Voltage\") && !msg.meta.modbus_tag_name.includes(\"Phase_angle\")",
+            "action": "msg.payload = Number(msg.payload);\nmsg.meta.unit = \"V\";\nmsg.meta.modbus_tag_datatype = \"float64\";\nmsg.meta.modbus_tag_datatype_json = \"number\";\nreturn msg;"
+          },
+          {
+            "ifExpression": "msg.meta.modbus_tag_name.includes(\"Current\") && !msg.meta.modbus_tag_name.includes(\"Phase_angle\") && !msg.meta.modbus_tag_name.includes(\"load_percentage\")",
+            "action": "msg.payload = Number(msg.payload);\nmsg.meta.unit = \"A\";\nmsg.meta.modbus_tag_datatype = \"float64\";\nmsg.meta.modbus_tag_datatype_json = \"number\";\nreturn msg;"
+          },
+          {
+            "ifExpression": "msg.meta.modbus_tag_name.includes(\"Power\") && !msg.meta.modbus_tag_name.includes(\"Power_Factor\")",
+            "action": "msg.payload = Number(msg.payload);\nmsg.meta.unit = \"W\";\nmsg.meta.modbus_tag_datatype = \"float64\";\nmsg.meta.modbus_tag_datatype_json = \"number\";\nreturn msg;"
+          },
+          {
+            "ifExpression": "msg.meta.modbus_tag_name.includes(\"Frequency\")",
+            "action": "msg.payload = Number(msg.payload);\nmsg.meta.unit = \"Hz\";\nmsg.meta.modbus_tag_datatype = \"float64\";\nmsg.meta.modbus_tag_datatype_json = \"number\";\nreturn msg;"
+          },
+          {
+            "ifExpression": "msg.meta.modbus_tag_name.includes(\"Energy\")",
+            "action": "msg.payload = Number(msg.payload);\nmsg.meta.unit = \"Wh\";\nmsg.meta.modbus_tag_datatype = \"int64\";\nmsg.meta.modbus_tag_datatype_json = \"number\";\nreturn msg;"
+          }
+        ]
+      },
+      "yamlInject": {
+        "rawYaml": "buffer:\n  none: {}\n"
+      }
+    }
+  }
+}
+
+docs {
+  Use camelCase JSON keys (readFlow, applyReadConfig, templateVariables, slaveIds, etc.) — same as OPC-UA facade and other Device Management JSON APIs.
+  
+  - Input: fully structured (modbus standard + advanced byteOrder).
+  - Processor: STRUCTURED with defaultsCode (Go template + AddressMappings),
+    tagMappings for UI round-trip, and conditions via ifExpression.
+  - Name is fixed — 409 if bridge already exists on device; rename for a fresh deploy test.
+  
+  Poll: 02-GetModbusWorkflowResult → optional 03+04 GET verify.
+}
+
+script:post-response {
+  const resp = res.getBody();
+  if (resp && resp.actionId) {
+    bru.setEnvVar('modbus_workflow_action_id', resp.actionId);
+  }
+}

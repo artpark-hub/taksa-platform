@@ -1,0 +1,146 @@
+meta {
+  name: Edit OPC-UA protocol converter (facade)
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{base_url}}/api/v1/devicemgmt/devices/{{device_id}}/protocol-converters/opc-ua/{{opcua_converter_uuid}}
+  body: json
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "deviceId": "{{device_id}}",
+    "uuid": "{{opcua_converter_uuid}}",
+    "name": "facade-opcua-edited-{{timestamp}}",
+    "state": "active",
+    "connection": {
+      "ip": "192.168.1.50",
+      "port": 4840
+    },
+    "location": {
+      "levels": {
+        "0": "AcmeCorp",
+        "1": "PlantA",
+        "2": "Line1"
+      }
+    },
+    "input": {
+      "mode": "STRUCTURED",
+      "structured": {
+        "standard": {
+          "endpoint": "opc.tcp://{{ .IP }}:{{ .PORT }}",
+          "subscribeEnabled": true,
+          "useHeartbeat": true,
+          "subscribeNodeIds": [
+            { "nodeId": "ns=2;s=MyVariable" },
+            { "nodeId": "ns=2;s=Tank1.Temperature" }
+          ]
+        },
+        "advanced": {
+          "profile": "kepware",
+          "securityMode": "SignAndEncrypt",
+          "securityPolicy": "Basic256Sha256",
+          "username": "opcuser",
+          "password": "opc-password"
+        }
+      }
+    },
+    "readFlow": {
+      "dataType": "TIME_SERIES",
+      "processorMode": "STRUCTURED",
+      "bufferMode": "STRUCTURED",
+      "processor": {
+        "defaults": {
+          "locationPath": "{{ .location_path }}",
+          "dataContract": "_historian",
+          "virtualPath": ""
+        },
+        "tagMappings": [
+          {
+            "nodeId": "ns=2;s=Tank1.Temperature",
+            "locationPathSuffix": "tank1",
+            "dataContract": "_historian",
+            "virtualPath": "temperature",
+            "tagName": "tank1_temperature"
+          }
+        ],
+        "conditions": [
+          {
+            "joiner": "AND",
+            "clauses": [
+              {
+                "field": "Node ID",
+                "operator": "equals (===)",
+                "value": "ns=2;s=Tank1.Temperature"
+              }
+            ],
+            "action": "msg.meta.unit = \"celsius\";\nreturn msg;"
+          }
+        ],
+        "advancedProcessing": "return msg;"
+      },
+      "yamlInject": {
+        "rawYaml": "buffer:\n  none: {}\n"
+      }
+    }
+  }
+}
+
+docs {
+  Queue a single edit-protocol-converter action with server-built readDFC.
+  
+  Requires `opcua_converter_uuid` (from list, GET result, or deploy workflow).
+  Poll completion with 04-GetOpcUaActionResult.
+  
+  JSON field names use camelCase (readFlow, subscribeNodeIds, nodeId, etc.).
+  `connection` is required by the facade edit handler.
+  Only include sections you intend to change; this example updates input + readFlow.
+}
+
+script:pre-request {
+  bru.setEnvVar('timestamp', Date.now().toString());
+
+  if (!bru.getEnvVar('opcua_converter_uuid') && bru.getEnvVar('converter_uuid')) {
+    bru.setEnvVar('opcua_converter_uuid', bru.getEnvVar('converter_uuid'));
+  }
+
+  if (!bru.getEnvVar('opcua_converter_uuid')) {
+    console.warn('⚠ Set opcua_converter_uuid before edit');
+  }
+}
+
+script:post-response {
+  const resp = res.getBody();
+
+  if (resp && resp.actionId) {
+    bru.setEnvVar('opcua_action_id', resp.actionId);
+    console.log('✓ OPC-UA EDIT queued');
+    console.log('  actionId: ' + resp.actionId);
+    console.log('  Poll: 04-GetOpcUaActionResult');
+  }
+}
+
+tests {
+  test("Edit action queued", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response has actionId", function() {
+    const resp = res.getBody();
+    expect(resp).to.have.property('actionId');
+    expect(resp.actionId).to.not.be.empty;
+  });
+
+  test("Action ID is UUID format", function() {
+    const resp = res.getBody();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(resp.actionId).to.match(uuidRegex);
+  });
+}
