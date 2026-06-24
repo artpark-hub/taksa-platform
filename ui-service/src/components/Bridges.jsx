@@ -331,6 +331,8 @@ const Bridges = () => {
                                     params.set('bridgeId', bridgeId);
                                     if (deviceId) params.set('deviceId', deviceId);
                                     if (deviceName) params.set('deviceName', deviceName);
+                                    const bridgeType = getBridgeType(bridge);
+                                    if (bridgeType && bridgeType !== '--') params.set('bridgeType', bridgeType);
                                     
                                     setOpenMenuBridgeId(null);
                                     router.push(`/dashboard/bridges/edit?${params.toString()}`);

@@ -7,6 +7,7 @@ import General from './General';
 import Connection from './Connection';
 import Readflow from './Readflow';
 import './BridgeConfiguration.css';
+import { buildOpcUaFacadeRequest, isOpcUaProtocol } from '../../lib/opcuaFacade';
 
 const BridgeConfiguration = () => {
     const router = useRouter();
@@ -162,9 +163,20 @@ const BridgeConfiguration = () => {
         return () => clearInterval(interval);
     }, [isDeploying]);
 
-    const pollProtocolConverterActionResult = async (actionId) => {
-        for (let attempt = 0; attempt < 20; attempt += 1) {
-            const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(actionId)}/result`, {
+    const pollProtocolConverterActionResult = async (
+        actionId,
+        maxWaitSeconds = 60,
+        resultType = 'generic',
+        { requireResult = false } = {}
+    ) => {
+        const maxAttempts = Math.ceil((maxWaitSeconds * 1000) / 2000);
+        const isOpcUaResult = resultType === 'opcua';
+
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            const resultPath = isOpcUaResult
+                ? `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/actions/${encodeURIComponent(actionId)}/result`
+                : `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(actionId)}/result`;
+            const response = await fetch(resultPath, {
                 method: 'GET',
                 headers: {
                     Accept: 'application/json'
@@ -182,16 +194,21 @@ const BridgeConfiguration = () => {
             const hasCompletedAt = Boolean(data?.completedAt);
             const hasError = Boolean(data?.errorMessage);
             const hasResult = Boolean(data?.result);
+            const isFailed = hasError || statusText.includes('FAILED') || ['5', '6', '7', '8'].includes(statusText);
+            const isCompleted = statusText.includes('COMPLETED') || statusText === '4' || hasCompletedAt;
 
-            if (hasError || statusText.includes('FAILED') || statusText === '3') {
+            if (isFailed) {
                 throw new Error(getErrorMessage(data, 'Bridge deployment failed.'));
             }
 
-            if (statusText.includes('COMPLETED') || statusText === '2' || hasCompletedAt || hasResult) {
+            if (hasResult || isCompleted) {
+                if (requireResult && !hasResult) {
+                    throw new Error('Bridge action completed without result data.');
+                }
                 return data;
             }
 
-            await wait(3000);
+            await wait(2000);
         }
 
         throw new Error('Bridge deployment timed out. Please check bridge status and try again.');
@@ -218,6 +235,56 @@ const BridgeConfiguration = () => {
 
         if (!actionId) {
             throw new Error('Protocol converter edit was queued but action id was not found.');
+        }
+
+        return actionId;
+    };
+
+    const queueOpcUaProtocolConverterDeploy = async (deployPayload) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(deployPayload)
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue OPC-UA bridge deployment.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('OPC-UA bridge deployment was queued but workflow action id was not found.');
+        }
+
+        return data;
+    };
+
+    const queueOpcUaProtocolConverterGet = async (converterUuid) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/${encodeURIComponent(converterUuid)}`, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json'
+            },
+            credentials: 'include'
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue OPC-UA bridge configuration refresh.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('OPC-UA bridge configuration refresh was queued but action id was not found.');
         }
 
         return actionId;
@@ -373,6 +440,49 @@ const BridgeConfiguration = () => {
 
                 const parsedPort = Number.parseInt(String(bridgeConfig?.port || ''), 10);
                 const location = getDeployLocationFromBridgeConfig();
+                const opcUaProtocolMeta = sanitizeProtocolMeta(bridgeConfig?.protocol);
+                const opcUaReadInputType = String(bridgeConfig?.readInputType || bridgeConfig?.protocol || '')
+                    .toLowerCase()
+                    .replace(/[\s_-]/g, '');
+                const isOpcUaDeploy = isOpcUaProtocol(opcUaProtocolMeta) || isOpcUaProtocol(opcUaReadInputType);
+
+                if (isOpcUaDeploy) {
+                    const opcUaPayload = buildOpcUaFacadeRequest({
+                        bridgeConfig,
+                        deviceId: selectedDeviceId,
+                        location,
+                        port: Number.isFinite(parsedPort) ? parsedPort : 0,
+                        includeApplyReadConfig: true
+                    });
+
+                    setDeployMessage('Deploying OPC-UA bridge, please wait.');
+                    const workflowData = await queueOpcUaProtocolConverterDeploy(opcUaPayload);
+                    const workflowActionId = extractActionId(workflowData);
+                    const workflowResult = await pollProtocolConverterActionResult(workflowActionId, 120, 'opcua');
+                    const converterUuid = extractConverterUuid(workflowResult);
+
+                    if (!converterUuid) {
+                        throw new Error('OPC-UA bridge deployed but uuid was not found in workflow result.');
+                    }
+
+                    setDeployMessage('Verifying OPC-UA configuration, please wait.');
+                    const getActionId = await queueOpcUaProtocolConverterGet(converterUuid);
+                    await pollProtocolConverterActionResult(getActionId, 60, 'opcua', { requireResult: true });
+
+                    const query = new URLSearchParams();
+
+                    if (selectedDeviceId) {
+                        query.set('deviceId', selectedDeviceId);
+                    }
+
+                    if (selectedDeviceName) {
+                        query.set('deviceName', selectedDeviceName);
+                    }
+
+                    router.push(`/dashboard/bridges/list${query.toString() ? `?${query.toString()}` : ''}`);
+                    return;
+                }
+
                 const deployPayload = {
                     name: bridgeConfig?.name || '',
                     connection: {

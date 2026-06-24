@@ -7,6 +7,7 @@ import EditGeneral from './Edit-general';
 import EditConnection from './Edit-connection';
 import EditReadflow from './Edit-readflow';
 import './EditBridge.css';
+import { buildOpcUaFacadeRequest, isOpcUaProtocol, opcUaFacadeResultToBridgeConfig } from '../../lib/opcuaFacade';
 
 const EditBridge = () => {
     const router = useRouter();
@@ -15,6 +16,7 @@ const EditBridge = () => {
     const bridgeId = searchParams.get('bridgeId') || '';
     const selectedDeviceId = searchParams.get('deviceId') || '';
     const selectedDeviceName = searchParams.get('deviceName') || '';
+    const bridgeType = searchParams.get('bridgeType') || '';
 
     const [activeTab, setActiveTab] = useState('general');
     const [visitedTabs, setVisitedTabs] = useState({ general: true });
@@ -199,11 +201,20 @@ const EditBridge = () => {
         return () => clearInterval(interval);
     }, [isLoadingConfig]);
 
-    const pollProtocolConverterActionResult = async (actionId, maxWaitSeconds = 45) => {
-        const maxAttempts = Math.ceil((maxWaitSeconds * 1000) / 3000);
+    const pollProtocolConverterActionResult = async (
+        actionId,
+        maxWaitSeconds = 45,
+        resultType = 'generic',
+        { requireResult = true } = {}
+    ) => {
+        const maxAttempts = Math.ceil((maxWaitSeconds * 1000) / 2000);
+        const isOpcUaResult = resultType === 'opcua';
         
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-            const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(actionId)}/result`, {
+            const resultPath = isOpcUaResult
+                ? `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/actions/${encodeURIComponent(actionId)}/result`
+                : `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(actionId)}/result`;
+            const response = await fetch(resultPath, {
                 method: 'GET',
                 headers: {
                     Accept: 'application/json'
@@ -221,23 +232,22 @@ const EditBridge = () => {
             const hasCompletedAt = Boolean(data?.completedAt);
             const hasError = Boolean(data?.errorMessage);
             const hasResult = Boolean(data?.result);
+            const isFailed = hasError || statusText.includes('FAILED') || ['5', '6', '7', '8'].includes(statusText);
+            const isCompleted = statusText.includes('COMPLETED') || statusText === '4' || hasCompletedAt;
 
-            if (hasError || statusText.includes('FAILED') || statusText === '5') {
+            if (isFailed) {
                 const errMsg = data?.errorMessage || data?.error?.message || data?.message || 'Bridge configuration retrieval failed.';
                 throw new Error(errMsg);
             }
 
-            const isCompleted = statusText.includes('COMPLETED') || statusText === '4' || statusText === '2' || hasCompletedAt;
-
-            if (hasResult) {
+            if (hasResult || isCompleted) {
+                if (requireResult && !hasResult) {
+                    throw new Error('Bridge configuration retrieval completed without result data.');
+                }
                 return data;
             }
 
-            if (isCompleted) {
-                throw new Error('Bridge configuration retrieval completed without result data.');
-            }
-
-            await wait(3000);
+            await wait(2000);
         }
 
         throw new Error(`Getting bridge configuration timed out after ${maxWaitSeconds} seconds. Please try again.`);
@@ -269,6 +279,56 @@ const EditBridge = () => {
         return actionId;
     };
 
+    const queueOpcUaProtocolConverterUpdate = async (converterUuid, editPayload) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/${encodeURIComponent(converterUuid)}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(editPayload)
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue OPC-UA bridge edit request.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('OPC-UA bridge edit was queued but action id was not found.');
+        }
+
+        return actionId;
+    };
+
+    const queueOpcUaProtocolConverterGet = async (converterUuid) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/${encodeURIComponent(converterUuid)}`, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json'
+            },
+            credentials: 'include'
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue OPC-UA bridge configuration retrieval.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('OPC-UA bridge configuration retrieval was queued but action id was not found.');
+        }
+
+        return actionId;
+    };
+
     useEffect(() => {
         let cancelled = false;
 
@@ -279,12 +339,16 @@ const EditBridge = () => {
             }
 
             try {
+                const useOpcUaFacade = isOpcUaProtocol(bridgeType);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000);
 
                 let initResponse;
                 try {
-                    initResponse = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(bridgeId)}`, {
+                    const initPath = useOpcUaFacade
+                        ? `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/${encodeURIComponent(bridgeId)}`
+                        : `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(bridgeId)}`;
+                    initResponse = await fetch(initPath, {
                         method: 'GET',
                         headers: {
                             Accept: 'application/json'
@@ -310,9 +374,26 @@ const EditBridge = () => {
 
                 if (cancelled) return;
 
-                const resultData = await pollProtocolConverterActionResult(actionId, 45);
+                const resultData = await pollProtocolConverterActionResult(
+                    actionId,
+                    45,
+                    useOpcUaFacade ? 'opcua' : 'generic',
+                    { requireResult: true }
+                );
 
                 if (cancelled) return;
+
+                if (useOpcUaFacade) {
+                    const nextConfig = opcUaFacadeResultToBridgeConfig({
+                        result: resultData?.result || resultData,
+                        selectedDeviceName,
+                        fallbackBridgeId: bridgeId
+                    });
+                    loadedProtocolConverterRef.current = resultData?.result || resultData;
+                    setBridgeConfig(nextConfig);
+                    initialBridgeConfigRef.current = normalizeBridgeConfig(nextConfig);
+                    return;
+                }
 
                 const result = resultData?.result || resultData;
                 loadedProtocolConverterRef.current = result && typeof result === 'object' ? result : null;
@@ -386,7 +467,7 @@ const EditBridge = () => {
         return () => {
             cancelled = true;
         };
-    }, [bridgeId, selectedDeviceId, selectedDeviceName]);
+    }, [bridgeId, selectedDeviceId, selectedDeviceName, bridgeType]);
 
     const isStep2Ready = useMemo(() => {
         const hasName = String(bridgeConfig?.name || '').trim().length > 0;
@@ -482,6 +563,40 @@ const EditBridge = () => {
                     ? bridgeConfig.readTemplateVariables
                     : [];
 
+                if (isOpcuaPatch) {
+                    const editPayload = buildOpcUaFacadeRequest({
+                        bridgeConfig,
+                        deviceId: selectedDeviceId,
+                        uuid: bridgeId,
+                        location,
+                        port: portNum
+                    });
+
+                    const actionId = await queueOpcUaProtocolConverterUpdate(bridgeId, editPayload);
+                    setDeployMessage('Applying OPC-UA changes, please wait.');
+                    await pollProtocolConverterActionResult(actionId, 60, 'opcua', { requireResult: false });
+
+                    setDeployMessage('Refreshing OPC-UA configuration, please wait.');
+                    const getActionId = await queueOpcUaProtocolConverterGet(bridgeId);
+                    const refreshed = await pollProtocolConverterActionResult(getActionId, 60, 'opcua', { requireResult: true });
+                    const nextConfig = opcUaFacadeResultToBridgeConfig({
+                        result: refreshed?.result || refreshed,
+                        selectedDeviceName,
+                        fallbackBridgeId: bridgeId
+                    });
+                    loadedProtocolConverterRef.current = refreshed?.result || refreshed;
+                    setBridgeConfig(nextConfig);
+                    initialBridgeConfigRef.current = normalizeBridgeConfig(nextConfig);
+
+                    setDeployMessage('Update completed successfully!');
+                    setTimeout(() => {
+                        setIsDeploying(false);
+                        setDeployMessage('');
+                        router.push(`/dashboard/bridges/list?deviceId=${encodeURIComponent(selectedDeviceId)}&deviceName=${encodeURIComponent(selectedDeviceName)}`);
+                    }, 2000);
+                    return;
+                }
+
                 const loadedConverter = loadedProtocolConverterRef.current && typeof loadedProtocolConverterRef.current === 'object'
                     ? loadedProtocolConverterRef.current
                     : {};
@@ -559,7 +674,7 @@ const EditBridge = () => {
 
                 const actionId = await queueProtocolConverterUpdate(bridgeId, editPayload);
                 setDeployMessage('Applying changes, please wait.');
-                await pollProtocolConverterActionResult(actionId, 60);
+                await pollProtocolConverterActionResult(actionId, 60, 'generic', { requireResult: false });
 
                 setDeployMessage('Update completed successfully!');
                 setTimeout(() => {
