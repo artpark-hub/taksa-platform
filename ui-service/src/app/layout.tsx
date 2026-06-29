@@ -23,7 +23,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('taksa_theme');document.documentElement.dataset.theme=t==='dark'?'dark':'light';document.documentElement.style.colorScheme=document.documentElement.dataset.theme;}catch(e){document.documentElement.dataset.theme='light';}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('taksa_theme');var theme=t==='dark'?'dark':'light';document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;}catch(e){document.documentElement.dataset.theme='light';document.documentElement.style.colorScheme='light';}})();`,
           }}
         />
         {children}

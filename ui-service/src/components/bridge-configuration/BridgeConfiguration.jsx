@@ -198,7 +198,8 @@ const BridgeConfiguration = () => {
 
             const statusText = String(data?.status ?? '').toUpperCase();
             const hasCompletedAt = Boolean(data?.completedAt);
-            const hasError = Boolean(data?.errorMessage);
+            const actionErrorMessage = data?.errorMessage || data?.error_message || data?.error?.message || (typeof data?.error === 'string' ? data.error : '');
+            const hasError = Boolean(actionErrorMessage);
             const hasResult = Boolean(data?.result);
             const isFailed = hasError || statusText.includes('FAILED') || ['5', '6', '7', '8'].includes(statusText);
             const isCompleted = statusText.includes('COMPLETED') || statusText === '4' || hasCompletedAt;
