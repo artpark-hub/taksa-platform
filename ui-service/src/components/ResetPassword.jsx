@@ -316,7 +316,12 @@ const ResetPassword = () => {
                     <img
                         src="/images/taksa_black.png"
                         alt="Taksa Logo"
-                        className="reset-brand-logo"
+                        className="reset-brand-logo auth-logo-light"
+                    />
+                    <img
+                        src="/taksa_white_rmbg.png"
+                        alt="Taksa Logo"
+                        className="reset-brand-logo auth-logo-dark"
                     />
                     <h3 className="reset-brand-title">Factory Operating System</h3>
                 </div>

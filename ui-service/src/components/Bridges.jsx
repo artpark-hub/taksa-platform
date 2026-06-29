@@ -41,7 +41,30 @@ const Bridges = () => {
     };
 
     const getBridgeType = (bridge) => {
-        return bridge?.type || '--';
+        const rawType = bridge?.type ||
+            bridge?.protocol ||
+            bridge?.protocolType ||
+            bridge?.protocol_type ||
+            bridge?.meta?.protocol ||
+            bridge?.input?.type ||
+            bridge?.readDFC?.inputs?.type ||
+            '';
+
+        if (!rawType) {
+            return '--';
+        }
+
+        const normalized = String(rawType).trim().toLowerCase().replace(/[\s_-]/g, '');
+
+        if (normalized === 'opcua' || normalized === 'benthosopcua') {
+            return 'OPCUA';
+        }
+
+        if (normalized === 'modbus' || normalized === 'modbustcp') {
+            return 'Modbus';
+        }
+
+        return String(rawType);
     };
 
     const getDeploymentStatus = (bridge) => {
@@ -331,6 +354,8 @@ const Bridges = () => {
                                     params.set('bridgeId', bridgeId);
                                     if (deviceId) params.set('deviceId', deviceId);
                                     if (deviceName) params.set('deviceName', deviceName);
+                                    const bridgeType = getBridgeType(bridge);
+                                    if (bridgeType && bridgeType !== '--') params.set('bridgeType', bridgeType);
                                     
                                     setOpenMenuBridgeId(null);
                                     router.push(`/dashboard/bridges/edit?${params.toString()}`);

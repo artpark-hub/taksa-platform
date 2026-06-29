@@ -7,6 +7,8 @@ import EditGeneral from './Edit-general';
 import EditConnection from './Edit-connection';
 import EditReadflow from './Edit-readflow';
 import './EditBridge.css';
+import { buildModbusFacadeRequest, isModbusProtocol, modbusFacadeResultToBridgeConfig } from '../../lib/modbusFacade';
+import { buildOpcUaFacadeRequest, isOpcUaProtocol, opcUaFacadeResultToBridgeConfig } from '../../lib/opcuaFacade';
 
 const EditBridge = () => {
     const router = useRouter();
@@ -15,6 +17,7 @@ const EditBridge = () => {
     const bridgeId = searchParams.get('bridgeId') || '';
     const selectedDeviceId = searchParams.get('deviceId') || '';
     const selectedDeviceName = searchParams.get('deviceName') || '';
+    const bridgeType = searchParams.get('bridgeType') || '';
 
     const [activeTab, setActiveTab] = useState('general');
     const [visitedTabs, setVisitedTabs] = useState({ general: true });
@@ -91,6 +94,8 @@ const EditBridge = () => {
     const getErrorMessage = (data, fallback) => {
         return (
             data?.error?.message ||
+            data?.errorMessage ||
+            data?.error_message ||
             data?.message ||
             data?.details ||
             fallback
@@ -199,11 +204,23 @@ const EditBridge = () => {
         return () => clearInterval(interval);
     }, [isLoadingConfig]);
 
-    const pollProtocolConverterActionResult = async (actionId, maxWaitSeconds = 45) => {
-        const maxAttempts = Math.ceil((maxWaitSeconds * 1000) / 3000);
+    const pollProtocolConverterActionResult = async (
+        actionId,
+        maxWaitSeconds = 45,
+        resultType = 'generic',
+        { requireResult = true } = {}
+    ) => {
+        const maxAttempts = Math.ceil((maxWaitSeconds * 1000) / 2000);
+        const isOpcUaResult = resultType === 'opcua';
+        const isModbusResult = resultType === 'modbus';
         
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-            const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(actionId)}/result`, {
+            const resultPath = isOpcUaResult
+                ? `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/actions/${encodeURIComponent(actionId)}/result`
+                : isModbusResult
+                ? `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/modbus/actions/${encodeURIComponent(actionId)}/result`
+                : `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(actionId)}/result`;
+            const response = await fetch(resultPath, {
                 method: 'GET',
                 headers: {
                     Accept: 'application/json'
@@ -219,25 +236,24 @@ const EditBridge = () => {
 
             const statusText = String(data?.status ?? '').toUpperCase();
             const hasCompletedAt = Boolean(data?.completedAt);
-            const hasError = Boolean(data?.errorMessage);
+            const actionErrorMessage = data?.errorMessage || data?.error_message || data?.error?.message || (typeof data?.error === 'string' ? data.error : '');
+            const hasError = Boolean(actionErrorMessage);
             const hasResult = Boolean(data?.result);
+            const isFailed = hasError || statusText.includes('FAILED') || ['5', '6', '7', '8'].includes(statusText);
+            const isCompleted = statusText.includes('COMPLETED') || statusText === '4' || hasCompletedAt;
 
-            if (hasError || statusText.includes('FAILED') || statusText === '5') {
-                const errMsg = data?.errorMessage || data?.error?.message || data?.message || 'Bridge configuration retrieval failed.';
-                throw new Error(errMsg);
+            if (isFailed) {
+                throw new Error(getErrorMessage(data, 'Bridge configuration retrieval failed.'));
             }
 
-            const isCompleted = statusText.includes('COMPLETED') || statusText === '4' || statusText === '2' || hasCompletedAt;
-
-            if (hasResult) {
+            if (hasResult || isCompleted) {
+                if (requireResult && !hasResult) {
+                    throw new Error('Bridge configuration retrieval completed without result data.');
+                }
                 return data;
             }
 
-            if (isCompleted) {
-                throw new Error('Bridge configuration retrieval completed without result data.');
-            }
-
-            await wait(3000);
+            await wait(2000);
         }
 
         throw new Error(`Getting bridge configuration timed out after ${maxWaitSeconds} seconds. Please try again.`);
@@ -269,6 +285,106 @@ const EditBridge = () => {
         return actionId;
     };
 
+    const queueOpcUaProtocolConverterUpdate = async (converterUuid, editPayload) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/${encodeURIComponent(converterUuid)}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(editPayload)
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue OPC-UA bridge edit request.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('OPC-UA bridge edit was queued but action id was not found.');
+        }
+
+        return actionId;
+    };
+
+    const queueOpcUaProtocolConverterGet = async (converterUuid) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/${encodeURIComponent(converterUuid)}`, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json'
+            },
+            credentials: 'include'
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue OPC-UA bridge configuration retrieval.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('OPC-UA bridge configuration retrieval was queued but action id was not found.');
+        }
+
+        return actionId;
+    };
+
+    const queueModbusProtocolConverterUpdate = async (converterUuid, editPayload) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/modbus/${encodeURIComponent(converterUuid)}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(editPayload)
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue Modbus bridge edit request.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('Modbus bridge edit was queued but action id was not found.');
+        }
+
+        return actionId;
+    };
+
+    const queueModbusProtocolConverterGet = async (converterUuid) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/modbus/${encodeURIComponent(converterUuid)}`, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json'
+            },
+            credentials: 'include'
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue Modbus bridge configuration retrieval.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('Modbus bridge configuration retrieval was queued but action id was not found.');
+        }
+
+        return actionId;
+    };
+
     useEffect(() => {
         let cancelled = false;
 
@@ -279,12 +395,19 @@ const EditBridge = () => {
             }
 
             try {
+                const useOpcUaFacade = isOpcUaProtocol(bridgeType);
+                const useModbusFacade = isModbusProtocol(bridgeType);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000);
 
                 let initResponse;
                 try {
-                    initResponse = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(bridgeId)}`, {
+                    const initPath = useOpcUaFacade
+                        ? `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/${encodeURIComponent(bridgeId)}`
+                        : useModbusFacade
+                        ? `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/modbus/${encodeURIComponent(bridgeId)}`
+                        : `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(bridgeId)}`;
+                    initResponse = await fetch(initPath, {
                         method: 'GET',
                         headers: {
                             Accept: 'application/json'
@@ -310,9 +433,38 @@ const EditBridge = () => {
 
                 if (cancelled) return;
 
-                const resultData = await pollProtocolConverterActionResult(actionId, 45);
+                const resultData = await pollProtocolConverterActionResult(
+                    actionId,
+                    45,
+                    useOpcUaFacade ? 'opcua' : useModbusFacade ? 'modbus' : 'generic',
+                    { requireResult: true }
+                );
 
                 if (cancelled) return;
+
+                if (useOpcUaFacade) {
+                    const nextConfig = opcUaFacadeResultToBridgeConfig({
+                        result: resultData?.result || resultData,
+                        selectedDeviceName,
+                        fallbackBridgeId: bridgeId
+                    });
+                    loadedProtocolConverterRef.current = resultData?.result || resultData;
+                    setBridgeConfig(nextConfig);
+                    initialBridgeConfigRef.current = normalizeBridgeConfig(nextConfig);
+                    return;
+                }
+
+                if (useModbusFacade) {
+                    const nextConfig = modbusFacadeResultToBridgeConfig({
+                        result: resultData?.result || resultData,
+                        selectedDeviceName,
+                        fallbackBridgeId: bridgeId
+                    });
+                    loadedProtocolConverterRef.current = resultData?.result || resultData;
+                    setBridgeConfig(nextConfig);
+                    initialBridgeConfigRef.current = normalizeBridgeConfig(nextConfig);
+                    return;
+                }
 
                 const result = resultData?.result || resultData;
                 loadedProtocolConverterRef.current = result && typeof result === 'object' ? result : null;
@@ -386,7 +538,7 @@ const EditBridge = () => {
         return () => {
             cancelled = true;
         };
-    }, [bridgeId, selectedDeviceId, selectedDeviceName]);
+    }, [bridgeId, selectedDeviceId, selectedDeviceName, bridgeType]);
 
     const isStep2Ready = useMemo(() => {
         const hasName = String(bridgeConfig?.name || '').trim().length > 0;
@@ -476,11 +628,80 @@ const EditBridge = () => {
                     .trim()
                     .toLowerCase()
                     .replace(/[\s_-]/g, '');
-                const isOpcuaPatch = protocolMeta === 'opcua' || normalizedReadInputType === 'opcua' || normalizedReadInputType === 'benthosopcua';
+                const isOpcuaPatch = isOpcUaProtocol(protocolMeta) || isOpcUaProtocol(normalizedReadInputType);
+                const isModbusPatch = isModbusProtocol(protocolMeta) || isModbusProtocol(normalizedReadInputType);
                 const readInputType = isOpcuaPatch ? 'benthos_opcua' : normalizedReadInputType;
                 const readTemplateVariables = Array.isArray(bridgeConfig?.readTemplateVariables)
                     ? bridgeConfig.readTemplateVariables
                     : [];
+
+                if (isOpcuaPatch) {
+                    const editPayload = buildOpcUaFacadeRequest({
+                        bridgeConfig,
+                        deviceId: selectedDeviceId,
+                        uuid: bridgeId,
+                        location,
+                        port: portNum
+                    });
+
+                    const actionId = await queueOpcUaProtocolConverterUpdate(bridgeId, editPayload);
+                    setDeployMessage('Applying OPC-UA changes, please wait.');
+                    await pollProtocolConverterActionResult(actionId, 60, 'opcua', { requireResult: false });
+
+                    setDeployMessage('Refreshing OPC-UA configuration, please wait.');
+                    const getActionId = await queueOpcUaProtocolConverterGet(bridgeId);
+                    const refreshed = await pollProtocolConverterActionResult(getActionId, 60, 'opcua', { requireResult: true });
+                    const nextConfig = opcUaFacadeResultToBridgeConfig({
+                        result: refreshed?.result || refreshed,
+                        selectedDeviceName,
+                        fallbackBridgeId: bridgeId
+                    });
+                    loadedProtocolConverterRef.current = refreshed?.result || refreshed;
+                    setBridgeConfig(nextConfig);
+                    initialBridgeConfigRef.current = normalizeBridgeConfig(nextConfig);
+
+                    setDeployMessage('Update completed successfully!');
+                    setTimeout(() => {
+                        setIsDeploying(false);
+                        setDeployMessage('');
+                        router.push(`/dashboard/bridges/list?deviceId=${encodeURIComponent(selectedDeviceId)}&deviceName=${encodeURIComponent(selectedDeviceName)}`);
+                    }, 2000);
+                    return;
+                }
+
+                if (isModbusPatch) {
+                    const editPayload = buildModbusFacadeRequest({
+                        bridgeConfig,
+                        deviceId: selectedDeviceId,
+                        uuid: bridgeId,
+                        location,
+                        port: portNum
+                    });
+
+                    const actionId = await queueModbusProtocolConverterUpdate(bridgeId, editPayload);
+                    setDeployMessage('Applying Modbus changes, please wait.');
+                    await pollProtocolConverterActionResult(actionId, 60, 'modbus', { requireResult: false });
+
+                    setDeployMessage('Refreshing Modbus configuration, please wait.');
+                    const getActionId = await queueModbusProtocolConverterGet(bridgeId);
+                    const refreshed = await pollProtocolConverterActionResult(getActionId, 60, 'modbus', { requireResult: true });
+                    const nextConfig = modbusFacadeResultToBridgeConfig({
+                        result: refreshed?.result || refreshed,
+                        selectedDeviceName,
+                        fallbackBridgeId: bridgeId
+                    });
+                    loadedProtocolConverterRef.current = refreshed?.result || refreshed;
+                    setBridgeConfig(nextConfig);
+                    initialBridgeConfigRef.current = normalizeBridgeConfig(nextConfig);
+
+                    setDeployMessage('Update completed successfully!');
+                    setTimeout(() => {
+                        setIsDeploying(false);
+                        setDeployMessage('');
+                        router.push(`/dashboard/bridges/list?deviceId=${encodeURIComponent(selectedDeviceId)}&deviceName=${encodeURIComponent(selectedDeviceName)}`);
+                    }, 2000);
+                    return;
+                }
 
                 const loadedConverter = loadedProtocolConverterRef.current && typeof loadedProtocolConverterRef.current === 'object'
                     ? loadedProtocolConverterRef.current
@@ -559,7 +780,7 @@ const EditBridge = () => {
 
                 const actionId = await queueProtocolConverterUpdate(bridgeId, editPayload);
                 setDeployMessage('Applying changes, please wait.');
-                await pollProtocolConverterActionResult(actionId, 60);
+                await pollProtocolConverterActionResult(actionId, 60, 'generic', { requireResult: false });
 
                 setDeployMessage('Update completed successfully!');
                 setTimeout(() => {

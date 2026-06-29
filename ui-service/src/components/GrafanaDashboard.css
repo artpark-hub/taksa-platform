@@ -37,3 +37,8 @@
     min-height: var(--grafana-min-height); 
     border: none;
 }
+
+html[data-theme='dark'] .grafana-wrapper,
+html[data-theme='dark'] .grafana-frame-container {
+    background: var(--surface-soft, #0f151d);
+}
