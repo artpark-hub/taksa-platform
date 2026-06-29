@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-    Boxes, Settings, Menu, ChevronUp, Users, LogOut, House, LayoutDashboard, Workflow, FileCog, BookOpen, Compass, Bot
+    Boxes, Settings, Menu, ChevronUp, Users, LogOut, House, LayoutDashboard, Workflow, FileCog, BookOpen, Compass, Bot, Moon, Sun
 } from 'lucide-react';
 
 const Sidebar = ({ isCollapsed, toggleSidebar }) => {
@@ -15,6 +15,8 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showDashboardSubmenu, setShowDashboardSubmenu] = useState(false);
+    const [theme, setTheme] = useState('light');
+    const [isThemeReady, setIsThemeReady] = useState(false);
     const menuRef = useRef(null);
 
     useEffect(() => {
@@ -70,6 +72,29 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
             setShowDashboardSubmenu(false);
         }
     }, [pathname]);
+    useEffect(() => {
+        const storedTheme = typeof window !== 'undefined'
+            ? window.localStorage.getItem('taksa_theme')
+            : null;
+        const nextTheme = storedTheme === 'dark' ? 'dark' : 'light';
+
+        setTheme(nextTheme);
+        setIsThemeReady(true);
+        document.documentElement.dataset.theme = nextTheme;
+        document.documentElement.style.colorScheme = nextTheme;
+    }, []);
+
+    useEffect(() => {
+        if (!isThemeReady) {
+            return;
+        }
+
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        window.localStorage.setItem('taksa_theme', theme);
+        window.dispatchEvent(new CustomEvent('taksa-theme-change', { detail: { theme } }));
+    }, [isThemeReady, theme]);
+
 
     const handleLogout = async () => {
         if (isLoggingOut) return;
@@ -131,6 +156,11 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
         e.stopPropagation();
         router.push('/dashboard/settings');
         setShowUserMenu(false);
+    };
+
+    const handleThemeToggle = (e) => {
+        e.stopPropagation();
+        setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
     };
 
     const firstLetter = user.firstName ? user.firstName.charAt(0).toUpperCase() : 'U';
@@ -350,16 +380,27 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
 
                         <div className="popup-options">
                             <div
-                                className="popup-item"
+                                className={`popup-item ${pathname.startsWith('/dashboard/settings') ? 'active' : ''}`}
                                 onClick={handleSettingsClick}
-                                style={pathname.startsWith('/dashboard/settings') ? { backgroundColor: '#f0f0f0', color: '#000', fontWeight: '600' } : {}}
                             >
                                 <Settings size={16} /> <span>Settings</span>
                             </div>
+                            <button
+                                type="button"
+                                className="popup-item theme-toggle-item"
+                                onClick={handleThemeToggle}
+                                aria-pressed={theme === 'dark'}
+                            >
+                                {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
+                                <span className="theme-toggle-label">Theme</span>
+                                <span className="theme-toggle-state">{theme === 'dark' ? 'Dark' : 'Light'}</span>
+                                <span className="theme-toggle-switch" aria-hidden="true">
+                                    <span></span>
+                                </span>
+                            </button>
                             <div
-                                className="popup-item"
+                                className={`popup-item ${pathname.startsWith('/dashboard/users') ? 'active' : ''}`}
                                 onClick={handleUserManagementClick}
-                                style={pathname.startsWith('/dashboard/users') ? { backgroundColor: '#f0f0f0', color: '#000', fontWeight: '600' } : {}}
                             >
                                 <Users size={16} /> <span>User Management</span>
                             </div>
@@ -395,7 +436,7 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
                                 <span className="user-name">{user.firstName} {user.lastName}</span>
                                 <span className="user-email" title={user.email}>{user.email}</span>
                             </div>
-                            <ChevronUp size={16} color={isUserSectionActive ? "#ffffff" : "#666"} style={{ transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                            <ChevronUp size={16} color={isUserSectionActive ? "var(--active-text)" : "var(--text-muted)"} style={{ transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                         </>
                     )}
                 </div>

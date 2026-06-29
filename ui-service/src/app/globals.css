@@ -36,8 +36,20 @@
     --font-mono: var(--font-geist-mono);
 }
 
+html[data-theme='light'] {
+    --background: #ffffff;
+    --foreground: #171717;
+    color-scheme: light;
+}
+
+html[data-theme='dark'] {
+    --background: #0b0f14;
+    --foreground: #ededed;
+    color-scheme: dark;
+}
+
 @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme]) {
         --background: #0a0a0a;
         --foreground: #ededed;
     }
@@ -70,4 +82,347 @@ body {
     font-family: Arial, Helvetica, sans-serif;
     font-size: var(--text-base);
     line-height: 1.5;
+}
+
+html[data-theme='dark'] body {
+    background: var(--background);
+    color: var(--foreground);
+}
+
+html[data-theme='dark'] :is(.login-container, .register-container, .forgot-password-container, .reset-password-container, .legal-page-container) {
+    background-color: var(--background);
+    color: var(--foreground);
+}
+
+html[data-theme='dark'] :is(.login-card, .register-card, .forgot-password-card, .reset-password-card, .legal-document-container) {
+    background-color: #161f29;
+    border-color: #263241;
+    color: var(--foreground);
+    box-shadow: 0 0.7rem 2rem rgba(0, 0, 0, 0.46);
+}
+
+html[data-theme='dark'] :is(.login-card, .register-card, .forgot-password-card, .reset-password-card, .legal-document-container) :is(h1, h2, h3, p, label, span) {
+    color: inherit;
+}
+
+html[data-theme='dark'] :is(.login-card, .register-card, .forgot-password-card, .reset-password-card) :is(input, select, textarea) {
+    background-color: #101822;
+    border-color: #344253;
+    color: #f4f7fb;
+}
+
+/* Auth pages dark theme */
+.auth-logo-dark {
+    display: none;
+}
+
+html[data-theme='dark'] .auth-logo-light {
+    display: none;
+}
+
+html[data-theme='dark'] .auth-logo-dark {
+    display: block;
+}
+
+html[data-theme='dark'] :is(
+    .login-main-container,
+    .register-main-container,
+    .forgot-main-container,
+    .reset-main-container
+) {
+    --foreground: #eef2f7;
+    --background: #0b0f14;
+    --accent: #5ea8ff;
+    --surface-raised: #161f29;
+    --surface-soft: #0f151d;
+    --surface-muted: #1d2834;
+    --surface-hover: rgba(255, 255, 255, 0.08);
+    --text-primary: #f4f7fb;
+    --text-secondary: #d7dee8;
+    --text-muted: #a8b3c3;
+    --text-subtle: #7f8b9b;
+    --border-soft: #263241;
+    --border-medium: #344253;
+    --control-bg: #101822;
+    --control-disabled: #18212c;
+    --active-bg: #f2f5f8;
+    --active-text: #071018;
+    --danger: #fb7185;
+    --danger-bg: rgba(251, 113, 133, 0.14);
+    --danger-border: rgba(251, 113, 133, 0.35);
+    --success: #74d99f;
+    --success-bg: rgba(34, 197, 94, 0.16);
+    --success-border: rgba(34, 197, 94, 0.38);
+    background-color: var(--background);
+    background-image:
+        radial-gradient(circle, rgba(238, 242, 247, 0.09) 1px, transparent 1px),
+        radial-gradient(farthest-corner at 0% 150%, rgba(94, 168, 255, 0.22) 0%, transparent 62%);
+    color: var(--text-primary);
+}
+
+html[data-theme='dark'] :is(
+    .login-left-panel,
+    .register-left-panel,
+    .forgot-left-panel,
+    .reset-left-panel,
+    .login-right-panel,
+    .register-right-panel,
+    .forgot-right-panel,
+    .reset-right-panel
+) {
+    background: transparent;
+}
+
+html[data-theme='dark'] :is(
+    .login-form-wrapper,
+    .register-form-wrapper,
+    .forgot-form-wrapper,
+    .reset-form-wrapper,
+    .login-google-modal
+) {
+    background: rgba(22, 31, 41, 0.82);
+    border: 1px solid var(--border-soft);
+    box-shadow: 0 0.7rem 2rem rgba(0, 0, 0, 0.46);
+    color: var(--text-primary);
+    backdrop-filter: blur(14px);
+}
+
+html[data-theme='dark'] :is(
+    .login-brand-title,
+    .register-brand-title,
+    .forgot-brand-title,
+    .reset-brand-title,
+    .login-header-title,
+    .register-header-title,
+    .forgot-header-title,
+    .reset-header-title,
+    .login-google-modal-title,
+    .login-input-group label,
+    .register-input-group label,
+    .forgot-input-group label,
+    .reset-input-group label
+) {
+    color: var(--text-primary);
+}
+
+html[data-theme='dark'] :is(
+    .login-header-subtitle,
+    .register-header-subtitle,
+    .forgot-header-subtitle,
+    .reset-header-subtitle,
+    .login-footer-section,
+    .register-footer-section,
+    .forgot-footer-section,
+    .reset-footer-section,
+    .login-google-modal-subtitle,
+    .login-form-wrapper .legal-consent-label-copy,
+    .register-auth-form .legal-consent-title,
+    .login-google-modal-consent-title
+) {
+    color: var(--text-muted);
+}
+
+html[data-theme='dark'] :is(
+    .login-input-group input,
+    .register-input-group input,
+    .forgot-input-group input,
+    .reset-input-group input,
+    .login-google-modal-input
+) {
+    background: var(--control-bg);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+}
+
+html[data-theme='dark'] :is(
+    .login-input-group input:focus,
+    .register-input-group input:focus,
+    .forgot-input-group input:focus,
+    .reset-input-group input:focus,
+    .login-google-modal-input:focus
+) {
+    background: #111b26;
+    border-color: var(--active-bg);
+    box-shadow: 0 0 0 3px rgba(242, 245, 248, 0.08);
+}
+
+html[data-theme='dark'] :is(
+    .login-input-group input::placeholder,
+    .register-input-group input::placeholder,
+    .forgot-input-group input::placeholder,
+    .reset-input-group input::placeholder,
+    .login-google-modal-input::placeholder
+) {
+    color: var(--text-subtle);
+}
+
+html[data-theme='dark'] :is(
+    .login-input-group input:disabled,
+    .register-input-group input:disabled,
+    .forgot-input-group input:disabled,
+    .reset-input-group input:disabled
+) {
+    background: var(--control-disabled);
+    color: var(--text-subtle);
+}
+
+html[data-theme='dark'] :is(
+    .login-submit-btn,
+    .register-submit-btn,
+    .forgot-submit-btn,
+    .reset-submit-btn,
+    .login-google-modal-btn
+) {
+    background: var(--active-bg);
+    border-color: var(--active-bg);
+    color: var(--active-text);
+}
+
+html[data-theme='dark'] :is(
+    .login-submit-btn:hover,
+    .register-submit-btn:not(:disabled):hover,
+    .forgot-submit-btn:hover,
+    .reset-submit-btn:hover,
+    .login-google-modal-btn:not(:disabled):hover
+) {
+    background: #ffffff;
+    border-color: #ffffff;
+    color: var(--active-text);
+}
+
+html[data-theme='dark'] :is(
+    .login-submit-btn:disabled,
+    .register-submit-btn:disabled,
+    .forgot-submit-btn:disabled,
+    .reset-submit-btn:disabled,
+    .login-google-modal-btn:disabled
+) {
+    background: var(--surface-muted);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+    opacity: 0.85;
+}
+
+html[data-theme='dark'] :is(
+    .login-auth-mode-switch,
+    .login-accordion-body,
+    .legal-consent-card,
+    .login-google-modal-consent-card
+) {
+    background: var(--surface-soft);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
+html[data-theme='dark'] .login-auth-mode-btn {
+    color: var(--text-muted);
+}
+
+html[data-theme='dark'] .login-auth-mode-btn.is-active {
+    background: var(--surface-raised);
+    color: var(--text-primary);
+    box-shadow: 0 0.2rem 0.7rem rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme='dark'] :is(.login-google-btn, .login-azure-btn) {
+    background: var(--control-bg);
+    border-color: var(--border-medium);
+    color: var(--text-secondary);
+}
+
+html[data-theme='dark'] :is(.login-google-btn:hover, .login-azure-btn:hover) {
+    background: var(--surface-muted);
+    border-color: var(--border-medium);
+    color: var(--text-primary);
+}
+
+html[data-theme='dark'] :is(
+    .login-disabled-auth-wrap .login-azure-btn,
+    .login-disabled-auth-wrap .login-azure-btn:disabled,
+    .login-disabled-auth-wrap .login-azure-btn:hover
+) {
+    background: var(--control-disabled);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme='dark'] :is(
+    .login-password-toggle,
+    .register-input-group button,
+    .login-google-modal-close
+) {
+    color: var(--text-muted) !important;
+}
+
+html[data-theme='dark'] :is(
+    .login-password-toggle:hover,
+    .register-input-group button:hover,
+    .login-google-modal-close:hover
+) {
+    background: var(--surface-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] :is(
+    .login-footer-section a,
+    .register-footer-section a,
+    .forgot-footer-section a,
+    .reset-footer-section a,
+    .legal-consent-link-button,
+    .login-google-modal-link-button
+) {
+    color: #8cc8ff;
+}
+
+html[data-theme='dark'] :is(
+    .login-footer-section a:hover,
+    .register-footer-section a:hover,
+    .forgot-footer-section a:hover,
+    .reset-footer-section a:hover,
+    .legal-consent-link-button:hover,
+    .login-google-modal-link-button:hover
+) {
+    color: #c7e4ff;
+}
+
+html[data-theme='dark'] :is(
+    .login-form-divider,
+    .register-form-divider
+) {
+    background: var(--border-soft);
+}
+
+html[data-theme='dark'] :is(
+    .login-form-error,
+    .register-form-error,
+    .forgot-form-error,
+    .reset-form-error,
+    .login-input-error-border,
+    .register-input-error-border,
+    .forgot-input-error-border,
+    .login-google-modal-input-error
+) {
+    background: var(--danger-bg) !important;
+    border-color: var(--danger-border) !important;
+    color: var(--danger) !important;
+}
+
+.login-form-error,
+.register-form-error {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 4px;
+    color: #dc2626;
+    background: #ffeeee;
+}
+
+html[data-theme='dark'] :is(.forgot-success-box, .reset-success-box) {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+    color: var(--success);
+}
+
+html[data-theme='dark'] .login-google-modal-overlay {
+    background: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(4px);
 }

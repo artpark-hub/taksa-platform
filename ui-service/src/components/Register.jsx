@@ -284,7 +284,8 @@ const Register = () => {
         <div className="register-main-container">
             <div className="register-left-panel">
                 <div className="register-brand-container">
-                    <img src="/images/taksa_black.png" alt="Taksa Logo" className="register-brand-logo" />
+                    <img src="/images/taksa_black.png" alt="Taksa Logo" className="register-brand-logo auth-logo-light" />
+                    <img src="/taksa_white_rmbg.png" alt="Taksa Logo" className="register-brand-logo auth-logo-dark" />
                     <h3 className="register-brand-title">Factory Operating System</h3>
                 </div>
             </div>
@@ -295,7 +296,7 @@ const Register = () => {
                     <p className="register-header-subtitle">Create your account by entering your registration details below.</p>
 
                     {formError && (
-                        <div style={{ color: 'red', marginBottom: '15px', padding: '10px', background: '#ffeeee', borderRadius: '4px' }}>
+                        <div className="register-form-error">
                             {formError}
                         </div>
                     )}

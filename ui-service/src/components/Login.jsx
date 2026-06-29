@@ -835,7 +835,8 @@ const Login = () => {
         <div className="login-main-container">
             <div className="login-left-panel">
                 <div className="login-brand-container">
-                    <img src="/images/taksa_black.png" alt="Taksa Logo" className="login-brand-logo" />
+                    <img src="/images/taksa_black.png" alt="Taksa Logo" className="login-brand-logo auth-logo-light" />
+                    <img src="/taksa_white_rmbg.png" alt="Taksa Logo" className="login-brand-logo auth-logo-dark" />
                     <h3 className="login-brand-title">Factory Operating System</h3>
                 </div>
             </div>
@@ -846,7 +847,7 @@ const Login = () => {
                     <p className="login-header-subtitle">Access your account by entering your login details below.</p>
 
                     {formError && (
-                        <div style={{ color: 'red', marginBottom: '15px', padding: '10px', background: '#ffeeee', borderRadius: '4px' }}>
+                        <div className="login-form-error">
                             {formError}
                         </div>
                     )}

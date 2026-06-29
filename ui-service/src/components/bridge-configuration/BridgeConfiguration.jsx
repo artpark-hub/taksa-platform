@@ -7,6 +7,7 @@ import General from './General';
 import Connection from './Connection';
 import Readflow from './Readflow';
 import './BridgeConfiguration.css';
+import { buildModbusFacadeRequest, isModbusProtocol } from '../../lib/modbusFacade';
 import { buildOpcUaFacadeRequest, isOpcUaProtocol } from '../../lib/opcuaFacade';
 
 const BridgeConfiguration = () => {
@@ -44,6 +45,8 @@ const BridgeConfiguration = () => {
     const getErrorMessage = (data, fallback) => {
         return (
             data?.error?.message ||
+            data?.errorMessage ||
+            data?.error_message ||
             data?.message ||
             data?.details ||
             fallback
@@ -171,10 +174,13 @@ const BridgeConfiguration = () => {
     ) => {
         const maxAttempts = Math.ceil((maxWaitSeconds * 1000) / 2000);
         const isOpcUaResult = resultType === 'opcua';
+        const isModbusResult = resultType === 'modbus';
 
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
             const resultPath = isOpcUaResult
                 ? `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/opc-ua/actions/${encodeURIComponent(actionId)}/result`
+                : isModbusResult
+                ? `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/modbus/actions/${encodeURIComponent(actionId)}/result`
                 : `/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/${encodeURIComponent(actionId)}/result`;
             const response = await fetch(resultPath, {
                 method: 'GET',
@@ -285,6 +291,56 @@ const BridgeConfiguration = () => {
 
         if (!actionId) {
             throw new Error('OPC-UA bridge configuration refresh was queued but action id was not found.');
+        }
+
+        return actionId;
+    };
+
+    const queueModbusProtocolConverterDeploy = async (deployPayload) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/modbus`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(deployPayload)
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue Modbus bridge deployment.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('Modbus bridge deployment was queued but workflow action id was not found.');
+        }
+
+        return data;
+    };
+
+    const queueModbusProtocolConverterGet = async (converterUuid) => {
+        const response = await fetch(`/api/v1/devicemgmt/devices/${encodeURIComponent(selectedDeviceId)}/protocol-converters/modbus/${encodeURIComponent(converterUuid)}`, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json'
+            },
+            credentials: 'include'
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(getErrorMessage(data, 'Failed to queue Modbus bridge configuration refresh.'));
+        }
+
+        const actionId = extractActionId(data);
+
+        if (!actionId) {
+            throw new Error('Modbus bridge configuration refresh was queued but action id was not found.');
         }
 
         return actionId;
@@ -440,11 +496,12 @@ const BridgeConfiguration = () => {
 
                 const parsedPort = Number.parseInt(String(bridgeConfig?.port || ''), 10);
                 const location = getDeployLocationFromBridgeConfig();
-                const opcUaProtocolMeta = sanitizeProtocolMeta(bridgeConfig?.protocol);
-                const opcUaReadInputType = String(bridgeConfig?.readInputType || bridgeConfig?.protocol || '')
+                const protocolMeta = sanitizeProtocolMeta(bridgeConfig?.protocol);
+                const normalizedReadInputType = String(bridgeConfig?.readInputType || bridgeConfig?.protocol || '')
                     .toLowerCase()
                     .replace(/[\s_-]/g, '');
-                const isOpcUaDeploy = isOpcUaProtocol(opcUaProtocolMeta) || isOpcUaProtocol(opcUaReadInputType);
+                const isOpcUaDeploy = isOpcUaProtocol(protocolMeta) || isOpcUaProtocol(normalizedReadInputType);
+                const isModbusDeploy = isModbusProtocol(protocolMeta) || isModbusProtocol(normalizedReadInputType);
 
                 if (isOpcUaDeploy) {
                     const opcUaPayload = buildOpcUaFacadeRequest({
@@ -468,6 +525,43 @@ const BridgeConfiguration = () => {
                     setDeployMessage('Verifying OPC-UA configuration, please wait.');
                     const getActionId = await queueOpcUaProtocolConverterGet(converterUuid);
                     await pollProtocolConverterActionResult(getActionId, 60, 'opcua', { requireResult: true });
+
+                    const query = new URLSearchParams();
+
+                    if (selectedDeviceId) {
+                        query.set('deviceId', selectedDeviceId);
+                    }
+
+                    if (selectedDeviceName) {
+                        query.set('deviceName', selectedDeviceName);
+                    }
+
+                    router.push(`/dashboard/bridges/list${query.toString() ? `?${query.toString()}` : ''}`);
+                    return;
+                }
+
+                if (isModbusDeploy) {
+                    const modbusPayload = buildModbusFacadeRequest({
+                        bridgeConfig,
+                        deviceId: selectedDeviceId,
+                        location,
+                        port: Number.isFinite(parsedPort) ? parsedPort : 0,
+                        includeApplyReadConfig: true
+                    });
+
+                    setDeployMessage('Deploying Modbus bridge, please wait.');
+                    const workflowData = await queueModbusProtocolConverterDeploy(modbusPayload);
+                    const workflowActionId = extractActionId(workflowData);
+                    const workflowResult = await pollProtocolConverterActionResult(workflowActionId, 120, 'modbus');
+                    const converterUuid = extractConverterUuid(workflowResult);
+
+                    if (!converterUuid) {
+                        throw new Error('Modbus bridge deployed but uuid was not found in workflow result.');
+                    }
+
+                    setDeployMessage('Verifying Modbus configuration, please wait.');
+                    const getActionId = await queueModbusProtocolConverterGet(converterUuid);
+                    await pollProtocolConverterActionResult(getActionId, 60, 'modbus', { requireResult: true });
 
                     const query = new URLSearchParams();
 
@@ -526,12 +620,12 @@ const BridgeConfiguration = () => {
 
                 setDeployMessage('Adding configurations, please wait.');
 
-                const protocolMeta = sanitizeProtocolMeta(bridgeConfig?.protocol);
-                const normalizedReadInputType = String(bridgeConfig?.readInputType || bridgeConfig?.protocol || 'modbus')
+                const legacyProtocolMeta = sanitizeProtocolMeta(bridgeConfig?.protocol);
+                const legacyReadInputType = String(bridgeConfig?.readInputType || bridgeConfig?.protocol || 'modbus')
                     .toLowerCase()
                     .replace(/[\s_-]/g, '');
-                const isOpcuaPatch = protocolMeta === 'opcua' || normalizedReadInputType === 'opcua' || normalizedReadInputType === 'benthosopcua';
-                const readInputType = isOpcuaPatch ? 'benthos_opcua' : normalizedReadInputType;
+                const isOpcuaPatch = isOpcUaProtocol(legacyProtocolMeta) || isOpcUaProtocol(legacyReadInputType);
+                const readInputType = isOpcuaPatch ? 'benthos_opcua' : legacyReadInputType;
                 const readTemplateVariables = Array.isArray(bridgeConfig?.readTemplateVariables)
                     ? bridgeConfig.readTemplateVariables
                     : [];
@@ -571,7 +665,7 @@ const BridgeConfiguration = () => {
                         }
                     },
                     meta: {
-                        protocol: protocolMeta,
+                        protocol: legacyProtocolMeta,
                         ...(isOpcuaPatch ? { processingMode: 'streaming' } : {})
                     }
                 };

@@ -211,7 +211,12 @@ const ForgotPassword = () => {
                     <img
                         src="/images/taksa_black.png"
                         alt="Taksa Logo"
-                        className="forgot-brand-logo"
+                        className="forgot-brand-logo auth-logo-light"
+                    />
+                    <img
+                        src="/taksa_white_rmbg.png"
+                        alt="Taksa Logo"
+                        className="forgot-brand-logo auth-logo-dark"
                     />
                     <h3 className="forgot-brand-title">Factory Operating System</h3>
                 </div>

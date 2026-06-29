@@ -41,7 +41,30 @@ const Bridges = () => {
     };
 
     const getBridgeType = (bridge) => {
-        return bridge?.type || '--';
+        const rawType = bridge?.type ||
+            bridge?.protocol ||
+            bridge?.protocolType ||
+            bridge?.protocol_type ||
+            bridge?.meta?.protocol ||
+            bridge?.input?.type ||
+            bridge?.readDFC?.inputs?.type ||
+            '';
+
+        if (!rawType) {
+            return '--';
+        }
+
+        const normalized = String(rawType).trim().toLowerCase().replace(/[\s_-]/g, '');
+
+        if (normalized === 'opcua' || normalized === 'benthosopcua') {
+            return 'OPCUA';
+        }
+
+        if (normalized === 'modbus' || normalized === 'modbustcp') {
+            return 'Modbus';
+        }
+
+        return String(rawType);
     };
 
     const getDeploymentStatus = (bridge) => {

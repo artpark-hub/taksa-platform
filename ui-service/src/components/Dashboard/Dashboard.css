@@ -2,47 +2,115 @@
     --foreground: #000000;
     --background: #f8f9fa;
     --accent: #0056b3;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-soft: #f8f9fa;
+    --surface-muted: #f3f4f6;
+    --surface-hover: rgba(0, 0, 0, 0.05);
+    --sidebar-bg: rgba(255, 255, 255, 0.4);
+    --header-bg: #f7f7f766;
+    --text-primary: #111827;
+    --text-secondary: #374151;
+    --text-muted: #6b7280;
+    --text-subtle: #8a8a8a;
+    --border-soft: #e5e7eb;
+    --border-medium: #d1d5db;
+    --control-bg: #ffffff;
+    --control-disabled: #f9fafb;
+    --danger: #dc2626;
+    --danger-bg: #fef2f2;
+    --danger-border: #fecaca;
+    --success: #166534;
+    --success-bg: #dcfce7;
+    --warning: #92400e;
+    --warning-bg: #fef3c7;
+    --info: #0369a1;
+    --info-bg: #f0f9ff;
 
-    --sidebar-width-expanded:  clamp(13rem, 15vw + 5rem, 18rem);
+    --sidebar-width-expanded: clamp(13rem, 15vw + 5rem, 18rem);
     --sidebar-width-collapsed: clamp(4.25rem, 4.5vw + 1rem, 6rem);
-    --header-height:           clamp(3rem, 3vw + 2rem, 5rem);
+    --header-height: clamp(3rem, 3vw + 2rem, 5rem);
 
-    --active-bg:   #000000;
+    --active-bg: #000000;
     --active-text: #ffffff;
 
     /* ─── Dot pattern ────────────────────────────────────────── */
     --dot-spacing: clamp(1rem, 1vw + 0.5rem, 1.5rem);
 
     /* ─── Border radius scale ────────────────────────────────── */
-    --radius-sm:  clamp(0.2rem,  0.2vw + 0.1rem,  0.375rem);
-    --radius-md:  clamp(0.4rem,  0.3vw + 0.2rem,  0.625rem);
-    --radius-lg:  clamp(0.5rem,  0.5vw + 0.25rem, 0.875rem);
-    --radius-xl:  clamp(0.6rem,  0.6vw + 0.3rem,  1rem);
+    --radius-sm: clamp(0.2rem, 0.2vw + 0.1rem, 0.375rem);
+    --radius-md: clamp(0.4rem, 0.3vw + 0.2rem, 0.625rem);
+    --radius-lg: clamp(0.5rem, 0.5vw + 0.25rem, 0.875rem);
+    --radius-xl: clamp(0.6rem, 0.6vw + 0.3rem, 1rem);
 
     /* ─── Shadow scale ───────────────────────────────────────── */
-    --shadow-sm:      0 0.0625rem 0.1875rem rgba(0, 0, 0, 0.1);
-    --shadow-md:      0 0.25rem   0.75rem   rgba(0, 0, 0, 0.15);
-    --shadow-lg:      0 0.25rem   1.25rem   rgba(0, 0, 0, 0.15);
-    --shadow-sidebar: 0.3rem 0    1.25rem   rgba(0, 0, 0, 0.08);
-    --shadow-header:  0 0.25rem   0.9rem    rgba(0, 0, 0, 0.05);
-    --shadow-btn:     0 0.125rem  0.3rem    rgba(0, 0, 0, 0.05);
+    --shadow-sm: 0 0.0625rem 0.1875rem rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.15);
+    --shadow-sidebar: 0.3rem 0 1.25rem rgba(0, 0, 0, 0.08);
+    --shadow-header: 0 0.25rem 0.9rem rgba(0, 0, 0, 0.05);
+    --shadow-btn: 0 0.125rem 0.3rem rgba(0, 0, 0, 0.05);
 
     /* ─── Fluid Spacing Scale ────────────────────────────────── */
-    --space-xs:  clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
-    --space-sm:  clamp(0.5rem,  0.4rem + 0.5vw,  0.75rem);
-    --space-md:  clamp(0.75rem, 0.6rem + 0.75vw, 1.25rem);
-    --space-lg:  clamp(1rem,    0.8rem + 1vw,    1.5rem);
-    --space-xl:  clamp(1.25rem, 1rem   + 1.5vw,  2.5rem);
-    --space-2xl: clamp(1.5rem,  1.2rem + 2vw,    3.5rem);
-    --space-3xl: clamp(2rem,    1.5rem + 3vw,    5rem);
+    --space-xs: clamp(0.25rem, 0.2rem + 0.25vw, 0.5rem);
+    --space-sm: clamp(0.5rem, 0.4rem + 0.5vw, 0.75rem);
+    --space-md: clamp(0.75rem, 0.6rem + 0.75vw, 1.25rem);
+    --space-lg: clamp(1rem, 0.8rem + 1vw, 1.5rem);
+    --space-xl: clamp(1.25rem, 1rem + 1.5vw, 2.5rem);
+    --space-2xl: clamp(1.5rem, 1.2rem + 2vw, 3.5rem);
+    --space-3xl: clamp(2rem, 1.5rem + 3vw, 5rem);
 
     /* ─── Fluid Type Scale ───────────────────────────────────── */
-    --text-sm:   clamp(0.75rem,  0.7rem + 0.25vw, 0.875rem);
-    --text-base: clamp(0.875rem, 0.8rem + 0.4vw,  1rem);
-    --text-lg:   clamp(1rem,     0.9rem + 0.5vw,  1.25rem);
-    --text-xl:   clamp(1.125rem, 1rem   + 0.75vw, 1.5rem);
-    --text-2xl:  clamp(1.25rem,  1rem   + 1.5vw,  2rem);
-    --text-3xl:  clamp(1.5rem,   1.2rem + 2vw,    3rem);
+    --text-sm: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+    --text-base: clamp(0.875rem, 0.8rem + 0.4vw, 1rem);
+    --text-lg: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+    --text-xl: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+    --text-2xl: clamp(1.25rem, 1rem + 1.5vw, 2rem);
+    --text-3xl: clamp(1.5rem, 1.2rem + 2vw, 3rem);
+}
+
+
+html[data-theme='dark'] {
+    --foreground: #eef2f7;
+    --background: #0b0f14;
+    --accent: #5ea8ff;
+    --surface: #111820;
+    --surface-raised: #161f29;
+    --surface-soft: #2c3d51b8;
+    --surface-muted: #1d2834;
+    --surface-hover: rgba(255, 255, 255, 0.08);
+    --sidebar-bg: #2c3d51b8;
+    --header-bg: #2c3d51b8;
+    --text-primary: #f4f7fb;
+    --text-secondary: #d7dee8;
+    --text-muted: #a8b3c3;
+    --text-subtle: #7f8b9b;
+    --border-soft: #263241;
+    --border-medium: #344253;
+    --control-bg: #101822;
+    --control-disabled: #18212c;
+    --active-bg: #f2f5f8;
+    --active-text: #071018;
+    --danger: #fb7185;
+    --danger-bg: rgba(251, 113, 133, 0.14);
+    --danger-border: rgba(251, 113, 133, 0.35);
+    --success: #74d99f;
+    --success-bg: rgba(34, 197, 94, 0.16);
+    --warning: #f5c86a;
+    --warning-bg: rgba(245, 158, 11, 0.16);
+    --info: #7cc7ff;
+    --info-bg: rgba(56, 189, 248, 0.14);
+    --shadow-sm: 0 0.0625rem 0.1875rem rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 0.35rem 1rem rgba(0, 0, 0, 0.42);
+    --shadow-lg: 0 0.7rem 2rem rgba(0, 0, 0, 0.46);
+    --shadow-sidebar: 0.3rem 0 1.4rem rgba(0, 0, 0, 0.34);
+    --shadow-header: 0 0.25rem 1rem rgba(0, 0, 0, 0.28);
+    --shadow-btn: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.32);
+    color-scheme: dark;
+}
+
+html[data-theme='light'] {
+    color-scheme: light;
 }
 
 .dashboard-container {
@@ -69,7 +137,7 @@
     flex-direction: column;
     padding: var(--space-md);
     box-sizing: border-box;
-    background-color: rgba(255, 255, 255, 0.4);
+    background-color: var(--sidebar-bg);
     border-right: none;
     box-shadow: var(--shadow-sidebar);
     gap: var(--space-xs);
@@ -77,8 +145,14 @@
     z-index: 50;
 }
 
-.sidebar-expanded  { width: var(--sidebar-width-expanded); }
-.sidebar-collapsed { width: var(--sidebar-width-collapsed); align-items: center; }
+.sidebar-expanded {
+    width: var(--sidebar-width-expanded);
+}
+
+.sidebar-collapsed {
+    width: var(--sidebar-width-collapsed);
+    align-items: center;
+}
 
 .sidebar-header {
     height: clamp(2.5rem, 4vw + 1rem, 4rem);
@@ -105,9 +179,9 @@
 }
 
 .sidebar-toggle-btn {
-    background: white;
-    color: #333;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: var(--surface-raised);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-soft);
     border-radius: var(--radius-sm);
     width: clamp(1.25rem, 1.5vw + 0.5rem, 1.75rem);
     height: clamp(1.25rem, 1.5vw + 0.5rem, 1.75rem);
@@ -121,7 +195,7 @@
 }
 
 .sidebar-toggle-btn:hover {
-    background: #f4f4f4;
+    background: var(--surface-muted);
 }
 
 .sidebar-nav {
@@ -133,13 +207,14 @@
 }
 
 .popup-item {
-    all: unset; /* removes ALL default button styles */
+    all: unset;
+    /* removes ALL default button styles */
     display: flex;
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-sm);
     font-size: var(--text-sm);
-    color: #333;
+    color: var(--text-secondary);
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: background 0.1s;
@@ -155,7 +230,7 @@
     gap: var(--space-md);
     padding: var(--space-sm) var(--space-md);
     text-decoration: none;
-    color: #666;
+    color: var(--text-muted);
     border-radius: var(--radius-lg);
     transition: all 0.2s;
     font-weight: 500;
@@ -198,7 +273,7 @@
     gap: var(--space-md);
     min-width: 0;
     text-decoration: none;
-    color: #666;
+    color: var(--text-muted);
     overflow: hidden;
     font-weight: 500;
     font-size: var(--text-base);
@@ -217,25 +292,25 @@
     flex-shrink: 0;
     border-radius: var(--radius-lg);
     transition: background-color 0.2s, box-shadow 0.2s;
-    color: #666;
+    color: var(--text-muted);
     box-sizing: border-box;
 }
 
 .dashboard-toggle-btn:hover {
-    background-color: rgba(0, 0, 0, 0.08);
+    background-color: var(--surface-hover);
 }
 
 .dashboard-toggle-btn.dashboard-toggle-active {
-    color: #30343a;
+    color: var(--text-secondary);
 }
 
 .dashboard-toggle-btn.dashboard-toggle-muted {
-    color: #2f343a;
+    color: var(--text-secondary);
 }
 
 .sidebar-link:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-    color: #000;
+    background-color: var(--surface-hover);
+    color: var(--text-primary);
 }
 
 .sidebar-link.active {
@@ -255,13 +330,16 @@
 .sidebar-link.active .sidebar-icon,
 .sidebar-link.active .sidebar-icon svg,
 .sidebar-link.active svg {
-    color: #ffffff;
-    stroke: #ffffff;
+    color: var(--active-text);
+    stroke: var(--active-text);
 }
 
 /* removed — handled by .dashboard-parent-wrap.active above */
 
-.sidebar-collapsed .link-text    { display: none; }
+.sidebar-collapsed .link-text {
+    display: none;
+}
+
 .sidebar-collapsed .sidebar-link {
     padding: var(--space-sm);
     justify-content: center;
@@ -270,7 +348,6 @@
 
 .sidebar-footer {
     position: relative;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
     padding-top: var(--space-md);
     margin-top: auto;
     overflow: visible;
@@ -286,8 +363,13 @@
     cursor: pointer;
 }
 
-.user-profile:hover  { background-color: rgba(0, 0, 0, 0.05); }
-.user-profile.active { background-color: rgba(0, 0, 0, 0.05); }
+.user-profile:hover {
+    background-color: var(--surface-hover);
+}
+
+.user-profile.active {
+    background-color: var(--surface-hover);
+}
 
 .user-profile.active-page {
     background-color: var(--active-bg);
@@ -296,16 +378,21 @@
 }
 
 .user-profile.active-page .user-avatar {
-    background-color: #ffffff;
-    color: #000000;
+    background-color: var(--active-text);
+    color: var(--active-bg);
     box-shadow: var(--shadow-sm);
 }
 
-.user-profile.active-page .user-name  { color: var(--active-text); }
-.user-profile.active-page .user-email { color: rgba(255, 255, 255, 0.8); }
+.user-profile.active-page .user-name {
+    color: var(--active-text);
+}
+
+.user-profile.active-page .user-email {
+    color: color-mix(in srgb, var(--active-text), transparent 22%);
+}
 
 .user-profile.active .user-avatar {
-    background-color: #ffffff;
+    background-color: var(--surface-raised);
     box-shadow: var(--shadow-sm);
 }
 
@@ -313,12 +400,12 @@
     width: clamp(2rem, 2vw + 1rem, 2.5rem);
     height: clamp(2rem, 2vw + 1rem, 2.5rem);
     border-radius: 50%;
-    background-color: #f0f0f0;
+    background-color: var(--surface-muted);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    color: #333;
+    color: var(--text-secondary);
     font-size: var(--text-base);
     flex-shrink: 0;
     transition: background-color 0.2s;
@@ -334,7 +421,7 @@
 .user-name {
     font-size: var(--text-base);
     font-weight: 600;
-    color: #333;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -342,7 +429,7 @@
 
 .user-email {
     font-size: var(--text-sm);
-    color: #666;
+    color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -354,10 +441,10 @@
     bottom: 100%;
     left: var(--space-sm);
     right: var(--space-sm);
-    background: white;
+    background: var(--surface-raised);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-lg);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--border-soft);
     margin-bottom: var(--space-sm);
     padding: var(--space-xs);
     z-index: 100;
@@ -378,7 +465,7 @@
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-sm);
-    background: #f8f9fa;
+    background: var(--surface-soft);
     border-radius: var(--radius-lg);
     margin-bottom: var(--space-xs);
 }
@@ -386,13 +473,13 @@
 .user-avatar-small {
     width: clamp(1.75rem, 2vw + 0.5rem, 2.25rem);
     height: clamp(1.75rem, 2vw + 0.5rem, 2.25rem);
-    background: #e0e0e0;
+    background: var(--surface-muted);
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    color: #333;
+    color: var(--text-secondary);
 }
 
 .popup-user-info {
@@ -409,20 +496,57 @@
     text-overflow: ellipsis;
 }
 
-.popup-name  { font-size: var(--text-sm); font-weight: 600; color: #333; }
-.popup-email { font-size: var(--text-sm); color: #666; }
+.popup-name {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+}
 
-.popup-options { display: flex; flex-direction: column; }
+.popup-email {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+}
+
+.popup-options {
+    display: flex;
+    flex-direction: column;
+}
 
 
-.popup-item:hover        { background-color: #f0f0f0; }
-.popup-divider           { height: 1px; background-color: #eee; margin: var(--space-xs) 0; }
-.popup-item.logout       { color: #d32f2f; }
-.popup-item.logout:hover { background-color: #ffebee; }
+.popup-item:hover {
+    background-color: var(--surface-muted);
+}
+
+.popup-item.active {
+    background-color: var(--surface-muted);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.popup-divider {
+    height: 1px;
+    background-color: var(--border-soft);
+    margin: var(--space-xs) 0;
+}
+
+.popup-item.logout {
+    color: var(--danger);
+}
+
+.popup-item.logout:hover {
+    background-color: var(--danger-bg);
+}
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(var(--space-sm)); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(var(--space-sm));
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Header */
@@ -432,7 +556,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--space-xl);
-    background-color: #f7f7f766;
+    background-color: var(--header-bg);
     box-shadow: var(--shadow-header);
     position: sticky;
     top: 0;
@@ -460,7 +584,7 @@
 
 .header-greeting {
     font-size: var(--text-base);
-    color: #333;
+    color: var(--text-secondary);
 }
 
 /* Main Wrapper */
@@ -487,7 +611,7 @@
 
 .dashboard-main-content {
     flex: 1;
-    background-color: #ffffff;
+    background-color: var(--surface);
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
@@ -514,7 +638,7 @@
     margin: 0 0 var(--space-xs) 0;
     font-size: var(--text-sm);
     font-weight: 600;
-    color: #8a8a8a;
+    color: var(--text-subtle);
     line-height: 1.4;
 }
 
@@ -524,8 +648,15 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateX(-0.3rem); }
-    to   { opacity: 1; transform: translateX(0); }
+    from {
+        opacity: 0;
+        transform: translateX(-0.3rem);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 .dashboard-auth-overlay {
@@ -539,7 +670,7 @@
 }
 
 .dashboard-auth-modal {
-    background-color: #ffffff;
+    background-color: var(--surface-raised);
     border-radius: var(--radius-lg);
     box-shadow: 0 0.75rem 3rem rgba(0, 0, 0, 0.25);
     padding: var(--space-2xl);
@@ -550,7 +681,7 @@
 
 .dashboard-auth-modal h3 {
     margin: var(--space-xl) 0 0 0;
-    color: #111827;
+    color: var(--text-primary);
     font-size: var(--text-lg);
     font-weight: 700;
 }
@@ -558,8 +689,8 @@
 .dashboard-auth-loader {
     width: 3rem;
     height: 3rem;
-    border: 0.3rem solid #e5e7eb;
-    border-top-color: #111827;
+    border: 0.3rem solid var(--border-soft);
+    border-top-color: var(--text-primary);
     border-radius: 50%;
     animation: dashboard-auth-spin 1s linear infinite;
     margin: 0 auto;
@@ -579,4 +710,927 @@
     .dashboard-main-content {
         padding: var(--space-md);
     }
+}
+
+.theme-toggle-item {
+    position: relative;
+}
+
+.theme-toggle-label {
+    flex: 1;
+}
+
+.theme-toggle-state {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.theme-toggle-switch {
+    width: 1.9rem;
+    height: 1rem;
+    border-radius: 999px;
+    background: var(--surface-muted);
+    border: 1px solid var(--border-medium);
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem;
+    margin-left: 0.1rem;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.theme-toggle-switch span {
+    width: 0.68rem;
+    height: 0.68rem;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.theme-toggle-item[aria-pressed='true'] .theme-toggle-switch {
+    background: color-mix(in srgb, var(--accent), transparent 68%);
+    border-color: color-mix(in srgb, var(--accent), transparent 36%);
+}
+
+.theme-toggle-item[aria-pressed='true'] .theme-toggle-switch span {
+    transform: translateX(0.82rem);
+    background: var(--accent);
+}
+
+html[data-theme='dark'] .dashboard-sidebar,
+html[data-theme='dark'] .dashboard-header,
+html[data-theme='dark'] .user-menu-popup {
+    backdrop-filter: blur(1.2rem);
+}
+
+html[data-theme='dark'] .sidebar-logo,
+html[data-theme='dark'] .header-logo {
+    filter: brightness(0) invert(1) drop-shadow(0 0.1rem 0.45rem rgba(255, 255, 255, 0.12));
+}
+
+html[data-theme='dark'] .dashboard-container {
+    background-image:
+        radial-gradient(circle, color-mix(in srgb, var(--foreground), transparent 88%) 1px, transparent 1px),
+        radial-gradient(farthest-corner at 0% 100%, color-mix(in srgb, var(--accent), transparent 70%) 0%, transparent 62%);
+}
+
+html[data-theme='dark'] .dashboard-main-content {
+    color: var(--text-primary);
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.add-bridge-container,
+    .add-instance-container,
+    .bridges-container,
+    .select-dcd-container,
+    .select-templates-container,
+    .instances-container,
+    .user-management-container,
+    .edit-user-container,
+    .bridge-config-container,
+    .topic-browser-container,
+    .getconfig-container,
+    .grafana-dashboard-container,
+    .home-container,
+    .explore-container) {
+    color: var(--text-primary);
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.add-bridge-card,
+    .add-instance-card,
+    .bridges-card,
+    .bridges-table-card,
+    .bridges-empty-card,
+    .bridges-filter-card,
+    .select-dcd-card,
+    .select-template-card,
+    .instances-card,
+    .instances-table-card,
+    .user-management-card,
+    .user-table-card,
+    .edit-user-card,
+    .bridge-config-section,
+    .bridge-config-card,
+    .general-card,
+    .connection-card,
+    .readflow-card,
+    .readflow-panel,
+    .opcua-panel,
+    .opcua-card,
+    .topic-browser-card,
+    .getconfig-card,
+    .modal-content,
+    .bridges-delete-modal,
+    .bridges-queue-modal,
+    .bridge-config-queue-modal,
+    .dashboard-auth-modal) {
+    background-color: var(--surface-raised) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+    box-shadow: var(--shadow-md);
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(h1, h2, h3, h4, h5, h6,
+    .bridges-title,
+    .bridge-config-title,
+    .general-section-title,
+    .connection-section-title,
+    .readflow-section-title,
+    .modal-title,
+    .section-title,
+    .card-title,
+    label,
+    th) {
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(p,
+    span,
+    td,
+    .bridges-subtitle,
+    .bridge-config-subtitle,
+    .form-help,
+    .helper-text,
+    .muted-text,
+    .empty-text,
+    .section-subtitle,
+    .card-subtitle) {
+    border-color: var(--border-soft);
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridges-subtitle,
+    .bridge-config-subtitle,
+    .form-help,
+    .helper-text,
+    .muted-text,
+    .empty-text,
+    .section-subtitle,
+    .card-subtitle,
+    .table-muted,
+    small) {
+    color: var(--text-muted) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(input, textarea, select, .code-editor, .yaml-editor, .monaco-placeholder) {
+    background-color: var(--control-bg) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-medium) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(input, textarea)::placeholder {
+    color: var(--text-subtle) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(input:disabled, textarea:disabled, select:disabled, .disabled) {
+    background-color: var(--control-disabled) !important;
+    color: var(--text-subtle) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(table, thead, tbody, tr, th, td) {
+    border-color: var(--border-soft) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(thead, .table-header, .bridges-table thead, .instances-table thead, .user-table thead) {
+    background-color: var(--surface-raised) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(tr:hover, .table-row:hover, .dropdown-item:hover, .menu-item:hover) {
+    background-color: var(--surface-hover) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.dropdown-menu, .action-menu, .bridges-action-menu) {
+    background-color: var(--surface-raised) !important;
+    border-color: var(--border-soft) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.status-active, .status-online, .badge-success) {
+    background-color: var(--success-bg) !important;
+    color: var(--success) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.status-pending, .badge-warning) {
+    background-color: var(--warning-bg) !important;
+    color: var(--warning) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.status-inactive, .status-offline, .badge-danger, .bridge-config-error-msg, .bridges-error) {
+    background-color: var(--danger-bg) !important;
+    border-color: var(--danger-border) !important;
+    color: var(--danger) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.btn-black-header,
+    .bridges-btn-black,
+    .bridge-config-save-btn,
+    .btn-save,
+    .btn-continue.active,
+    .primary-btn,
+    .submit-btn) {
+    background-color: var(--active-bg) !important;
+    border-color: var(--active-bg) !important;
+    color: var(--active-text) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.back-btn,
+    .bridges-back-btn,
+    .bridge-config-back-btn,
+    .modal-close-btn,
+    .secondary-btn,
+    .cancel-btn) {
+    background-color: var(--surface-muted) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-tab, .tab-btn, .eu-tab) {
+    color: var(--text-muted) !important;
+    border-color: var(--border-soft) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-tab.active, .tab-btn.active, .eu-tab.active) {
+    background-color: var(--surface-raised) !important;
+    color: var(--text-primary) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-step-line, .step-line) {
+    background-color: var(--border-medium) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-step-line.full-active, .bridge-config-step-line.progress-42, .bridge-config-step-line.progress-90, .step-line.active) {
+    background-color: var(--active-bg) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-step-circle, .step-circle) {
+    background-color: var(--surface-muted) !important;
+    border-color: var(--border-medium) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-step-item.active .bridge-config-step-circle, .bridge-config-step-item.completed .bridge-config-step-circle) {
+    background-color: var(--active-bg) !important;
+    border-color: var(--active-bg) !important;
+    color: var(--active-text) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(pre, code, .code-text-scroll) {
+    background-color: #071018 !important;
+    color: #d9e7f5 !important;
+    border-color: var(--border-soft) !important;
+}
+
+/* Complete dashboard dark theme pass. These rules intentionally sit last. */
+html[data-theme='dark'] .dashboard-main-content {
+    background-color: var(--surface-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content>* {
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is([class*='container'],
+    [class*='page'],
+    [class*='content'],
+    [class*='body'],
+    [class*='grid'],
+    [class*='list']) {
+    background-color: transparent !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is([class$='-card'],
+    [class*='-card '],
+    [class$='-panel'],
+    [class*='-panel '],
+    [class$='-table-wrapper'],
+    [class*='-table-wrapper '],
+    [class$='-empty-state'],
+    [class*='-empty-state '],
+    [class$='-modal'],
+    [class*='-modal '],
+    [class$='-dialog'],
+    [class*='-dialog '],
+    [class$='-popup'],
+    [class*='-popup '],
+    [class$='-dropdown'],
+    [class*='-dropdown '],
+    [class$='-menu'],
+    [class*='-menu '],
+    [class$='-section'],
+    [class*='-section ']) {
+    background-color: var(--surface-raised) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(thead,
+    th,
+    .levels-row td) {
+    background-color: var(--surface-raised) !important;
+    border-color: var(--border-soft) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(h1, h2, h3, h4, h5, h6,
+    [class*='title'],
+    [class*='name'],
+    [class*='label'],
+    label,
+    strong,
+    th,
+    td) {
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(p,
+    small,
+    [class*='subtitle'],
+    [class*='description'],
+    [class*='sub'],
+    [class*='helper'],
+    [class*='muted'],
+    [class*='id'],
+    [class*='email']) {
+    color: var(--text-muted) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(input,
+    textarea,
+    select,
+    option,
+    [contenteditable='true'],
+    .code-editor,
+    .yaml-editor,
+    .monaco-placeholder,
+    .code-text-scroll,
+    .bridge-code-block,
+    .opcua-code-modal-textarea,
+    .opcua-action-textarea) {
+    background-color: var(--control-bg) !important;
+    border-color: var(--border-medium) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(table, tr, th, td) {
+    border-color: var(--border-soft) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(tr:hover,
+    [class$='-card']:hover,
+    [class*='-card ']:hover,
+    [class$='-item']:hover,
+    [class*='-item ']:hover,
+    [class$='-option']:hover,
+    [class*='-option ']:hover) {
+    background-color: var(--surface-hover) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(button,
+    [role='button'],
+    a[class*='btn'],
+    [class*='btn']) {
+    border-color: var(--border-medium);
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.btn-black,
+    .btn-black-header,
+    .bridges-btn-black,
+    .bridge-config-save-btn,
+    .btn-save,
+    .btn-continue.active,
+    .primary-btn,
+    .submit-btn,
+    .header-add-btn) {
+    background-color: var(--active-bg) !important;
+    border-color: var(--active-bg) !important;
+    color: var(--active-text) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.btn-black,
+    .btn-black-header,
+    .bridges-btn-black,
+    .bridge-config-save-btn,
+    .btn-save,
+    .btn-continue.active,
+    .primary-btn,
+    .submit-btn,
+    .header-add-btn) * {
+    color: inherit !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.back-btn,
+    .bridges-back-btn,
+    .bridge-config-back-btn,
+    .select-template-back-btn,
+    .modal-close-btn,
+    .secondary-btn,
+    .cancel-btn,
+    .expand-btn,
+    .action-btn) {
+    background-color: var(--surface-muted) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.status-active,
+    .status-online,
+    .select-dcd-status-active,
+    .badge-success) {
+    background-color: var(--success-bg) !important;
+    border-color: color-mix(in srgb, var(--success), transparent 54%) !important;
+    color: var(--success) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.status-pending,
+    .badge-warning) {
+    background-color: var(--warning-bg) !important;
+    border-color: color-mix(in srgb, var(--warning), transparent 54%) !important;
+    color: var(--warning) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.status-inactive,
+    .status-offline,
+    .status-decommissioned,
+    .badge-danger,
+    [class*='error']) {
+    background-color: var(--danger-bg) !important;
+    border-color: var(--danger-border) !important;
+    color: var(--danger) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.status-unspecified,
+    .status-unknown,
+    .status-suspended,
+    .select-dcd-status-pill) {
+    background-color: var(--surface-muted) !important;
+    border-color: var(--border-medium) !important;
+    color: var(--text-secondary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.home-card,
+    .home-panel,
+    .select-dcd-card,
+    .instances-table-wrapper,
+    .template-card,
+    .bridges-table-card,
+    .bridge-config-body > div,
+    .general-form-card,
+    .connection-form-card,
+    .readflow-form-card) {
+    box-shadow: var(--shadow-md) !important;
+}
+
+html[data-theme='dark'] .popup-item.theme-toggle-item {
+    background-color: transparent;
+}
+
+html[data-theme='dark'] .popup-item.theme-toggle-item:hover {
+    background-color: var(--surface-hover);
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.modal-content,
+    .legal-modal-content,
+    .queue-modal,
+    .confirmation-modal) {
+    background-color: var(--surface-raised) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Dark theme readability polish. Keep labels/headings clean, not boxed. */
+html[data-theme='dark'] .dashboard-main-content :is([class$='-header'],
+    [class*='-header '],
+    [class$='-header-wrapper'],
+    [class*='-header-wrapper '],
+    [class$='-header-container'],
+    [class*='-header-container '],
+    [class$='-title'],
+    [class*='-title '],
+    [class$='-section-title'],
+    [class*='-section-title '],
+    [class$='-heading'],
+    [class*='-heading ']) {
+    background-color: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.home-card,
+    .home-panel,
+    .select-dcd-card,
+    .instances-table-wrapper,
+    .template-card,
+    .bridge-config-body > div,
+    .opcua-readflow-card,
+    .opcua-settings-panel,
+    .opcua-section-content) {
+    background-color: var(--surface-raised) !important;
+    border: 1px solid var(--border-soft) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.home-card-header,
+    .home-panel-header,
+    .opcua-readflow-header,
+    .opcua-selected-heading,
+    .bridge-config-header,
+    .select-dcd-header,
+    .instances-header-container,
+    .select-template-header,
+    .template-controls-row) {
+    background: transparent !important;
+    border-color: transparent !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-tabs,
+    .opcua-view-toggle,
+    .opcua-section-nav) {
+    background-color: var(--surface-muted) !important;
+    border-color: var(--border-soft) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-tab,
+    .opcua-view-toggle button,
+    .opcua-section-nav button) {
+    background-color: transparent !important;
+    color: var(--text-muted) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-tab.active,
+    .opcua-view-toggle button.active,
+    .opcua-section-nav button.active) {
+    background-color: var(--surface-raised) !important;
+    color: var(--text-primary) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-tab.active::after,
+    .bridge-config-step-line.half-active::before,
+    .bridge-config-step-line.progress-42::before,
+    .bridge-config-step-line.progress-90::before,
+    .bridge-config-step-line.full-active::before,
+    .template-step-line.half-active::before,
+    .template-step-line.progress-68::before) {
+    background-color: var(--active-bg) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.opcua-section-nav small,
+    .opcua-field-row p,
+    .opcua-additional-field small,
+    .select-dcd-subtitle,
+    .instances-subtitle,
+    .template-section-title span) {
+    color: var(--text-muted) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.warning-box,
+    .config-warning,
+    [class*='warning']) {
+    background-color: var(--warning-bg) !important;
+    border-color: color-mix(in srgb, var(--warning), transparent 45%) !important;
+    color: var(--warning) !important;
+}
+
+html[data-theme='dark'] .grafana-wrapper,
+html[data-theme='dark'] .grafana-frame-container {
+    background-color: var(--surface-soft) !important;
+}
+
+/* Dark theme component finish: remove light islands and accidental label blocks. */
+html[data-theme='dark'] .dashboard-main-content :is(.select-dcd-card-content,
+    .select-dcd-card-top,
+    .levels-content,
+    .level-item,
+    .bridge-general-form-row,
+    .bridge-general-form-row label,
+    .bridge-general-level-input-wrap,
+    .eu-form,
+    .eu-input-row,
+    .eu-input-row label,
+    .pass-input-wrapper,
+    .getconfig-title-wrap,
+    .bridge-condition-field,
+    .bridge-condition-field label,
+    .opcua-additional-row,
+    .opcua-additional-field,
+    .opcua-additional-field label,
+    .opcua-field-row,
+    .opcua-field-row label,
+    .opcua-metadata-heading,
+    .opcua-clause-list,
+    .opcua-node-actions) {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.select-dcd-card,
+    .instances-table-wrapper,
+    .bridge-processing-visual-shell,
+    .bridge-processing-section,
+    .opcua-node-table-wrap,
+    .opcua-node-grid-shell,
+    .opcua-additional-empty,
+    .opcua-downsampler-summary,
+    .opcua-condition-card,
+    .opcua-condition-action-editor,
+    .eu-card,
+    .getconfig-editor-card) {
+    background: var(--surface-raised) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.instances-table th,
+    .instances-table td,
+    .bridge-processing-section-header,
+    .bridge-processing-row-actions,
+    .opcua-node-table th,
+    .opcua-node-table td,
+    .opcua-condition-header,
+    .opcua-condition-action-lines) {
+    background: var(--surface-raised) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.instances-table tbody tr,
+    .opcua-node-table tbody tr,
+    .opcua-processor-panel .opcua-node-table th,
+    .opcua-processor-panel .opcua-node-table td) {
+    background: var(--surface-raised) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-step-line,
+    .step-line,
+    .template-step-line) {
+    background-color: var(--active-bg) !important;
+    opacity: 0.95;
+}
+
+html[data-theme='dark'] .dashboard-main-content .bridge-config-step-line::before,
+html[data-theme='dark'] .dashboard-main-content .step-line::before,
+html[data-theme='dark'] .dashboard-main-content .template-step-line::before,
+html[data-theme='dark'] .dashboard-main-content .bridge-config-step-line.half-active::before,
+html[data-theme='dark'] .dashboard-main-content .bridge-config-step-line.progress-42::before,
+html[data-theme='dark'] .dashboard-main-content .bridge-config-step-line.progress-90::before,
+html[data-theme='dark'] .dashboard-main-content .bridge-config-step-line.full-active::before,
+html[data-theme='dark'] .dashboard-main-content .template-step-line.half-active::before,
+html[data-theme='dark'] .dashboard-main-content .template-step-line.progress-68::before {
+    background-color: var(--active-bg) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-save-btn,
+    .getconfig-save-btn,
+    .btn-save,
+    .header-add-btn,
+    .bridge-general-add-level-btn,
+    .bridge-add-condition-btn,
+    .opcua-outline-btn,
+    .opcua-secondary-btn,
+    .opcua-add-clause-btn,
+    .opcua-add-metadata-btn,
+    .bridge-processing-section-header) {
+    background: var(--active-bg) !important;
+    border-color: var(--active-bg) !important;
+    color: var(--active-text) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-save-btn:disabled,
+    .getconfig-save-btn:disabled,
+    .btn-save:disabled,
+    .bridge-general-add-level-btn:disabled,
+    .bridge-add-condition-btn:disabled,
+    .opcua-outline-btn:disabled,
+    .opcua-secondary-btn:disabled,
+    .opcua-add-clause-btn:disabled,
+    .opcua-add-metadata-btn:disabled) {
+    background: var(--surface-muted) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-muted) !important;
+    opacity: 0.85 !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.action-btn,
+    .expand-btn,
+    .bridge-processing-icon-btn,
+    .opcua-icon-btn,
+    .bridge-general-level-trash-btn,
+    .eye-btn) {
+    background: var(--surface-muted) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border-soft) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.action-btn:hover,
+    .expand-btn:hover,
+    .bridge-processing-icon-btn:hover,
+    .opcua-icon-btn:hover,
+    .bridge-general-level-trash-btn:hover,
+    .eye-btn:hover) {
+    background: var(--surface-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.action-dropdown,
+    .dropdown-menu,
+    .bridges-action-menu,
+    .user-menu-popup) {
+    background: var(--surface-raised) !important;
+    border-color: var(--border-soft) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.dropdown-item,
+    .dropdown-item-icon,
+    .action-dropdown button,
+    .bridges-action-menu button) {
+    color: var(--text-secondary) !important;
+    background: transparent !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.dropdown-item:hover,
+    .action-dropdown button:hover,
+    .bridges-action-menu button:hover) {
+    background: var(--surface-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.dropdown-item.text-danger,
+    .dropdown-item.text-danger .dropdown-item-icon,
+    .bridge-delete-condition-btn) {
+    color: var(--danger) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(input,
+    textarea,
+    select,
+    .eu-select,
+    .bridge-condition-input,
+    .bridge-condition-textarea,
+    .bridge-readflow-select-wrapper select,
+    .opcua-node-toolbar input[type='search'],
+    .opcua-node-table input,
+    .opcua-node-table select,
+    .opcua-condition-rule input,
+    .opcua-condition-rule select,
+    .opcua-clause-joiner,
+    .opcua-action-textarea) {
+    background: var(--control-bg) !important;
+    border-color: var(--border-medium) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(input:disabled,
+    textarea:disabled,
+    select:disabled,
+    .eu-input-row input:disabled,
+    .bridge-readflow-select-wrapper select:disabled) {
+    background: var(--control-disabled) !important;
+    color: var(--text-subtle) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(input::placeholder,
+    textarea::placeholder,
+    .opcua-node-toolbar input[type='search']::placeholder,
+    .opcua-condition-rule input::placeholder) {
+    color: var(--text-subtle) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.opcua-condition-header span,
+    .bridge-condition-preview,
+    .opcua-downsampler-summary p,
+    .opcua-downsampler-summary li,
+    .opcua-additional-empty p,
+    .eu-card-desc,
+    .getconfig-title-wrap p) {
+    color: var(--text-muted) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.opcua-downsampler-summary p button,
+    .getconfig-warning-box strong,
+    .getconfig-warning-box p,
+    .getconfig-warning-box svg) {
+    color: inherit !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content .getconfig-warning-box {
+    background: var(--warning-bg) !important;
+    border-color: color-mix(in srgb, var(--warning), transparent 45%) !important;
+    color: var(--warning) !important;
+}
+
+/* Dark stepper parity with light theme: muted track, bright progress segment. */
+html[data-theme='dark'] .dashboard-main-content :is(.step-line,
+    .template-step-line,
+    .bridge-config-step-line) {
+    background-color: var(--border-medium) !important;
+    opacity: 1 !important;
+    border-radius: 999px;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.step-line.half-active::before,
+    .step-line.progress-34::before,
+    .template-step-line.half-active::before,
+    .template-step-line.progress-68::before,
+    .bridge-config-step-line.half-active::before,
+    .bridge-config-step-line.progress-42::before,
+    .bridge-config-step-line.progress-90::before,
+    .bridge-config-step-line.full-active::before) {
+    background-color: var(--active-bg) !important;
+    border-radius: inherit;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.step-circle,
+    .template-step-circle,
+    .bridge-config-step-circle) {
+    background-color: var(--surface-soft) !important;
+    border-color: var(--border-medium) !important;
+    color: var(--text-muted) !important;
+    box-shadow: none !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.step-item.active .step-circle,
+    .template-step-item.active .template-step-circle,
+    .bridge-config-step-item.active .bridge-config-step-circle) {
+    background-color: var(--active-bg) !important;
+    border-color: var(--active-bg) !important;
+    color: var(--active-text) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-step-item.completed .bridge-config-step-circle) {
+    background-color: var(--surface-raised) !important;
+    border-color: var(--active-bg) !important;
+    color: var(--active-bg) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.step-item p,
+    .template-step-item p,
+    .bridge-config-step-item p) {
+    color: var(--text-muted) !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.step-item.active p,
+    .template-step-item.active p,
+    .bridge-config-step-item.active p) {
+    color: var(--text-primary) !important;
+}
+
+/* Dark bridge forms: keep outer surfaces, remove nested box-within-box outlines. */
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-body,
+    .bridge-config-body > div,
+    .bridge-general-card,
+    .bridge-connection-card,
+    .bridge-readflow-config-card,
+    .bridge-readflow-section-card,
+    .general-section,
+    .opcua-readflow-card,
+    .opcua-settings-panel,
+    .opcua-processor-panel,
+    .opcua-section-content,
+    .opcua-processing-card,
+    .bridge-processing-visual-shell,
+    .bridge-processing-section,
+    .opcua-condition-card,
+    .opcua-downsampler-summary,
+    .opcua-additional-empty) {
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-general-card,
+    .bridge-connection-card,
+    .bridge-readflow-config-card,
+    .bridge-readflow-section-card,
+    .general-section,
+    .opcua-readflow-card,
+    .opcua-settings-panel,
+    .opcua-processor-panel,
+    .opcua-section-content,
+    .opcua-processing-card,
+    .bridge-processing-visual-shell,
+    .bridge-processing-section,
+    .opcua-condition-card,
+    .opcua-downsampler-summary,
+    .opcua-additional-empty) {
+    background: transparent !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-general-card-header,
+    .bridge-readflow-card-header,
+    .bridge-processing-section-header,
+    .opcua-readflow-header,
+    .opcua-condition-header,
+    .opcua-selected-heading) {
+    border-bottom-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+html[data-theme='dark'] .dashboard-main-content :is(.bridge-config-body > div,
+    .bridge-config-tabs,
+    .opcua-section-nav,
+    .opcua-view-toggle,
+    .bridge-processing-section-content) {
+    border-color: transparent !important;
 }
